@@ -1,0 +1,74 @@
+version: "3"
+
+dotenv: [".infra.env"]
+
+vars:
+  BOOTSTRAP_DIR: bootstrap
+  K8S_IMAGE_DIR: images/k8s-node
+  SCRIPTS_DIR: scripts
+
+tasks:
+  # --- PACKER / IMAGES ---
+  images:k8s:fmt:
+    dir: "{{.K8S_IMAGE_DIR}}"
+    cmds:
+      - packer fmt .
+
+  images:k8s:validate:
+    desc: Validate K8s Packer templates
+    dir: "{{.K8S_IMAGE_DIR}}"
+    cmds:
+      - packer init .
+      - packer validate .
+
+  images:k8s:build:
+    desc: Build the Kubernetes AMI
+    dir: "{{.K8S_IMAGE_DIR}}"
+    cmds:
+      - packer init .
+      - packer build .
+
+  # --- BOOTSTRAP ---
+  bootstrap:gen-vars:
+    desc: Generate terraform.tfvars
+    dir: "{{.SCRIPTS_DIR}}"
+    cmds:
+      - ./gen_pkrvars.sh
+    sources:
+      - ./gen_pkrvars.sh
+    generates:
+      - ../{{.BOOTSTRAP_DIR}}/terraform.tfvars
+
+  bootstrap:plan:
+    desc: Plan bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    deps: [bootstrap:gen-vars]
+    cmds:
+      - terraform init
+      - terraform plan
+
+  bootstrap:apply:
+    desc: Apply bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - terraform apply -auto-approve
+
+  bootstrap:init:
+    desc: Initialize bootstrap with partial backend injection
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - >
+        terraform init 
+        -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" 
+        -backend-config="key=bootstrap/terraform.tfstate" 
+        -backend-config="region={{.AWS_REGION}}" 
+        -backend-config="profile={{.AWS_PROFILE}}"
+        -backend-config="encrypt=true"
+        -migrate-state 
+        -force-copy
+      - rm -f terraform.tfstate terraform.tfstate.backup
+
+  # --- ALIAS ---
+  build-ami:
+    desc: Shortcut to build K8s AMI
+    deps: [images:k8s:build]
