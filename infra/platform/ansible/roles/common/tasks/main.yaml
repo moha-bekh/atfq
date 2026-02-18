@@ -1,0 +1,41 @@
+---
+- name: Ensure hostname is correctly set
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Add hostname to /etc/hosts for local resolution
+  lineinfile:
+    path: /etc/hosts
+    line: "127.0.1.1 {{ inventory_hostname }}"
+    state: present
+
+- name: Ensure containerd is enabled and running
+  systemd:
+    name: containerd
+    enabled: yes
+    state: started
+
+- name: Load required kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Apply K8s sysctl network parameters
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/k8s.conf
+    reload: yes
+  loop:
+    - { key: "net.bridge.bridge-nf-call-iptables", value: "1" }
+    - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { key: "net.ipv4.ip_forward", value: "1" }
+
+- name: Disable swap (Kubeadm requirement)
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  changed_when: false
