@@ -25,7 +25,7 @@ variable "ssh_user" {
 variable "ami_prefix" {
   type        = string
   description = "Prefix for the generated AMI name. A timestamp will be appended to ensure uniqueness."
-  default     = "k8s-node-ubuntu"
+  default     = "atfq-k8s-node"
 }
 
 variable "k8s_version" {

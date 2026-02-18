@@ -4,7 +4,9 @@
     "awscli2@latest",
     "packer@latest",
     "go-task@latest",
-    "terraform@latest"
+    "terraform@latest",
+    "ansible@latest",
+    "kubernetes-helm@latest"
   ],
   "shell": {
     "init_hook": [

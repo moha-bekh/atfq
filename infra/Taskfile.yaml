@@ -3,9 +3,10 @@ version: "3"
 dotenv: [".infra.env"]
 
 vars:
-  BOOTSTRAP_DIR: bootstrap
   K8S_IMAGE_DIR: images/k8s-node
-  SCRIPTS_DIR: scripts
+  BOOTSTRAP_DIR: bootstrap
+  NETWORK_DIR: iac/network
+  COMPUTE_DIR: iac/compute
 
 tasks:
   # --- PACKER / IMAGES ---
@@ -29,15 +30,6 @@ tasks:
       - packer build .
 
   # --- BOOTSTRAP ---
-  bootstrap:gen-vars:
-    desc: Generate terraform.tfvars
-    dir: "{{.SCRIPTS_DIR}}"
-    cmds:
-      - ./gen_pkrvars.sh
-    sources:
-      - ./gen_pkrvars.sh
-    generates:
-      - ../{{.BOOTSTRAP_DIR}}/terraform.tfvars
 
   bootstrap:plan:
     desc: Plan bootstrap foundation
@@ -68,7 +60,115 @@ tasks:
         -force-copy
       - rm -f terraform.tfstate terraform.tfstate.backup
 
+  # --- IAC ---
+
+  # --- IAC NETWORK ---
+  iac:network:init:
+    desc: Init Network layer
+    cmds:
+      - |
+        terraform -chdir={{.NETWORK_DIR}} init \
+          -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -backend-config="key=network/terraform.tfstate" \
+          -backend-config="region={{.AWS_REGION}}" \
+          -backend-config="profile={{.AWS_PROFILE}}"
+
+  iac:network:apply:
+    desc: Apply Network layer
+    deps: [iac:network:init]
+    cmds:
+      - |
+        terraform -chdir={{.NETWORK_DIR}} apply -auto-approve \
+          -var="region={{.AWS_REGION}}" \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}" \
+          -var="vpc_cidr={{.AWS_VPC_CIDR}}" \
+          -var="public_subnet_cidr={{.AWS_PUBLIC_SUBNET_CIDR}}"
+
+  iac:network:destroy:
+    desc: "Destroy Network layer"
+    dir: iac/network
+    cmds:
+      - |
+        terraform destroy -auto-approve \
+          -var="region={{.AWS_REGION}}" \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}" \
+          -var="vpc_cidr={{.AWS_VPC_CIDR}}" \
+          -var="public_subnet_cidr={{.AWS_PUBLIC_SUBNET_CIDR}}"
+
+  # --- IAC COMPUTE ---
+  iac:compute:init:
+    desc: Init Compute layer
+    cmds:
+      - |
+        terraform -chdir={{.COMPUTE_DIR}} init \
+          -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -backend-config="key=compute/terraform.tfstate" \
+          -backend-config="region={{.AWS_REGION}}" \
+          -backend-config="profile={{.AWS_PROFILE}}"
+
+  iac:compute:apply:
+    desc: Apply Compute layer
+    deps: [iac:compute:init]
+    cmds:
+      - |
+        terraform -chdir={{.COMPUTE_DIR}} apply -auto-approve \
+          -var="region={{.AWS_REGION}}" \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}" \
+          -var="state_bucket_name={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}" \
+          -var="ssh_key_name={{.SSH_KEY_NAME}}" \
+          -var="pod_network_cidr={{.AWS_POD_NETWORK_CIDR}}"
+
+  iac:compute:destroy:
+    desc: "Destroy Compute layer"
+    dir: iac/compute
+    cmds:
+      - |
+        terraform destroy -auto-approve \
+          -var="region={{.AWS_REGION}}" \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}" \
+          -var="state_bucket_name={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}" \
+          -var="ssh_key_name={{.SSH_KEY_NAME}}" \
+          -var="pod_network_cidr={{.AWS_POD_NETWORK_CIDR}}"
+
+  iac:compute:clean:
+    desc: Remove generated ansible files
+    cmds:
+      - rm -f platform/ansible/inventory.yaml
+      - rm -f platform/ansible/ansible.cfg
+      - rm -f platform/ansible/group_vars/all.yaml
+
   # --- ALIAS ---
   build-ami:
     desc: Shortcut to build K8s AMI
     deps: [images:k8s:build]
+
+  deploy:infra:
+    desc: Deploy full infrastructure (Network + Compute)
+    cmds:
+      - task: iac:network:apply
+      - task: iac:compute:apply
+
+  deploy:cluster:
+    desc: "Initialize the Kubernetes cluster using Ansible and Cilium"
+    dir: platform/ansible
+    pre_conditions:
+      - sh: test -f inventory.yaml
+        msg: "Inventory file not found. Run 'task iac:compute:apply' first."
+      - sh: test -f main.yaml
+        msg: "Ansible main playbook not found."
+    cmds:
+      - mkdir -p ../../config
+      - |
+        ansible-playbook -i inventory.yaml main.yaml \
+          -e "project_name={{.PROJECT_NAME}}" \
+          -e "pod_network_cidr={{.POD_NETWORK_CIDR}}" \
+          --private-key ~/.ssh/{{.PROJECT_NAME}}
+    env:
+      ANSIBLE_HOST_KEY_CHECKING: "False"
+      ANSIBLE_CONFIG: "./ansible.cfg"

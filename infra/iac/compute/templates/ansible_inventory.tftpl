@@ -1,0 +1,21 @@
+all:
+  vars:
+    ansible_user: ${username}
+    ansible_ssh_private_key_file: ${ssh_key_path}
+  children:
+    controllers:
+      hosts:
+%{ for name, instance in nodes ~}
+%{ if instance.tags.Role == "master" ~}
+        ${name}:
+          ansible_host: ${instance.public_ip}
+%{ endif ~}
+%{ endfor ~}
+    workers:
+      hosts:
+%{ for name, instance in nodes ~}
+%{ if instance.tags.Role == "worker" ~}
+        ${name}:
+          ansible_host: ${instance.public_ip}
+%{ endif ~}
+%{ endfor ~}
