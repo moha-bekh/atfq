@@ -51,10 +51,9 @@ tasks:
     cmds:
       - >
         terraform init 
+        -backend-config="profile={{.AWS_PROFILE}}"
         -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" 
         -backend-config="key=bootstrap/terraform.tfstate" 
-        -backend-config="region={{.AWS_REGION}}" 
-        -backend-config="profile={{.AWS_PROFILE}}"
         -backend-config="encrypt=true"
         -migrate-state 
         -force-copy
@@ -68,10 +67,9 @@ tasks:
     cmds:
       - |
         terraform -chdir={{.NETWORK_DIR}} init \
+          -backend-config="profile={{.AWS_PROFILE}}" \
           -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
-          -backend-config="key=network/terraform.tfstate" \
-          -backend-config="region={{.AWS_REGION}}" \
-          -backend-config="profile={{.AWS_PROFILE}}"
+          -backend-config="key=network/terraform.tfstate"
 
   iac:network:apply:
     desc: Apply Network layer
@@ -79,11 +77,8 @@ tasks:
     cmds:
       - |
         terraform -chdir={{.NETWORK_DIR}} apply -auto-approve \
-          -var="region={{.AWS_REGION}}" \
           -var="profile={{.AWS_PROFILE}}" \
-          -var="account_id={{.AWS_ACCOUNT_ID}}" \
-          -var="vpc_cidr={{.AWS_VPC_CIDR}}" \
-          -var="public_subnet_cidr={{.AWS_PUBLIC_SUBNET_CIDR}}"
+          -var="account_id={{.AWS_ACCOUNT_ID}}"
 
   iac:network:destroy:
     desc: "Destroy Network layer"
@@ -91,11 +86,8 @@ tasks:
     cmds:
       - |
         terraform destroy -auto-approve \
-          -var="region={{.AWS_REGION}}" \
           -var="profile={{.AWS_PROFILE}}" \
-          -var="account_id={{.AWS_ACCOUNT_ID}}" \
-          -var="vpc_cidr={{.AWS_VPC_CIDR}}" \
-          -var="public_subnet_cidr={{.AWS_PUBLIC_SUBNET_CIDR}}"
+          -var="account_id={{.AWS_ACCOUNT_ID}}"
 
   # --- IAC COMPUTE ---
   iac:compute:init:
@@ -103,10 +95,9 @@ tasks:
     cmds:
       - |
         terraform -chdir={{.COMPUTE_DIR}} init \
+          -backend-config="profile={{.AWS_PROFILE}}" \
           -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
-          -backend-config="key=compute/terraform.tfstate" \
-          -backend-config="region={{.AWS_REGION}}" \
-          -backend-config="profile={{.AWS_PROFILE}}"
+          -backend-config="key=compute/terraform.tfstate"
 
   iac:compute:apply:
     desc: Apply Compute layer
@@ -114,13 +105,10 @@ tasks:
     cmds:
       - |
         terraform -chdir={{.COMPUTE_DIR}} apply -auto-approve \
-          -var="region={{.AWS_REGION}}" \
           -var="profile={{.AWS_PROFILE}}" \
           -var="account_id={{.AWS_ACCOUNT_ID}}" \
           -var="state_bucket_name={{.AWS_S3_STATE_BUCKET_NAME}}" \
-          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}" \
-          -var="ssh_key_name={{.SSH_KEY_NAME}}" \
-          -var="pod_network_cidr={{.AWS_POD_NETWORK_CIDR}}"
+          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}"
 
   iac:compute:destroy:
     desc: "Destroy Compute layer"
@@ -128,20 +116,17 @@ tasks:
     cmds:
       - |
         terraform destroy -auto-approve \
-          -var="region={{.AWS_REGION}}" \
           -var="profile={{.AWS_PROFILE}}" \
           -var="account_id={{.AWS_ACCOUNT_ID}}" \
           -var="state_bucket_name={{.AWS_S3_STATE_BUCKET_NAME}}" \
-          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}" \
-          -var="ssh_key_name={{.SSH_KEY_NAME}}" \
-          -var="pod_network_cidr={{.AWS_POD_NETWORK_CIDR}}"
+          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}"
 
   iac:compute:clean:
     desc: Remove generated ansible files
     cmds:
-      - rm -f platform/ansible/inventory.yaml
-      - rm -f platform/ansible/ansible.cfg
-      - rm -f platform/ansible/group_vars/all.yaml
+      - rm -f provisioning/inventory.yaml
+      - rm -f provisioning/ansible.cfg
+      - rm -f provisioning/group_vars/all.yaml
 
   # --- ALIAS ---
   build-ami:
@@ -154,20 +139,19 @@ tasks:
       - task: iac:network:apply
       - task: iac:compute:apply
 
-  deploy:cluster:
+  init:cluster:
     desc: "Initialize the Kubernetes cluster using Ansible and Cilium"
-    dir: platform/ansible
+    dir: provisioning
     pre_conditions:
       - sh: test -f inventory.yaml
         msg: "Inventory file not found. Run 'task iac:compute:apply' first."
       - sh: test -f main.yaml
         msg: "Ansible main playbook not found."
     cmds:
-      - mkdir -p ../../config
       - |
         ansible-playbook -i inventory.yaml main.yaml \
           -e "project_name={{.PROJECT_NAME}}" \
-          -e "pod_network_cidr={{.POD_NETWORK_CIDR}}" \
+          -e "pod_network_cidr={{.AWS_POD_NETWORK_CIDR}}" \
           --private-key ~/.ssh/{{.PROJECT_NAME}}
     env:
       ANSIBLE_HOST_KEY_CHECKING: "False"

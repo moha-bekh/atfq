@@ -5,7 +5,7 @@ resource "local_file" "ansible_inventory" {
     
     nodes = aws_instance.atfq_nodes
   })
-  filename = "${path.module}/../../platform/ansible/inventory.yaml"
+  filename = "${path.module}/../../provisioning/inventory.yaml"
 }
 
 resource "local_file" "ansible_cfg" {
@@ -13,7 +13,7 @@ resource "local_file" "ansible_cfg" {
     username     = var.username
     ssh_key_path = "~/.ssh/${var.ssh_key_name}"
   })
-  filename = "${path.module}/../../platform/ansible/ansible.cfg"
+  filename = "${path.module}/../../provisioning/ansible.cfg"
 }
 
 resource "local_file" "ansible_vars" {
@@ -26,5 +26,5 @@ resource "local_file" "ansible_vars" {
     
     controller_private_ip = [for n in aws_instance.atfq_nodes : n.private_ip if n.tags.Role == "master"][0]
   })
-  filename = "${path.module}/../../platform/ansible/group_vars/all.yaml"
+  filename = "${path.module}/../../provisioning/group_vars/all.yaml"
 }
