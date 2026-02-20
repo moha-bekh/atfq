@@ -1,7 +1,5 @@
 ---
-# 1. INITIALISATION DU MASTER (uniquement si c'est le contrôleur)
 - name: Initialize Kubernetes Control Plane
-  when: "'controllers' in group_names"
   command: >
     kubeadm init
     --pod-network-cidr={{ pod_network_cidr }}
@@ -10,13 +8,8 @@
   register: kubeadm_init
   args:
     creates: /etc/kubernetes/admin.conf
-  failed_when: 
-    - kubeadm_init.rc != 0 
-    - "'already exists' not in kubeadm_init.stderr"
 
-# 2. CONFIGURATION KUBECONFIG SUR LE MASTER
-- name: Create .kube directory for ubuntu user
-  when: "'controllers' in group_names"
+- name: Setup kubeconfig for ubuntu user
   file:
     path: /home/ubuntu/.kube
     state: directory
@@ -24,8 +17,7 @@
     group: ubuntu
     mode: "0755"
 
-- name: Copy admin.conf to user's kubeconfig
-  when: "'controllers' in group_names"
+- name: Copy admin.conf
   copy:
     src: /etc/kubernetes/admin.conf
     dest: /home/ubuntu/.kube/config
@@ -34,68 +26,42 @@
     group: ubuntu
     mode: "0600"
 
-# 3. GÉNÉRATION ET DISTRIBUTION DE LA COMMANDE DE JOIN
-- name: Generate cluster join command
-  when: "'controllers' in group_names"
+- name: Generate join command
   command: kubeadm token create --print-join-command
   register: join_command_raw
   changed_when: false
 
-- name: Set join command fact for all nodes
-  set_fact:
-    distributed_join_command: "{{ hostvars[groups['controllers'][0]]['join_command_raw']['stdout'] }}"
-  when: groups['controllers'][0] in hostvars
-  delegate_to: "{{ item }}"
-  delegate_facts: true
-  with_items: "{{ groups['all'] }}"
-
-# 4. JOIN DES WORKERS
-- name: Join Workers to cluster
-  when: "'workers' in group_names"
-  command: "{{ hostvars[inventory_hostname]['distributed_join_command'] }}"
-  args:
-    creates: /etc/kubernetes/kubelet.conf
-
-# 5. INSTALLATION DE HELM (SUR MASTER)
 - name: Install Helm
-  when: "'controllers' in group_names"
-  shell: |
-    set -o pipefail
-    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
   args:
-    executable: /bin/bash
     creates: /usr/local/bin/helm
 
-# 6. DÉPLOIEMENT CILIUM
-- name: Deploy Cilium Networking via Helm
-  when: "'controllers' in group_names"
+- name: Deploy Cilium Networking
   become: no
   shell: |
     helm repo add cilium https://helm.cilium.io/
     helm repo update
     helm upgrade --install cilium cilium/cilium --version 1.14.5 \
       --namespace kube-system \
-      --set operator.replicas=1
+      --set operator.replicas=1 \
+      --set k8sServiceHost={{ controller_private_ip }} \
+      --set k8sServicePort=6443 \
+      --set ipam.operator.clusterPoolIPv4PodCIDRList={{"{"}}{{ pod_network_cidr }}{{"}"}}
   environment:
     KUBECONFIG: /home/ubuntu/.kube/config
   register: cilium_install
   until: cilium_install is success
-  retries: 3
-  delay: 10
+  retries: 5
+  delay: 15
 
-# 7. RÉCUPÉRATION DU KUBECONFIG
-- name: Create local-ready kubeconfig with public IP
-  when: "'controllers' in group_names"
+- name: Prepare external kubeconfig
   shell: |
     cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config_external
-    PRIVATE_IP=$(hostname -I | awk '{print $1}')
-    sed -i "s|$PRIVATE_IP|{{ ansible_host }}|g" /home/ubuntu/.kube/config_external
-    chown ubuntu:ubuntu /home/ubuntu/.kube/config_external
+    sed -i "s|{{ controller_private_ip }}|{{ ansible_host }}|g" /home/ubuntu/.kube/config_external
   args:
     executable: /bin/bash
 
-- name: Fetch kubeconfig to local machine
-  when: "'controllers' in group_names"
+- name: Fetch kubeconfig
   fetch:
     src: /home/ubuntu/.kube/config_external
     dest: "{{ playbook_dir }}/../orchestration/kubeconfig_atfq"

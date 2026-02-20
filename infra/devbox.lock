@@ -181,6 +181,54 @@
         }
       }
     },
+    "helmfile@latest": {
+      "last_modified": "2026-01-23T17:20:52Z",
+      "resolved": "github:NixOS/nixpkgs/a1bab9e494f5f4939442a57a58d0449a109593fe#helmfile",
+      "source": "devbox-search",
+      "version": "1.1.9",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/hlnbzqjb3dfp7appzszbq24qfvhppiqg-helmfile-1.1.9",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/hlnbzqjb3dfp7appzszbq24qfvhppiqg-helmfile-1.1.9"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/qgadk4vnbvn4bjz7zs6iavz0rcr5673k-helmfile-1.1.9",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/qgadk4vnbvn4bjz7zs6iavz0rcr5673k-helmfile-1.1.9"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/n9qr07mdzcdld0b3ny16kikrpsjjywvi-helmfile-1.1.9",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/n9qr07mdzcdld0b3ny16kikrpsjjywvi-helmfile-1.1.9"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/cgq0s8s8j3jpymycms15xbmfdfzsc2hs-helmfile-1.1.9",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/cgq0s8s8j3jpymycms15xbmfdfzsc2hs-helmfile-1.1.9"
+        }
+      }
+    },
     "kubernetes-helm@latest": {
       "last_modified": "2026-01-23T17:20:52Z",
       "resolved": "github:NixOS/nixpkgs/a1bab9e494f5f4939442a57a58d0449a109593fe#kubernetes-helm",

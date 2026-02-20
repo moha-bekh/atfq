@@ -1,22 +1,17 @@
 ---
-- name: Check if node is already in cluster
+- name: Check if already joined
   stat:
     path: /etc/kubernetes/kubelet.conf
   register: kubelet_conf
 
-- name: Join the Kubernetes cluster
-  become: yes
-  command: "{{ hostvars['master-01']['distributed_join_command'] }}"
+- name: Join Cluster
+  command: "{{ hostvars['master-01']['join_command_raw']['stdout'] }}"
   when: 
     - not kubelet_conf.stat.exists
-    - hostvars['master-01']['distributed_join_command'] is defined
+    - hostvars['master-01']['join_command_raw'] is defined
   register: worker_join
-  failed_when:
-    - worker_join.rc != 0
-    - "'already exists' not in worker_join.stderr"
 
-- name: Ensure kubelet is running and enabled
-  become: yes
+- name: Ensure kubelet is running
   systemd:
     name: kubelet
     state: started

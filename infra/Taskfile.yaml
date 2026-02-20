@@ -9,7 +9,9 @@ vars:
   COMPUTE_DIR: iac/compute
 
 tasks:
+
   # --- PACKER / IMAGES ---
+
   images:k8s:fmt:
     dir: "{{.K8S_IMAGE_DIR}}"
     cmds:
@@ -25,30 +27,30 @@ tasks:
   images:k8s:build:
     desc: Build the Kubernetes AMI
     dir: "{{.K8S_IMAGE_DIR}}"
+    deps: [images:k8s:validate]
     cmds:
-      - packer init .
       - packer build .
 
   # --- BOOTSTRAP ---
 
+  bootstrap:local-init:
+    desc: Plan bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      # - mv backend.tf backend.tf.ignore
+      - terraform init
+
   bootstrap:plan:
     desc: Plan bootstrap foundation
     dir: "{{.BOOTSTRAP_DIR}}"
-    deps: [bootstrap:gen-vars]
     cmds:
-      - terraform init
       - terraform plan
 
-  bootstrap:apply:
-    desc: Apply bootstrap foundation
-    dir: "{{.BOOTSTRAP_DIR}}"
-    cmds:
-      - terraform apply -auto-approve
-
-  bootstrap:init:
+  bootstrap:remote-init:
     desc: Initialize bootstrap with partial backend injection
     dir: "{{.BOOTSTRAP_DIR}}"
     cmds:
+      - mv backend.tf.ignore backend.tf || true
       - >
         terraform init 
         -backend-config="profile={{.AWS_PROFILE}}"
@@ -59,9 +61,29 @@ tasks:
         -force-copy
       - rm -f terraform.tfstate terraform.tfstate.backup
 
-  # --- IAC ---
+  bootstrap:apply:
+    desc: Apply bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - terraform apply -auto-approve
+
+  bootstrap:destroy:
+    desc: destroy bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - terraform destroy -auto-approve
+
+  bootstrap:destroy:force:
+    desc: "Nuclear option: Switch to local state and destroy bootstrap S3 bucket"
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - mv backend.tf backend.tf.ignore || true
+      - terraform init -reconfigure
+      - terraform destroy -auto-approve
+      - rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
 
   # --- IAC NETWORK ---
+
   iac:network:init:
     desc: Init Network layer
     cmds:
@@ -72,13 +94,19 @@ tasks:
           -backend-config="key=network/terraform.tfstate"
 
   iac:network:apply:
-    desc: Apply Network layer
+    desc: Apply Network layer + Sync DNS
     deps: [iac:network:init]
     cmds:
       - |
         terraform -chdir={{.NETWORK_DIR}} apply -auto-approve \
           -var="profile={{.AWS_PROFILE}}" \
           -var="account_id={{.AWS_ACCOUNT_ID}}"
+
+
+  iac:network:output:ns:
+    desc: "Get Route53 Nameservers"
+    cmds:
+      - terraform -chdir=iac/network output route53_nameservers
 
   iac:network:destroy:
     desc: "Destroy Network layer"
@@ -90,6 +118,7 @@ tasks:
           -var="account_id={{.AWS_ACCOUNT_ID}}"
 
   # --- IAC COMPUTE ---
+
   iac:compute:init:
     desc: Init Compute layer
     cmds:
@@ -129,17 +158,46 @@ tasks:
       - rm -f provisioning/group_vars/all.yaml
 
   # --- ALIAS ---
-  build-ami:
+
+  image:build:
     desc: Shortcut to build K8s AMI
     deps: [images:k8s:build]
 
-  deploy:infra:
+  infra:apply:
     desc: Deploy full infrastructure (Network + Compute)
     cmds:
       - task: iac:network:apply
       - task: iac:compute:apply
 
-  init:cluster:
+  infra:apply-all:
+    desc: "Full automated deployment from zero to K8s cluster"
+    cmds:
+      - task: bootstrap:local-init
+      - task: bootstrap:apply
+      
+      - task: bootstrap:remote-init
+      
+      - task: iac:network:apply
+      - task: iac:compute:apply
+      
+      - task: cluster:init
+      - echo "Infrastructure is up! Don't forget to check your Name Servers if the DNS is failing."
+
+      - kubectl apply -f orchestration/test/nginx.yaml
+
+  infra:destroy:
+    desc: Destroy full infrastructure (Ordered)
+    cmds:
+      - task: iac:compute:destroy
+      - task: iac:network:destroy
+
+  infra:destroy-all:
+    desc: Destroy everything including bootstrap
+    cmds:
+      - task: infra:destroy
+      - task: bootstrap:destroy:force
+
+  cluster:init:
     desc: "Initialize the Kubernetes cluster using Ansible and Cilium"
     dir: provisioning
     pre_conditions:

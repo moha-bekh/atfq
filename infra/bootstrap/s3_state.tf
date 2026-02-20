@@ -1,6 +1,8 @@
 resource "aws_s3_bucket" "tf_state" {
   bucket = var.state_bucket_name
 
+  force_destroy = true # set to true ...
+
   lifecycle {
     prevent_destroy = false # Set to true once the first apply is done
   }

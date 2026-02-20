@@ -2,6 +2,7 @@
 - name: Common Configuration
   hosts: all
   become: yes
+  gather_facts: yes
   roles:
     - common
 
@@ -15,5 +16,6 @@
 - name: Setup Kubernetes Workers
   hosts: workers
   become: yes
+  gather_facts: yes
   roles:
     - k8s-worker

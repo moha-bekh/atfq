@@ -10,6 +10,7 @@ resource "aws_instance" "atfq_nodes" {
   vpc_security_group_ids = [aws_security_group.atfq_sg.id]
   
   associate_public_ip_address = true
+  source_dest_check = false
 
   user_data = <<-EOF
               #!/bin/bash

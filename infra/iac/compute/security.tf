@@ -18,23 +18,33 @@ resource "aws_security_group_rule" "allow_all_egress" {
   security_group_id = aws_security_group.atfq_sg.id
 }
 
-resource "aws_security_group_rule" "allow_internal_cluster" {
+# resource "aws_security_group_rule" "allow_internal_cluster" {
+#   type              = "ingress"
+#   from_port         = 0
+#   to_port           = 0
+#   protocol          = "-1"
+#   self              = true
+#   security_group_id = aws_security_group.atfq_sg.id
+# }
+#
+# resource "aws_security_group_rule" "allow_internal_vpc" {
+#   type              = "ingress"
+#   from_port         = 0
+#   to_port           = 0
+#   protocol          = "-1"
+#   cidr_blocks       = [data.terraform_remote_state.network.outputs.vpc_cidr]
+#   security_group_id = aws_security_group.atfq_sg.id
+# }
+
+resource "aws_security_group_rule" "allow_vpc_internal" {
   type              = "ingress"
   from_port         = 0
   to_port           = 0
   protocol          = "-1"
-  self              = true
+  cidr_blocks       = ["10.0.0.0/16"]
   security_group_id = aws_security_group.atfq_sg.id
 }
 
-resource "aws_security_group_rule" "allow_internal_vpc" {
-  type              = "ingress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1"
-  cidr_blocks       = [data.terraform_remote_state.network.outputs.vpc_cidr]
-  security_group_id = aws_security_group.atfq_sg.id
-}
 
 data "http" "my_ip" {
   url = "https://ifconfig.me/ip"
@@ -83,6 +93,26 @@ resource "aws_security_group_rule" "allow_nodeports" {
   from_port         = 30000
   to_port           = 32767
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
+  cidr_blocks       = ["0.0.0.0/0"] # Ou restreint à ton IP pour plus de sécurité
+  security_group_id = aws_security_group.atfq_sg.id
+}
+
+# CILIUM HEALTH CHECKS (Spécifique si le self-referencing ne suffit pas)
+resource "aws_security_group_rule" "allow_cilium_health" {
+  type              = "ingress"
+  from_port         = 4240
+  to_port           = 4240
+  protocol          = "tcp"
+  self              = true
+  security_group_id = aws_security_group.atfq_sg.id
+}
+
+# CILIUM VXLAN (Le tunnel pour le trafic des Pods)
+resource "aws_security_group_rule" "allow_cilium_vxlan" {
+  type              = "ingress"
+  from_port         = 8472
+  to_port           = 8472
+  protocol          = "udp"
+  self              = true
   security_group_id = aws_security_group.atfq_sg.id
 }

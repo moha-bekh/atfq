@@ -13,3 +13,12 @@ output "vpc_cidr" {
   value       = aws_vpc.atfq_vpc.cidr_block
 }
 
+output "route53_zone_id" {
+  description = "The ID of the Route53 hosted zone for the cluster"
+  value       = aws_route53_zone.atfq_zone.zone_id
+}
+
+output "route53_nameservers" {
+  description = "The DNS name servers assigned to the hosted zone. Configure these in Infomaniak (DNS Servers/NS)."
+  value       = aws_route53_zone.atfq_zone.name_servers
+}

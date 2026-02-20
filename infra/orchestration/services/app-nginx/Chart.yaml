@@ -1,0 +1,7 @@
+apiVersion: v2
+name: app-nginx
+version: 0.1.0
+dependencies:
+  - name: base-app
+    version: "0.1.0"
+    repository: "file://../../charts/base-app"

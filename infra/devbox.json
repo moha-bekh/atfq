@@ -6,7 +6,8 @@
     "go-task@latest",
     "terraform@latest",
     "ansible@latest",
-    "kubernetes-helm@latest"
+    "kubernetes-helm@latest",
+    "helmfile@latest"
   ],
   "shell": {
     "init_hook": [

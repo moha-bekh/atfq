@@ -1,0 +1,18 @@
+version: '3'
+
+tasks:
+  deploy:
+    desc: "Deploy a specific cluster (default prod)"
+    vars:
+      ENV: '{{.ENV | default "prod"}}'
+    cmds:
+      - helm dependency update {{.USER_WORKING_DIR}}/services/app-nginx
+      - helmfile --file {{.USER_WORKING_DIR}}/clusters/{{.ENV}}/helmfile.yaml apply
+    env:
+      KUBECONFIG: "{{.USER_WORKING_DIR}}/kubeconfig_atfq"
+
+  get-pods:
+    cmds:
+      - kubectl get pods -A
+    env:
+      KUBECONFIG: "{{.USER_WORKING_DIR}}/orchestration/kubeconfig_atfq"
