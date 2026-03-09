@@ -9,7 +9,6 @@ vars:
   COMPUTE_DIR: iac/compute
 
 tasks:
-
   # --- PACKER / IMAGES ---
 
   images:k8s:fmt:
@@ -33,11 +32,18 @@ tasks:
 
   # --- BOOTSTRAP ---
 
+  bootstrap:apply-all:
+    desc: "Apply bootstrap"
+    cmds:
+      - task: bootstrap:local-init
+      - task: bootstrap:apply
+      - task: bootstrap:remote-init
+
   bootstrap:local-init:
     desc: Plan bootstrap foundation
     dir: "{{.BOOTSTRAP_DIR}}"
     cmds:
-      # - mv backend.tf backend.tf.ignore
+      - mv backend.tf backend.tf.ignore || true
       - terraform init
 
   bootstrap:plan:
@@ -67,20 +73,41 @@ tasks:
     cmds:
       - terraform apply -auto-approve
 
-  bootstrap:destroy:
-    desc: destroy bootstrap foundation
-    dir: "{{.BOOTSTRAP_DIR}}"
-    cmds:
-      - terraform destroy -auto-approve
-
   bootstrap:destroy:force:
     desc: "Nuclear option: Switch to local state and destroy bootstrap S3 bucket"
     dir: "{{.BOOTSTRAP_DIR}}"
     cmds:
+      - mv backend.tf.ignore backend.tf || true
+
+      - >
+        terraform init -reconfigure 
+        -backend-config="profile={{.AWS_PROFILE}}" 
+        -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" 
+        -backend-config="key=bootstrap/terraform.tfstate"
+        -force-copy
+
       - mv backend.tf backend.tf.ignore || true
-      - terraform init -reconfigure
+
+      - terraform init -migrate-state -force-copy
+
       - terraform destroy -auto-approve
       - rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+
+  bootstrap:clean:
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - |
+      - aws iam detach-role-policy --role-name atfq-admin --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/atfq-admin-policy || true
+      - aws iam detach-role-policy --role-name github-actions-atfq-admin --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/atfq-admin-policy || true
+
+      - aws iam delete-policy --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/atfq-admin-policy || true
+
+      - aws iam delete-role --role-name atfq-admin || true
+      - aws iam delete-role --role-name github-actions-atfq-admin || true
+
+      - aws iam delete-open-id-connect-provider --open-id-connect-provider-arn arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com || true
+      - aws s3 rb s3://atfq-tf-state --force || true
+      - rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup || true
 
   # --- IAC NETWORK ---
 
@@ -101,7 +128,6 @@ tasks:
         terraform -chdir={{.NETWORK_DIR}} apply -auto-approve \
           -var="profile={{.AWS_PROFILE}}" \
           -var="account_id={{.AWS_ACCOUNT_ID}}"
-
 
   iac:network:output:ns:
     desc: "Get Route53 Nameservers"
@@ -172,18 +198,13 @@ tasks:
   infra:apply-all:
     desc: "Full automated deployment from zero to K8s cluster"
     cmds:
-      - task: bootstrap:local-init
-      - task: bootstrap:apply
-      
-      - task: bootstrap:remote-init
-      
+      - task: bootstrap:apply-all
+      - sleep 30
       - task: iac:network:apply
       - task: iac:compute:apply
-      
-      - task: cluster:init
-      - echo "Infrastructure is up! Don't forget to check your Name Servers if the DNS is failing."
 
-      - kubectl apply -f orchestration/test/nginx.yaml
+      # - task: cluster:init
+      # - kubectl apply -f orchestration/test/nginx.yaml
 
   infra:destroy:
     desc: Destroy full infrastructure (Ordered)
@@ -205,12 +226,11 @@ tasks:
         msg: "Inventory file not found. Run 'task iac:compute:apply' first."
       - sh: test -f main.yaml
         msg: "Ansible main playbook not found."
+      - sh: test -f ansible.cfg
+        msg: "Ansible config file not found."
     cmds:
       - |
         ansible-playbook -i inventory.yaml main.yaml \
           -e "project_name={{.PROJECT_NAME}}" \
           -e "pod_network_cidr={{.AWS_POD_NETWORK_CIDR}}" \
           --private-key ~/.ssh/{{.PROJECT_NAME}}
-    env:
-      ANSIBLE_HOST_KEY_CHECKING: "False"
-      ANSIBLE_CONFIG: "./ansible.cfg"
