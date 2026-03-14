@@ -1,7 +1,7 @@
 FROM golang:1.26-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache ca-certificates git
-COPY go.mod go.sum ./
+COPY go.mod go.s* ./
 RUN --mount=type=cache,target=/go/pkg/mod \
   go mod download
 

@@ -10,7 +10,4 @@ services:
       - ./.env
     # ports:
     #   - "$PORT:8080"
-    depends_on:
-      db-api-gateway:
-        condition: service_healthy
     restart: unless-stopped
