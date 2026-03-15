@@ -8,6 +8,7 @@ use axum::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use reqwest::Client;
+use tower_http::cors::{Any, CorsLayer};
 
 struct AppState {
     client: Client,
@@ -27,6 +28,11 @@ async fn main() {
         wiki_service_url: std::env::var("WIKI_SVC_URL").unwrap_or_else(|_| "http://wiki:8080".to_string()),
     });
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     // Correct Axum 0.8 wildcard syntax: {*path}
     let app = Router::new()
         .route("/", get(|| async { "ATFQ API Gateway v1.0" }))
@@ -34,6 +40,7 @@ async fn main() {
         .route("/api/auth/{*path}", any(proxy_auth_handler))
         .route("/api/user/{*path}", any(proxy_user_handler))
         .route("/api/wiki/{*path}", any(proxy_wiki_handler))
+        .layer(cors)
         .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));

@@ -6,8 +6,8 @@ services:
     init: true
     networks:
       - backend
-    env_file:
-      - ./.env
+    # env_file:
+    #   - ./.env
     # ports:
     #   - "$PORT:8080"
     restart: unless-stopped

@@ -10,10 +10,6 @@ services:
     ports:
       - "8085:8080"
     volumes:
-      - type: bind
-        source: ./api-gateway/.env
-        target: /vault/secrets/config
-        read_only: true
       # Hot Reload
       - type: bind
         source: ./api-gateway
@@ -34,12 +30,10 @@ services:
       - "8081:8080"
     volumes:
       - type: bind
-        source: ./svc/.env
-        target: /vault/secrets/config
-        read_only: true
-      - type: bind
         source: ./app
         target: /app
+      - type: volume
+        target: /app/node_modules
   auth:
     build:
       target: dev
@@ -74,6 +68,8 @@ services:
         source: ./user
         target: /app
         consistency: cached
+      - type: volume
+        target: /app/node_modules
   wiki:
     build:
       target: dev
