@@ -1,0 +1,23 @@
+version: "3"
+
+dotenv: [".env"]
+
+tasks:
+  up:
+    cmds:
+      - docker-compose up -d
+  build:
+    cmds:
+      - docker-compose build
+
+  build:up:
+    cmds:
+      - docker-compose up -d --build
+
+  prod:build:
+    cmds:
+      - docker buildx build --platform linux/amd64 -t {{.IMAGE_NAME}} .
+
+  prod:push:
+    cmds:
+      - docker buildx build --platform linux/amd64 -t {{.IMAGE_NAME}} --push .

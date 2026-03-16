@@ -1,0 +1,16 @@
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    networks:
+      - backend
+    env_file:
+      - ./.env
+    # ports:
+    #   - "$PORT:8080"
+    depends_on:
+      db-api-gateway:
+        condition: service_healthy
+    restart: unless-stopped

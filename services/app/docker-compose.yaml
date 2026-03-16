@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    networks:
+      - frontend
+    env_file:
+      - ./.env
+    # ports:
+    #   - "$PORT:8080"
+    depends_on:
+      db-app:
+        condition: service_healthy
+    restart: unless-stopped

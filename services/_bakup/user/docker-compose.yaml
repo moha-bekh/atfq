@@ -1,0 +1,47 @@
+networks:
+  atfq-net:
+    driver: bridge
+
+volumes:
+  user-postgres_data:
+
+services:
+  user:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    init: true
+    networks:
+      - atfq-net
+    env_file:
+      - ./.env.user
+    volumes:
+      # Secrets (env)
+      - type: bind
+        source: ./.env.user
+        target: /vault/secrets/config
+        read_only: true
+    ports:
+      - "8084:8080"
+    depends_on:
+      db-user:
+        condition: service_healthy
+  # ---------------------------------------------------------------------------
+  db-user:
+    image: postgres:16-alpine
+    networks:
+      - atfq-net
+    env_file:
+      - ./.env.db
+    volumes:
+      - type: volume
+        source: user-postgres_data
+        target: /var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_user -d user_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

@@ -1,0 +1,17 @@
+services:
+  net-gateway:
+    image: nginx:1.27-alpine
+    container_name: net-gateway
+    init: true
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - type: bind
+        source: ./nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+    restart: unless-stopped

@@ -1,0 +1,80 @@
+volumes:
+  cargo-cache:
+  auth-target-cache:
+  api-gateway-target-cache:
+
+services:
+  api-gateway:
+    build:
+      target: dev
+    volumes:
+      - type: bind
+        source: ./api-gateway/.env
+        target: /vault/secrets/config
+        read_only: true
+      # Hot Reload
+      - type: bind
+        source: ./api-gateway
+        target: ./app
+        consistency: cached
+      # Cargo cache
+      - type: volume
+        source: cargo-cache
+        target: /usr/local/cargo/registry
+      # Prevent re-compilation
+      - type: volume
+        source: api-gateway-target-cache
+        target: /app/target
+  app:
+    build:
+      target: dev
+    volumes:
+      - type: bind
+        source: ./svc/.env
+        target: /vault/secrets/config
+        read_only: true
+      - type: bind
+        source: ./app
+        target: ./app
+  auth:
+    build:
+      target: dev
+    volumes:
+      - type: bind
+        source: ./auth/.env
+        target: /vault/secrets/config
+        read_only: true
+      - type: bind
+        source: ./auth
+        target: ./app
+        consistency: cached
+      - type: volume
+        source: cargo-cache
+        target: /usr/local/cargo/registry
+      - type: volume
+        source: auth-target-cache
+        target: /app/target
+  user:
+    build:
+      target: dev
+    volumes:
+      - type: bind
+        source: ./user/.env
+        target: /vault/secrets/config
+        read_only: true
+      - type: bind
+        source: ./user
+        target: ./app
+        consistency: cached
+  wiki:
+    build:
+      target: dev
+    volumes:
+      - type: bind
+        source: ./wiki/.env
+        target: /vault/secrets/config
+        read_only: true
+      - type: bind
+        source: ./wiki
+        target: ./app
+        consistency: cached

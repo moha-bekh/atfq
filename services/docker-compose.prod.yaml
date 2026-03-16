@@ -1,0 +1,63 @@
+services:
+  net-gateway:
+    restart: always
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+  api-gateway:
+    build:
+      target: prod
+    restart: always
+    volumes: []
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+  app:
+    build:
+      target: prod
+    restart: always
+    volumes: []
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+    #   interval: 30s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 10s
+  auth:
+    build:
+      target: prod
+    restart: always
+    volumes: []
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+  user:
+    build:
+      target: prod
+    restart: always
+    volumes: []
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+  wiki:
+    build:
+      target: prod
+    restart: always
+    volumes: []
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # healthcheck:
+    #   test: ["./healthcheck"]
+    #   interval: 5s
+    #   timeout: 5s
+    #   retries: 5

@@ -1,0 +1,4 @@
+include:
+  - ./services/auth/docker-compose.yaml
+  - ./services/user/docker-compose.yaml
+  - ./services/wiki/docker-compose.yaml

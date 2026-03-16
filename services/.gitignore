@@ -1,0 +1,15 @@
+# services
+api-gateway/target
+
+app/node_modules/
+app/dist
+
+auth/target
+auth/.sqlx
+
+user/node_modules
+user/dist
+
+wiki/tmp
+wiki/wiki
+wiki/main

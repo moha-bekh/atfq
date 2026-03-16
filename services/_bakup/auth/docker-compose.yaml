@@ -1,0 +1,62 @@
+networks:
+  atfq-net:
+    driver: bridge
+
+volumes:
+  cargo-cache:
+  target-cache:
+  auth-postgres_data:
+
+services:
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    init: true
+    networks:
+      - atfq-net
+    env_file:
+      - ./.env.auth
+    volumes:
+      # Secrets (env)
+      - type: bind
+        source: ./.env.auth
+        target: /vault/secrets/config
+        read_only: true
+      # App (Hot Reload)
+      - type: bind
+        source: .
+        target: /app
+        consistency: cached
+      # Cargo cache
+      - type: volume
+        source: cargo-cache
+        target: /usr/local/cargo/registry
+      # Prevent re-compilation
+      - type: volume
+        source: target-cache
+        target: /app/target
+    ports:
+      - "8081:8080"
+    depends_on:
+      db-auth:
+        condition: service_healthy
+  # ---------------------------------------------------------------------------
+  db-auth:
+    image: postgres:16-alpine
+    networks:
+      - atfq-net
+    env_file:
+      - ./.env.db
+    volumes:
+      - type: volume
+        source: auth-postgres_data
+        target: /var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

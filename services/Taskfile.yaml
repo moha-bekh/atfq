@@ -1,0 +1,47 @@
+version: "3"
+
+vars:
+  COMPOSE_PROD: -f docker-compose.yaml -f docker-compose.prod.yaml
+
+tasks:
+  # Start a service in development mode (hot-reload enabled)
+  # Usage: task dev -- <service-name>
+  dev:
+    desc: "Run a service in development mode"
+    summary: |
+      Runs the specified service using the default docker-compose.yaml 
+      and docker-compose.override.yml files.
+    cmds:
+      - docker compose up {{.CLI_ARGS}}
+
+  # Start a service in production mode (secure, minimal image)
+  # Usage: task prod -- <service-name>
+  prod:
+    desc: "Run a service in production mode"
+    cmds:
+      - docker compose {{.COMPOSE_PROD}} up {{.CLI_ARGS}} -d
+
+  # Build or rebuild services
+  build:
+    desc: "Build or rebuild all services"
+    cmds:
+      - docker compose build {{.CLI_ARGS}}
+
+  # Stop and remove all containers and networks
+  down:
+    desc: "Stop and remove all containers"
+    cmds:
+      - docker compose down
+
+  # View logs for a specific service
+  # Usage: task logs -- <service-name>
+  logs:
+    desc: "Stream logs from a service"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}}
+
+  # Clean up docker system (prune unused data)
+  clean:
+    desc: "Remove unused Docker data"
+    cmds:
+      - docker system prune -f
