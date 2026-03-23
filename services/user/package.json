@@ -30,6 +30,10 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
-  "dev": "npx prisma db push && tsx watch src/main.ts"
+  "generate": "prisma generate",
+  "push": "prisma db push --accept-data-loss",
+  "dev": "prisma generate && prisma db push --accept-data-loss && tsx watch src/main.ts",
+  "build": "prisma generate && tsc",
+  "start": "prisma migrate deploy && node dist/main.js"
   }
 }
