@@ -1,19 +1,14 @@
 {
   "name": "user",
   "version": "1.0.0",
-  "description": "",
-  "main": "main.js",
-  "scripts": {
-    "predev": "prisma generate && prisma db push --accept-data-loss",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec 'tsx' src/main.ts",
-    "build": "prisma generate && tsc",
-    "prestart": "prisma migrate deploy",
-    "start": "node dist/main.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "module",
+  "scripts": {
+    "generate": "prisma generate",
+    "push": "prisma db push --accept-data-loss",
+    "dev": "prisma generate && prisma db push --accept-data-loss && tsx watch src/main.ts",
+    "build": "prisma generate && tsc",
+    "start": "prisma migrate deploy && node dist/main.js"
+  },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
@@ -24,7 +19,6 @@
   "devDependencies": {
     "@prisma/config": "^6.12.0",
     "@types/node": "^25.5.0",
-    "nodemon": "^3.1.14",
     "prisma": "^6.12.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
