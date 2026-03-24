@@ -16,4 +16,5 @@ wiki/main
 
 # vim swp files
 *.swp
+*.swp
 *.swo
