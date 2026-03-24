@@ -1,31 +1,25 @@
 import Fastify from 'fastify';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
-import { PrismaClient } from '@prisma/client';
 import path from 'path';
 
-const prisma = new PrismaClient();
-const fastify = Fastify({ logger: true });
+import { prisma } from './database.ts'
+import * as handlers from './handlers/index.js'
 
-// Load the protobuf
+const fastify = Fastify({ logger: true });
 const PROTO_PATH = path.resolve('./src/proto/user.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_PATH);
 const userProto = (grpc.loadPackageDefinition(packageDefinition) as any).user;
 
-const getUser = async (call: any, callback: any) => {
-  try {
-    const user = await prisma.users.findUnique({
-      where: { id: call.request.id }
-    });
-    user ? callback(null, user) : callback({ code: grpc.status.NOT_FOUND, details: "User not found" });
-  } catch (err) {
-    callback(err);
-  }
-};
-
 const startGrpc = () => {
   const server = new grpc.Server();
-  server.addService(userProto.UserService.service, { GetUser: getUser });
+  // Import handlers
+  server.addService(userProto.UserService.service, {
+	  GetUser:		handlers.getUser,
+	  CreateUser:	handlers.createUser,
+	  ListUsers:	handlers.listUsers
+
+  });
   server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), (error, port) => {
     if (error) console.error(error);
     else console.log(`gRPC User Service running on port ${port}`);
