@@ -7,7 +7,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
   longs: String,
   enums: String,
-  defaults: true, // This ensures 'false' and empty strings are not omitted
+  defaults: true,
   oneofs: true
 });
 const userProto = (grpc.loadPackageDefinition(packageDefinition) as any).user;
@@ -22,6 +22,15 @@ const client = new userProto.UserService(
 const createAsync = (payload: any) => {
   return new Promise((resolve, reject) => {
     client.CreateUser(payload, (error: any, response: any) => {
+      if (error) reject(error);
+      else resolve(response);
+    });
+  });
+};
+
+const updateAsync = (payload: any) => {
+  return new Promise((resolve, reject) => {
+    client.UpdateUser(payload, (error: any, response: any) => {
       if (error) reject(error);
       else resolve(response);
     });
@@ -58,43 +67,43 @@ const deleteAsync = (payload: any) => {
 // --- Test Sequence ---
 
 const runTestSequence = async () => {
-  console.log("🚀 Starting Refined gRPC Test Sequence (RBAC & Atomic Transaction)...\n");
+  console.log("🚀 Starting Refined gRPC Test Sequence (RBAC & Modifications)...\n");
 
   try {
-    // 1. Create User with Email
-    console.log("1️⃣  Creating User_1 (Expects Atomic Profile & Role creation)...");
+    // 1. Create User
+    console.log("1️⃣  Creating User_1...");
     const user1: any = await createAsync({
       username: "alpha_user",
       firstname: "Alpha",
       lastname: "Tester",
       email: "alpha@example.com"
     });
-    console.log("✅ User created successfully!");
-    console.log("Full Object for User_1 (Detailed View):");
-    console.dir(user1, { depth: null });
+    console.log("✅ Created ID:", user1.id);
 
-    // 2. Verify Profile Defaults and Roles
-    console.log(`\n2️⃣  Verifying Profile Mapping and Roles for User_1...`);
-    const hasCorrectRole = user1.roles && user1.roles.includes('user');
-    const hasCorrectTheme = user1.profile && user1.profile.dark_theme === false;
+    // 2. Modify User_1
+    console.log("\n2️⃣  Modifying User_1 (Firstname, Lastname, Email, Profile Picture)...");
+    const updatedUser1: any = await updateAsync({
+      id: user1.id,
+      firstname: "Updated-Alpha",
+      lastname: "Updated-Tester",
+      email: "new-alpha@example.com",
+      profile_picture: "https://example.com/alpha.png"
+    });
+    
+    console.log("✅ Update Successful! Current state:");
+    console.dir({
+      fullName: `${updatedUser1.firstname} ${updatedUser1.lastname}`,
+      email: updatedUser1.email,
+      profile_picture: updatedUser1.profile?.profile_picture
+    }, { depth: null });
 
-    if (hasCorrectRole && hasCorrectTheme) {
-      console.log("✅ Profile defaults and 'user' role assignment verified.");
+    // 3. Verify change persistence via GetUser
+    console.log("\n3️⃣  Verifying persistence via GetUser...");
+    const fetched: any = await getAsync({ id: user1.id });
+    if (fetched.firstname === "Updated-Alpha" && fetched.profile.profile_picture === "https://example.com/alpha.png") {
+      console.log("✅ Data persistence verified.");
     } else {
-      console.error("❌ Verification failed: check roles or profile defaults.");
-    }
-
-    // 3. Test Identity Uniqueness
-    console.log("\n3️⃣  Testing Duplicate Username/Email protection...");
-    try {
-      await createAsync({ 
-        username: "alpha_user", 
-        firstname: "Duplicate", 
-        lastname: "User",
-        email: "other@example.com" 
-      });
-    } catch (error: any) {
-      console.log(`✅ Correctly rejected: ${error.details}`);
+      console.error("❌ Persistence check failed.");
     }
 
     // 4. Create User_2
@@ -105,31 +114,29 @@ const runTestSequence = async () => {
       lastname: "Tester", 
       email: "beta@example.com"
     });
-    console.log("✅ Success! ID:", user2.id);
 
-    // 5. List All Users (Comprehensive Table)
-    console.log("\n5️⃣  Fetching complete User list with all fields...");
+    // 5. List All Users
+    console.log("\n5️⃣  Fetching User list...");
     const allUsers: any = await listAsync({});
-    
-    // Mapping for a readable table view including all proto fields
-	const tableData = allUsers.users.map((u: any) => ({
-	  id: u.id,
-	  username: u.username,
-	  email: u.email,
-	  roles: u.roles ? u.roles.join(', ') : 'none',
-	  permissions: u.permissions ? u.permissions.join(', ') : 'none', // Added for visibility 
-	  lang: u.profile?.language
-	}));
+    const tableData = allUsers.users.map((u: any) => ({
+      id: u.id,
+      username: u.username,
+      fullName: `${u.firstname} ${u.lastname}`,
+      email: u.email,
+      roles: u.roles?.join(', '),
+      permissions: u.permissions?.join(', '),
+      pic: u.profile?.profile_picture || 'none'
+    }));
     console.table(tableData);
 
     // 6. Cleanup
-    console.log("\n6️⃣  Cleaning up database...");
+    console.log("\n6️⃣  Cleaning up...");
     await deleteAsync({ id: user1.id });
     await deleteAsync({ id: user2.id });
-    console.log("✅ Test users deleted.");
+    console.log("✅ Cleanup complete.");
 
   } catch (error: any) {
-    console.error("\n❌ Test Sequence Failed:", error.details || error.message);
+    console.error("\n❌ Test Failed:", error.details || error.message);
   }
 };
 

@@ -25,7 +25,8 @@ const startGrpc = () => {
 	  GetUser:		handlers.getUser,
 	  CreateUser:	handlers.createUser,
 	  ListUsers:	handlers.listUsers,
-	  DeleteUser:	handlers.deleteUser
+	  DeleteUser:	handlers.deleteUser,
+	  UpdateUser: handlers.updateUser
 
   });
   server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), (error, port) => {

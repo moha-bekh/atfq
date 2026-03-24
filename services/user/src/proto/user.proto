@@ -7,12 +7,22 @@ service UserService {
   rpc CreateUser (CreateUserRequest) returns (UserResponse);
   rpc ListUsers (Empty) returns (UserListResponse);
   rpc DeleteUser (UserRequest) returns (UserResponse);
+  rpc UpdateUser (UpdateUserRequest) returns (UserResponse);
 }
 
 message Empty {}
 
 message UserRequest {
   string    id = 1;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  optional string firstname = 2;
+  optional string lastname = 3;
+  optional string profile_picture = 4;
+  optional bool   dark_theme = 5;
+  optional string language = 6;
 }
 
 message CreateUserRequest {
