@@ -18,6 +18,7 @@ model User {
 	username		String			@unique @db.VarChar(255)
 	firstname		String			@db.VarChar(255)
 	lastname  		String			@db.VarChar(255)
+	email			String			@unique @db.VarChar(255)
 	createdAt 		DateTime		@default(now()) @map("created_at") @db.Timestamptz
 	updatedAt 		DateTime		@default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 	profile   		Profile?

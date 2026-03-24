@@ -9,6 +9,8 @@ service UserService {
   rpc DeleteUser (UserRequest) returns (UserResponse);
 }
 
+message Empty {}
+
 message UserRequest {
   string    id = 1;
 }
@@ -17,9 +19,15 @@ message CreateUserRequest {
   string    username = 1;
   string    firstname = 2;
   string    lastname = 3;
+  string    email = 4;
 }
 
-message Empty {}
+message ProfileResponse {
+  string id = 1;
+  string profile_picture = 2;
+  bool   dark_theme = 3;
+  string language = 4;
+}
 
 message UserResponse {
   string    id = 1;
@@ -27,6 +35,9 @@ message UserResponse {
   string    firstname = 3;
   string    lastname = 4;
   string    email = 5;
+  ProfileResponse profile = 6;
+  repeated string roles = 7;
+  repeated string permissions = 8;
 }
 
 message UserListResponse {

@@ -8,7 +8,14 @@ import * as handlers from './handlers/index.js'
 
 const fastify = Fastify({ logger: true });
 const PROTO_PATH = path.resolve('./src/proto/user.proto');
-const packageDefinition = protoLoader.loadSync(PROTO_PATH);
+
+const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true
+});
 const userProto = (grpc.loadPackageDefinition(packageDefinition) as any).user;
 
 const startGrpc = () => {
