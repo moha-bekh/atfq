@@ -3,28 +3,27 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "tsx src/main.ts",
+    "studio": "prisma studio",
+    "test": "tsx src/test-client.ts",
     "generate": "prisma generate",
-    "push": "prisma db push --accept-data-loss",
-    "seed": "prisma db seed",
-    "dev": "prisma generate && prisma db push --accept-data-loss && prisma db seed && tsx watch src/main.ts",
-    "build": "prisma generate && tsc",
-    "start": "prisma migrate deploy && node dist/main.js"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
-    "@prisma/client": "^6.12.0",
+    "@prisma/client": "^7.6.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.8.2"
   },
   "devDependencies": {
-    "@prisma/config": "^6.12.0",
+    "@prisma/config": "^7.6.0",
     "@types/node": "^25.5.0",
-    "prisma": "^6.12.0",
+    "prisma": "^7.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+  "overrides": {
+    "effect": "3.20.0"
   }
 }

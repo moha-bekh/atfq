@@ -3,8 +3,11 @@ RUN apt-get update -y && apt-get install -y openssl \
 		postgresql-client
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+COPY prisma.config.ts ./
 RUN --mount=type=cache,target=/root/.npm \
-  npm ci
+			DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
+			npm ci
 
 FROM base AS dev
 COPY . .
