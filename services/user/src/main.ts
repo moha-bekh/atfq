@@ -29,6 +29,7 @@ const startGrpc = () => {
 	  UpdateUser: handlers.updateUser
 
   });
+
   server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), (error, port) => {
     if (error) console.error(error);
     else console.log(`gRPC User Service running on port ${port}`);
