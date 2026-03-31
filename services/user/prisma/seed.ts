@@ -1,10 +1,16 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
+import 'dotenv/config';
 
-const prisma = new PrismaClient();
+const pool = new pg.Pool({ 
+  connectionString: process.env.DATABASE_URL 
+});
 
-/**
- * Reusable helper to create or update a role and its associated permissions.
- */
+const adapter = new PrismaPg(pool);
+
+const prisma = new PrismaClient({ adapter });
+
 async function upsertRoleWithPermissions(data: {
   id: string;
   name: string;

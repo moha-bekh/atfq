@@ -5,7 +5,7 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   
   datasource: {
-    url: env("DATABASE_URL") ?? "postgresql://dummy:dummy@localhost:5432/dummy",
+    url: env("DATABASE_URL"),//?? "postgresql://dummy:dummy@localhost:5432/dummy",
   },
 
   migrations: {

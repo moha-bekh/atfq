@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/main.ts",
+    "dev": "prisma migrate deploy && tsx prisma/seed.ts && tsx src/main.ts",
     "studio": "prisma studio",
     "test": "tsx src/test-client.ts",
     "generate": "prisma generate",
@@ -12,13 +12,16 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
     "@grpc/proto-loader": "^0.8.0",
+    "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "dotenv": "^17.3.1",
-    "fastify": "^5.8.2"
+    "fastify": "^5.8.2",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@prisma/config": "^7.6.0",
     "@types/node": "^25.5.0",
+    "@types/pg": "^8.20.0",
     "prisma": "^7.6.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
