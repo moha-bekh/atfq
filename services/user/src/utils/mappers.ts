@@ -1,13 +1,19 @@
-export const mapUserToProto = (user: any) => {
-  const roles = user.roles ? user.roles.map((ur: any) => ur.roleId) : [];
+import { Prisma } from '@prisma/client';
+import type { UserResponse } from '../types/grpc.js';
 
-  const permissions = user.roles
-    ? user.roles.flatMap((ur: any) =>
-        ur.role?.permissions?.map((rp: any) => rp.permissionId) || []
-      )
-    : [];
+type UserWithRelations = Prisma.UserGetPayload<{
+  include: {
+    profile: true;
+    roles: { include: { role: { include: { permissions: true } } } };
+  };
+}>;
 
-  const uniquePermissions = [...new Set(permissions)];
+export const mapUserToProto = (user: UserWithRelations): UserResponse => {
+  const roles = user.roles.map((ur) => ur.roleId);
+
+  const permissions = user.roles.flatMap((ur) =>
+    ur.role?.permissions?.map((rp) => rp.permissionId) ?? []
+  );
 
   return {
     id: user.id,
@@ -15,13 +21,15 @@ export const mapUserToProto = (user: any) => {
     firstname: user.firstname,
     lastname: user.lastname,
     email: user.email,
-    profile: user.profile ? {
-      id: user.profile.id,
-      profile_picture: user.profile.profilePicture,
-      dark_theme: user.profile.darkTheme,
-      language: user.profile.language
-    } : null,
+    profile: user.profile
+      ? {
+          id: user.profile.id,
+          profile_picture: user.profile.profilePicture ?? '',
+          dark_theme: user.profile.darkTheme,
+          language: user.profile.language,
+        }
+      : null,
     roles,
-    permissions: uniquePermissions
+    permissions: [...new Set(permissions)],
   };
 };

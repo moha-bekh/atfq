@@ -1,27 +1,29 @@
 import * as grpc from '@grpc/grpc-js';
 import { prisma } from '../database.js';
 import { mapUserToProto } from '../utils/mappers.js';
+import { validateId } from '../utils/validate.js';
+import type { GrpcCall, GrpcCallback, UserRequest, UserResponse } from '../types/grpc.js';
 
-export const getUser = async (call: any, callback: any) => {
-try {
+export const getUser = async (call: GrpcCall<UserRequest>, callback: GrpcCallback<UserResponse>) => {
+  try {
+    validateId(call.request.id);
+
     const user = await prisma.user.findUnique({
       where: { id: call.request.id },
-      include: { 
-        profile: true, 
-        roles: {
-          include: {
-            role: { include: { permissions: true } }
-          }
-        }
-      } 
+      include: {
+        profile: true,
+        roles: { include: { role: { include: { permissions: true } } } }
+      }
     });
+
     if (user) {
-      // Maps the combined data to the UserResponse proto format
       callback(null, mapUserToProto(user));
     } else {
       callback({ code: grpc.status.NOT_FOUND, details: "User not found" });
     }
   } catch (err: any) {
-    callback({ code: grpc.status.INTERNAL, details: err.message });
+    const code = err.code ?? grpc.status.INTERNAL;
+    const details = err.details ?? err.message;
+    callback({ code, details });
   }
 };

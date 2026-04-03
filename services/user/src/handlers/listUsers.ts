@@ -1,26 +1,20 @@
 import * as grpc from '@grpc/grpc-js';
 import { prisma } from '../database.js';
 import { mapUserToProto } from '../utils/mappers.js';
+import type { GrpcCall, GrpcCallback, Empty, UserListResponse } from '../types/grpc.js';
 
-export const listUsers = async (call: any, callback: any) => {
-	try {
+export const listUsers = async (_call: GrpcCall<Empty>, callback: GrpcCallback<UserListResponse>) => {
+  try {
     const users = await prisma.user.findMany({
-      include: { 
-        profile: true, 
-        roles: {
-          include: {
-            role: { include: { permissions: true } } // Fetch permissions for all users in list
-          }
-        }
+      include: {
+        profile: true,
+        roles: { include: { role: { include: { permissions: true } } } }
       }
     });
 
-    // Map each database user object to the UserResponse format defined in the proto
-    const mappedUsers = users.map(mapUserToProto);
-
-    callback(null, { users: mappedUsers });
+    callback(null, { users: users.map(mapUserToProto) });
   } catch (err: any) {
     console.error("Database Error:", err);
-    callback({ code: grpc.status.INTERNAL, details: err.message });
+    callback({ code: grpc.status.INTERNAL, details: "Internal server error" });
   }
 };
