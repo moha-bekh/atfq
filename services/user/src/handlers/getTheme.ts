@@ -2,13 +2,13 @@ import * as grpc from '@grpc/grpc-js';
 import { prisma } from '../database.js';
 import { mapThemeToProto } from '../utils/mappers.js';
 import { validateId } from '../utils/validate.js';
-import type { GrpcCall, GrpcCallback, ThemeRequest, ThemeResponse } from '../types/grpc.js';
+import type { GrpcCall, GrpcCallback, UserRequest, ThemeResponse } from '../types/grpc.js';
 
-export const getTheme = async (call: GrpcCall<ThemeRequest>, callback: GrpcCallback<ThemeResponse>) => {
+export const getTheme = async (call: GrpcCall<UserRequest>, callback: GrpcCallback<ThemeResponse>) => {
   try {
     validateId(call.request.id);
 
-    const theme = await prisma.theme.findUnique({ where: { id: call.request.id } });
+    const theme = await prisma.theme.findUnique({ where: { userId: call.request.id } });
 
     if (theme) {
       callback(null, mapThemeToProto(theme));

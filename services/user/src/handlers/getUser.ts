@@ -12,7 +12,7 @@ export const getUser = async (call: GrpcCall<UserRequest>, callback: GrpcCallbac
       where: { id: call.request.id },
       include: {
         profile: true,
-        activeTheme: true,
+        theme: true,
         roles: { include: { role: { include: { permissions: true } } } }
       }
     });

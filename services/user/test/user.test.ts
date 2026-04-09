@@ -6,7 +6,6 @@ import path from 'path';
 import type {
   Empty,
   UserRequest,
-  ThemeRequest,
   CreateUserRequest,
   UpdateUserRequest,
   UsernameRequest,
@@ -14,13 +13,10 @@ import type {
   RoleRequest,
   CreateThemeRequest,
   UpdateThemeRequest,
-  DeleteThemeRequest,
-  SetActiveThemeRequest,
   UserResponse,
   UserListResponse,
   ProfileResponse,
   ThemeResponse,
-  ThemeListResponse,
 } from '../src/types/grpc.js';
 
 // ── gRPC client setup ─────────────────────────────────────────────────────────
@@ -44,12 +40,10 @@ interface UserServiceClient {
   AssignRole(req: RoleRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
   RemoveRole(req: RoleRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
   GetProfile(req: UserRequest,              cb: (e: GrpcServiceError | null, r: ProfileResponse) => void): void;
-  CreateTheme(req: CreateThemeRequest,      cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
-  GetTheme(req: ThemeRequest,               cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
-  ListThemes(req: UserRequest,              cb: (e: GrpcServiceError | null, r: ThemeListResponse) => void): void;
-  UpdateTheme(req: UpdateThemeRequest,      cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
-  DeleteTheme(req: DeleteThemeRequest,      cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
-  SetActiveTheme(req: SetActiveThemeRequest, cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  CreateTheme(req: CreateThemeRequest,  cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  GetTheme(req: UserRequest,            cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  UpdateTheme(req: UpdateThemeRequest,  cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  DeleteTheme(req: UserRequest,         cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
 }
 
 const raw: UserServiceClient = new userProto.UserService(
@@ -80,16 +74,12 @@ const client = {
     new Promise((res, rej) => raw.GetProfile(req, (e, r) => (e ? rej(e) : res(r)))),
   createTheme: (req: CreateThemeRequest): Promise<ThemeResponse> =>
     new Promise((res, rej) => raw.CreateTheme(req, (e, r) => (e ? rej(e) : res(r)))),
-  getTheme: (req: ThemeRequest): Promise<ThemeResponse> =>
+  getTheme: (req: UserRequest): Promise<ThemeResponse> =>
     new Promise((res, rej) => raw.GetTheme(req, (e, r) => (e ? rej(e) : res(r)))),
-  listThemes: (req: UserRequest): Promise<ThemeListResponse> =>
-    new Promise((res, rej) => raw.ListThemes(req, (e, r) => (e ? rej(e) : res(r)))),
   updateTheme: (req: UpdateThemeRequest): Promise<ThemeResponse> =>
     new Promise((res, rej) => raw.UpdateTheme(req, (e, r) => (e ? rej(e) : res(r)))),
-  deleteTheme: (req: DeleteThemeRequest): Promise<ThemeResponse> =>
+  deleteTheme: (req: UserRequest): Promise<ThemeResponse> =>
     new Promise((res, rej) => raw.DeleteTheme(req, (e, r) => (e ? rej(e) : res(r)))),
-  setActiveTheme: (req: SetActiveThemeRequest): Promise<ThemeResponse> =>
-    new Promise((res, rej) => raw.SetActiveTheme(req, (e, r) => (e ? rej(e) : res(r)))),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -655,14 +645,11 @@ describe('CreateTheme', () => {
     assert.equal(theme.color_extra_error, '#20C2CC');
   });
 
-  test('accepts 3-digit hex colors', async () => {
-    const theme = await client.createTheme({
-      user_id: userId,
-      name: 'Short Hex',
-      ...BASE_THEME_COLORS,
-      color_bg: '#ABC',
-    });
-    assert.equal(theme.color_bg, '#ABC');
+  test('rejects creating a second theme for the same user', async () => {
+    await assert.rejects(
+      () => createTempTheme(userId, 'Duplicate'),
+      (err) => { assertGrpcError(err, grpc.status.ALREADY_EXISTS); return true; },
+    );
   });
 
   test('rejects empty user_id', async () => {
@@ -674,21 +661,21 @@ describe('CreateTheme', () => {
 
   test('rejects empty name', async () => {
     await assert.rejects(
-      () => client.createTheme({ user_id: userId, name: '', ...BASE_THEME_COLORS }),
+      () => client.createTheme({ user_id: UNKNOWN_ID, name: '', ...BASE_THEME_COLORS }),
       (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'name'); return true; },
     );
   });
 
   test('rejects name longer than 100 characters', async () => {
     await assert.rejects(
-      () => client.createTheme({ user_id: userId, name: 'a'.repeat(101), ...BASE_THEME_COLORS }),
+      () => client.createTheme({ user_id: UNKNOWN_ID, name: 'a'.repeat(101), ...BASE_THEME_COLORS }),
       (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'name'); return true; },
     );
   });
 
   test('rejects invalid hex color', async () => {
     await assert.rejects(
-      () => client.createTheme({ user_id: userId, name: 'Bad Color', ...BASE_THEME_COLORS, color_bg: 'red' }),
+      () => client.createTheme({ user_id: UNKNOWN_ID, name: 'Bad Color', ...BASE_THEME_COLORS, color_bg: 'red' }),
       (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'color_bg'); return true; },
     );
   });
@@ -705,62 +692,30 @@ describe('CreateTheme', () => {
 
 describe('GetTheme', () => {
   let userId: string;
-  let themeId: string;
 
   before(async () => {
     userId = (await createTempUser('theme_get')).id;
-    themeId = (await createTempTheme(userId)).id;
+    await createTempTheme(userId);
   });
   after(async () => { await client.deleteUser({ id: userId }); });
 
-  test('returns the correct theme by id', async () => {
-    const theme = await client.getTheme({ id: themeId });
-    assert.equal(theme.id, themeId);
+  test('returns the correct theme by user_id', async () => {
+    const theme = await client.getTheme({ id: userId });
     assert.equal(theme.user_id, userId);
     assert.equal(theme.color_bg, '#7766BD');
   });
 
-  test('rejects empty id', async () => {
+  test('rejects empty user_id', async () => {
     await assert.rejects(
       () => client.getTheme({ id: '' }),
       (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
     );
   });
 
-  test('returns NOT_FOUND for unknown theme id', async () => {
+  test('returns NOT_FOUND when user has no theme', async () => {
     await assert.rejects(
       () => client.getTheme({ id: UNKNOWN_ID }),
       (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
-    );
-  });
-});
-
-// ── ListThemes ────────────────────────────────────────────────────────────────
-
-describe('ListThemes', () => {
-  let userId: string;
-
-  before(async () => { userId = (await createTempUser('theme_list')).id; });
-  after(async ()  => { await client.deleteUser({ id: userId }); });
-
-  test('returns empty list when user has no themes', async () => {
-    const { themes } = await client.listThemes({ id: userId });
-    assert.ok(Array.isArray(themes));
-    assert.equal(themes.length, 0);
-  });
-
-  test('returns all themes belonging to the user', async () => {
-    await createTempTheme(userId, 'Theme A');
-    await createTempTheme(userId, 'Theme B');
-    const { themes } = await client.listThemes({ id: userId });
-    assert.ok(themes.length >= 2);
-    assert.ok(themes.every((t) => t.user_id === userId));
-  });
-
-  test('rejects empty id', async () => {
-    await assert.rejects(
-      () => client.listThemes({ id: '' }),
-      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
     );
   });
 });
@@ -769,61 +724,53 @@ describe('ListThemes', () => {
 
 describe('UpdateTheme', () => {
   let userId: string;
-  let themeId: string;
 
   before(async () => {
     userId = (await createTempUser('theme_update')).id;
-    themeId = (await createTempTheme(userId)).id;
+    await createTempTheme(userId);
   });
   after(async () => { await client.deleteUser({ id: userId }); });
 
   test('updates the name', async () => {
-    const updated = await client.updateTheme({ id: themeId, user_id: userId, name: 'Renamed' });
+    const updated = await client.updateTheme({ user_id: userId, name: 'Renamed' });
     assert.equal(updated.name, 'Renamed');
   });
 
   test('updates a single color field', async () => {
-    const updated = await client.updateTheme({ id: themeId, user_id: userId, color_bg: '#123456' });
+    const updated = await client.updateTheme({ user_id: userId, color_bg: '#123456' });
     assert.equal(updated.color_bg, '#123456');
   });
 
   test('partial update leaves other fields unchanged', async () => {
-    const before = await client.getTheme({ id: themeId });
-    await client.updateTheme({ id: themeId, user_id: userId, color_bg: '#FFFFFF' });
-    const after = await client.getTheme({ id: themeId });
+    const before = await client.getTheme({ id: userId });
+    await client.updateTheme({ user_id: userId, color_bg: '#FFFFFF' });
+    const after = await client.getTheme({ id: userId });
     assert.equal(after.color_main, before.color_main);
     assert.equal(after.color_text, before.color_text);
   });
 
+  test('accepts 3-digit hex colors', async () => {
+    const updated = await client.updateTheme({ user_id: userId, color_bg: '#ABC' });
+    assert.equal(updated.color_bg, '#ABC');
+  });
+
   test('rejects invalid hex color', async () => {
     await assert.rejects(
-      () => client.updateTheme({ id: themeId, user_id: userId, color_error: 'notahex' }),
+      () => client.updateTheme({ user_id: userId, color_error: 'notahex' }),
       (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'color_error'); return true; },
     );
   });
 
-  test('rejects empty theme id', async () => {
+  test('rejects empty user_id', async () => {
     await assert.rejects(
-      () => client.updateTheme({ id: '', user_id: userId }),
+      () => client.updateTheme({ user_id: '' }),
       (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
     );
   });
 
-  test('returns PERMISSION_DENIED when user does not own the theme', async () => {
-    const other = await createTempUser('tu_other');
-    try {
-      await assert.rejects(
-        () => client.updateTheme({ id: themeId, user_id: other.id, color_bg: '#000000' }),
-        (err) => { assertGrpcError(err, grpc.status.PERMISSION_DENIED); return true; },
-      );
-    } finally {
-      await client.deleteUser({ id: other.id });
-    }
-  });
-
-  test('returns NOT_FOUND for unknown theme id', async () => {
+  test('returns NOT_FOUND for unknown user_id', async () => {
     await assert.rejects(
-      () => client.updateTheme({ id: UNKNOWN_ID, user_id: userId, name: 'X' }),
+      () => client.updateTheme({ user_id: UNKNOWN_ID, name: 'X' }),
       (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
     );
   });
@@ -837,101 +784,61 @@ describe('DeleteTheme', () => {
   before(async () => { userId = (await createTempUser('theme_delete')).id; });
   after(async ()  => { await client.deleteUser({ id: userId }); });
 
-  test('deletes a theme and makes it unreachable', async () => {
-    const theme = await createTempTheme(userId);
-    await client.deleteTheme({ id: theme.id, user_id: userId });
+  test('deletes the theme and makes it unreachable', async () => {
+    await createTempTheme(userId);
+    await client.deleteTheme({ id: userId });
     await assert.rejects(
-      () => client.getTheme({ id: theme.id }),
-      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
-    );
-  });
-
-  test('returns PERMISSION_DENIED when user does not own the theme', async () => {
-    const theme = await createTempTheme(userId);
-    const other = await createTempUser('td_other');
-    try {
-      await assert.rejects(
-        () => client.deleteTheme({ id: theme.id, user_id: other.id }),
-        (err) => { assertGrpcError(err, grpc.status.PERMISSION_DENIED); return true; },
-      );
-    } finally {
-      await client.deleteUser({ id: other.id });
-      await client.deleteTheme({ id: theme.id, user_id: userId });
-    }
-  });
-
-  test('rejects empty theme id', async () => {
-    await assert.rejects(
-      () => client.deleteTheme({ id: '', user_id: userId }),
-      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
-    );
-  });
-
-  test('returns NOT_FOUND for unknown theme id', async () => {
-    await assert.rejects(
-      () => client.deleteTheme({ id: UNKNOWN_ID, user_id: userId }),
-      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
-    );
-  });
-});
-
-// ── SetActiveTheme ────────────────────────────────────────────────────────────
-
-describe('SetActiveTheme', () => {
-  let userId: string;
-  let themeId: string;
-
-  before(async () => {
-    userId = (await createTempUser('theme_active')).id;
-    themeId = (await createTempTheme(userId)).id;
-  });
-  after(async () => { await client.deleteUser({ id: userId }); });
-
-  test('sets the active theme and reflects it in the profile', async () => {
-    await client.setActiveTheme({ user_id: userId, theme_id: themeId });
-    const profile = await client.getProfile({ id: userId });
-    assert.ok(profile.active_theme, 'profile should have an active theme');
-    assert.equal(profile.active_theme?.id, themeId);
-    assert.equal(profile.active_theme?.color_bg, '#7766BD');
-  });
-
-  test('active theme is included in GetUser response', async () => {
-    const user = await client.getUser({ id: userId });
-    assert.equal(user.profile?.active_theme?.id, themeId);
-  });
-
-  test('returns PERMISSION_DENIED when theme belongs to another user', async () => {
-    const other = await createTempUser('ta_other');
-    const otherTheme = await createTempTheme(other.id);
-    try {
-      await assert.rejects(
-        () => client.setActiveTheme({ user_id: userId, theme_id: otherTheme.id }),
-        (err) => { assertGrpcError(err, grpc.status.PERMISSION_DENIED); return true; },
-      );
-    } finally {
-      await client.deleteUser({ id: other.id });
-    }
-  });
-
-  test('returns NOT_FOUND for unknown theme', async () => {
-    await assert.rejects(
-      () => client.setActiveTheme({ user_id: userId, theme_id: UNKNOWN_ID }),
+      () => client.getTheme({ id: userId }),
       (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
     );
   });
 
   test('rejects empty user_id', async () => {
     await assert.rejects(
-      () => client.setActiveTheme({ user_id: '', theme_id: themeId }),
+      () => client.deleteTheme({ id: '' }),
       (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
     );
   });
 
-  test('deleting active theme clears it from the profile', async () => {
-    const tempTheme = await createTempTheme(userId, 'Temp Active');
-    await client.setActiveTheme({ user_id: userId, theme_id: tempTheme.id });
-    await client.deleteTheme({ id: tempTheme.id, user_id: userId });
+  test('returns NOT_FOUND when user has no theme', async () => {
+    await assert.rejects(
+      () => client.deleteTheme({ id: UNKNOWN_ID }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+});
+
+// ── Theme visible in GetUser / GetProfile ─────────────────────────────────────
+
+describe('Theme in user responses', () => {
+  let userId: string;
+
+  before(async () => {
+    userId = (await createTempUser('theme_resp')).id;
+    await createTempTheme(userId);
+  });
+  after(async () => { await client.deleteUser({ id: userId }); });
+
+  test('GetUser includes theme in profile', async () => {
+    const user = await client.getUser({ id: userId });
+    assert.ok(user.profile?.theme, 'profile should have a theme');
+    assert.equal(user.profile?.theme?.user_id, userId);
+    assert.equal(user.profile?.theme?.color_bg, '#7766BD');
+  });
+
+  test('GetProfile includes theme', async () => {
     const profile = await client.getProfile({ id: userId });
-    assert.ok(!profile.active_theme?.id, 'active_theme should be cleared after deletion');
+    assert.ok(profile.theme, 'profile should have a theme');
+    assert.equal(profile.theme?.color_bg, '#7766BD');
+  });
+
+  test('GetUser has no theme before one is created', async () => {
+    const newUser = await createTempUser('theme_none');
+    try {
+      const user = await client.getUser({ id: newUser.id });
+      assert.equal(user.profile?.theme, null);
+    } finally {
+      await client.deleteUser({ id: newUser.id });
+    }
   });
 });

@@ -14,7 +14,7 @@ export const getUserByEmail = async (call: GrpcCall<EmailRequest>, callback: Grp
       where: { email },
       include: {
         profile: true,
-        activeTheme: true,
+        theme: true,
         roles: { include: { role: { include: { permissions: true } } } }
       }
     });

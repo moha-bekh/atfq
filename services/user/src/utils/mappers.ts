@@ -4,7 +4,7 @@ import type { UserResponse, ThemeResponse } from '../types/grpc.js';
 type UserWithRelations = Prisma.UserGetPayload<{
   include: {
     profile: true;
-    activeTheme: true;
+    theme: true;
     roles: { include: { role: { include: { permissions: true } } } };
   };
 }>;
@@ -43,8 +43,8 @@ export const mapUserToProto = (user: UserWithRelations): UserResponse => {
           id: user.profile.id,
           profile_picture: user.profile.profilePicture ?? '',
           language: user.profile.language,
-          active_theme: user.activeTheme
-            ? mapThemeToProto(user.activeTheme)
+          theme: user.theme
+            ? mapThemeToProto(user.theme)
             : null,
         }
       : null,

@@ -34,10 +34,8 @@ const startGrpc = () => {
     GetProfile:         handlers.getProfile,
     CreateTheme:        handlers.createTheme,
     GetTheme:           handlers.getTheme,
-    ListThemes:         handlers.listThemes,
     UpdateTheme:        handlers.updateTheme,
     DeleteTheme:        handlers.deleteTheme,
-    SetActiveTheme:     handlers.setActiveTheme,
   });
 
   server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), (error, port) => {

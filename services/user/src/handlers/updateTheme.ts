@@ -6,22 +6,13 @@ import type { GrpcCall, GrpcCallback, UpdateThemeRequest, ThemeResponse } from '
 
 export const updateTheme = async (call: GrpcCall<UpdateThemeRequest>, callback: GrpcCallback<ThemeResponse>) => {
   try {
-    const { id, name, color_bg, color_main, color_caret, color_text, color_sub, color_sub_alt, color_error, color_extra_error } = call.request;
+    const { user_id, name, color_bg, color_main, color_caret, color_text, color_sub, color_sub_alt, color_error, color_extra_error } = call.request;
 
-    validateId(id);
-    validateId(call.request.user_id);
+    validateId(user_id);
     validateTheme({ name, color_bg, color_main, color_caret, color_text, color_sub, color_sub_alt, color_error, color_extra_error }, false);
 
-    const existing = await prisma.theme.findUnique({ where: { id } });
-    if (!existing) {
-      return callback({ code: grpc.status.NOT_FOUND, details: 'Theme not found' });
-    }
-    if (existing.userId !== call.request.user_id) {
-      return callback({ code: grpc.status.PERMISSION_DENIED, details: 'Theme does not belong to this user' });
-    }
-
     const theme = await prisma.theme.update({
-      where: { id },
+      where: { userId: user_id },
       data: {
         name: name ?? undefined,
         colorBg: color_bg ?? undefined,

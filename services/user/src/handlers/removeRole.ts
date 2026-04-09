@@ -28,7 +28,7 @@ export const removeRole = async (call: GrpcCall<RoleRequest>, callback: GrpcCall
       where: { id: user_id },
       include: {
         profile: true,
-        activeTheme: true,
+        theme: true,
         roles: { include: { role: { include: { permissions: true } } } }
       }
     });

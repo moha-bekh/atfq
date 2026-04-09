@@ -31,6 +31,9 @@ export const createTheme = async (call: GrpcCall<CreateThemeRequest>, callback: 
     if (err.code === 'P2003') {
       return callback({ code: grpc.status.NOT_FOUND, details: 'User not found' });
     }
+    if (err.code === 'P2002') {
+      return callback({ code: grpc.status.ALREADY_EXISTS, details: 'User already has a theme' });
+    }
     const code = err.code ?? grpc.status.INTERNAL;
     const details = err.details ?? err.message;
     callback({ code, details });

@@ -10,7 +10,7 @@ export const getProfile = async (call: GrpcCall<UserRequest>, callback: GrpcCall
 
     const user = await prisma.user.findUnique({
       where: { id: call.request.id },
-      include: { profile: true, activeTheme: true },
+      include: { profile: true, theme: true },
     });
 
     if (user?.profile) {
@@ -18,7 +18,7 @@ export const getProfile = async (call: GrpcCall<UserRequest>, callback: GrpcCall
         id: user.profile.id,
         profile_picture: user.profile.profilePicture ?? '',
         language: user.profile.language,
-        active_theme: user.activeTheme ? mapThemeToProto(user.activeTheme) : null,
+        theme: user.theme ? mapThemeToProto(user.theme) : null,
       });
     } else {
       callback({ code: grpc.status.NOT_FOUND, details: 'Profile not found' });

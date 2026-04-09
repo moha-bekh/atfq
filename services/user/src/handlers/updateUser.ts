@@ -26,7 +26,7 @@ export const updateUser = async (call: GrpcCall<UpdateUserRequest>, callback: Gr
         },
         include: {
           profile: true,
-          activeTheme: true,
+          theme: true,
           roles: { include: { role: { include: { permissions: true } } } }
         }
       });
