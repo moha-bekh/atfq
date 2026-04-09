@@ -22,12 +22,16 @@ const startGrpc = () => {
   const server = new grpc.Server();
   // Import handlers
   server.addService(userProto.UserService.service, {
-	  GetUser:		handlers.getUser,
-	  CreateUser:	handlers.createUser,
-	  ListUsers:	handlers.listUsers,
-	  DeleteUser:	handlers.deleteUser,
-	  UpdateUser: handlers.updateUser
-
+    GetUser:            handlers.getUser,
+    GetUserByUsername:  handlers.getUserByUsername,
+    GetUserByEmail:     handlers.getUserByEmail,
+    CreateUser:         handlers.createUser,
+    ListUsers:          handlers.listUsers,
+    DeleteUser:         handlers.deleteUser,
+    UpdateUser:         handlers.updateUser,
+    AssignRole:         handlers.assignRole,
+    RemoveRole:         handlers.removeRole,
+    GetProfile:         handlers.getProfile,
   });
 
   server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), (error, port) => {

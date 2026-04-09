@@ -4,13 +4,31 @@ package user;
 
 service UserService {
   rpc GetUser (UserRequest) returns (UserResponse);
+  rpc GetUserByUsername (UsernameRequest) returns (UserResponse);
+  rpc GetUserByEmail (EmailRequest) returns (UserResponse);
   rpc CreateUser (CreateUserRequest) returns (UserResponse);
   rpc ListUsers (Empty) returns (UserListResponse);
   rpc DeleteUser (UserRequest) returns (UserResponse);
   rpc UpdateUser (UpdateUserRequest) returns (UserResponse);
+  rpc AssignRole (RoleRequest) returns (UserResponse);
+  rpc RemoveRole (RoleRequest) returns (UserResponse);
+  rpc GetProfile (UserRequest) returns (ProfileResponse);
 }
 
 message Empty {}
+
+message UsernameRequest {
+  string username = 1;
+}
+
+message EmailRequest {
+  string email = 1;
+}
+
+message RoleRequest {
+  string user_id = 1;
+  string role_id = 2;
+}
 
 message UserRequest {
   string    id = 1;

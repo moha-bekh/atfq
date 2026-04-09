@@ -8,8 +8,12 @@ import type {
   UserRequest,
   CreateUserRequest,
   UpdateUserRequest,
+  UsernameRequest,
+  EmailRequest,
+  RoleRequest,
   UserResponse,
   UserListResponse,
+  ProfileResponse,
 } from '../src/types/grpc.js';
 
 // ── gRPC client setup ─────────────────────────────────────────────────────────
@@ -23,11 +27,16 @@ const userProto = (grpc.loadPackageDefinition(packageDef) as any).user;
 interface GrpcServiceError { code: grpc.status; details: string; }
 
 interface UserServiceClient {
-  CreateUser(req: CreateUserRequest, cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
-  GetUser(req: UserRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
-  UpdateUser(req: UpdateUserRequest, cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
-  ListUsers(req: Empty,              cb: (e: GrpcServiceError | null, r: UserListResponse) => void): void;
-  DeleteUser(req: UserRequest,       cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  CreateUser(req: CreateUserRequest,    cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  GetUser(req: UserRequest,             cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  GetUserByUsername(req: UsernameRequest, cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  GetUserByEmail(req: EmailRequest,     cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  UpdateUser(req: UpdateUserRequest,    cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  ListUsers(req: Empty,                 cb: (e: GrpcServiceError | null, r: UserListResponse) => void): void;
+  DeleteUser(req: UserRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  AssignRole(req: RoleRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  RemoveRole(req: RoleRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
+  GetProfile(req: UserRequest,          cb: (e: GrpcServiceError | null, r: ProfileResponse) => void): void;
 }
 
 const raw: UserServiceClient = new userProto.UserService(
@@ -40,12 +49,22 @@ const client = {
     new Promise((res, rej) => raw.CreateUser(req, (e, r) => (e ? rej(e) : res(r)))),
   getUser: (req: UserRequest): Promise<UserResponse> =>
     new Promise((res, rej) => raw.GetUser(req, (e, r) => (e ? rej(e) : res(r)))),
+  getUserByUsername: (req: UsernameRequest): Promise<UserResponse> =>
+    new Promise((res, rej) => raw.GetUserByUsername(req, (e, r) => (e ? rej(e) : res(r)))),
+  getUserByEmail: (req: EmailRequest): Promise<UserResponse> =>
+    new Promise((res, rej) => raw.GetUserByEmail(req, (e, r) => (e ? rej(e) : res(r)))),
   updateUser: (req: UpdateUserRequest): Promise<UserResponse> =>
     new Promise((res, rej) => raw.UpdateUser(req, (e, r) => (e ? rej(e) : res(r)))),
   listUsers: (): Promise<UserListResponse> =>
     new Promise((res, rej) => raw.ListUsers({}, (e, r) => (e ? rej(e) : res(r)))),
   deleteUser: (req: UserRequest): Promise<UserResponse> =>
     new Promise((res, rej) => raw.DeleteUser(req, (e, r) => (e ? rej(e) : res(r)))),
+  assignRole: (req: RoleRequest): Promise<UserResponse> =>
+    new Promise((res, rej) => raw.AssignRole(req, (e, r) => (e ? rej(e) : res(r)))),
+  removeRole: (req: RoleRequest): Promise<UserResponse> =>
+    new Promise((res, rej) => raw.RemoveRole(req, (e, r) => (e ? rej(e) : res(r)))),
+  getProfile: (req: UserRequest): Promise<ProfileResponse> =>
+    new Promise((res, rej) => raw.GetProfile(req, (e, r) => (e ? rej(e) : res(r)))),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -293,5 +312,191 @@ describe('DeleteUser', () => {
       () => client.deleteUser({ id: UNKNOWN_ID }),
       (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
     );
+  });
+});
+
+// ── GetUserByUsername ─────────────────────────────────────────────────────────
+
+describe('GetUserByUsername', () => {
+  let user: UserResponse;
+
+  before(async () => { user = await createTempUser('by_uname'); });
+  after(async ()  => { await client.deleteUser({ id: user.id }); });
+
+  test('returns the correct user by username', async () => {
+    const found = await client.getUserByUsername({ username: user.username });
+    assert.equal(found.id, user.id);
+    assert.equal(found.username, user.username);
+    assert.ok(Array.isArray(found.roles));
+  });
+
+  test('rejects empty username', async () => {
+    await assert.rejects(
+      () => client.getUserByUsername({ username: '' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'username'); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for unknown username', async () => {
+    await assert.rejects(
+      () => client.getUserByUsername({ username: 'does_not_exist_xyz' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+});
+
+// ── GetUserByEmail ────────────────────────────────────────────────────────────
+
+describe('GetUserByEmail', () => {
+  let user: UserResponse;
+
+  before(async () => { user = await createTempUser('by_email'); });
+  after(async ()  => { await client.deleteUser({ id: user.id }); });
+
+  test('returns the correct user by email', async () => {
+    const found = await client.getUserByEmail({ email: user.email });
+    assert.equal(found.id, user.id);
+    assert.equal(found.email, user.email);
+    assert.ok(Array.isArray(found.roles));
+  });
+
+  test('rejects empty email', async () => {
+    await assert.rejects(
+      () => client.getUserByEmail({ email: '' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'email'); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for unknown email', async () => {
+    await assert.rejects(
+      () => client.getUserByEmail({ email: 'nobody@nowhere.invalid' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+});
+
+// ── AssignRole / RemoveRole ───────────────────────────────────────────────────
+
+describe('AssignRole', () => {
+  let userId: string;
+
+  before(async () => { userId = (await createTempUser('assign_role')).id; });
+  after(async ()  => { await client.deleteUser({ id: userId }); });
+
+  test('assigns an existing role to a user', async () => {
+    const updated = await client.assignRole({ user_id: userId, role_id: 'admin' });
+    assert.ok(updated.roles.includes('admin'));
+  });
+
+  test('returns ALREADY_EXISTS if role already assigned', async () => {
+    await assert.rejects(
+      () => client.assignRole({ user_id: userId, role_id: 'admin' }),
+      (err) => { assertGrpcError(err, grpc.status.ALREADY_EXISTS); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for unknown role', async () => {
+    await assert.rejects(
+      () => client.assignRole({ user_id: userId, role_id: 'nonexistent_role' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for unknown user', async () => {
+    await assert.rejects(
+      () => client.assignRole({ user_id: UNKNOWN_ID, role_id: 'user' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('rejects empty user_id', async () => {
+    await assert.rejects(
+      () => client.assignRole({ user_id: '', role_id: 'user' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('rejects empty role_id', async () => {
+    await assert.rejects(
+      () => client.assignRole({ user_id: userId, role_id: '' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'role_id'); return true; },
+    );
+  });
+});
+
+describe('RemoveRole', () => {
+  let userId: string;
+
+  before(async () => { userId = (await createTempUser('remove_role')).id; });
+  after(async ()  => { await client.deleteUser({ id: userId }); });
+
+  test('removes an assigned role from a user', async () => {
+    const updated = await client.removeRole({ user_id: userId, role_id: 'user' });
+    assert.ok(!updated.roles.includes('user'));
+  });
+
+  test('returns NOT_FOUND if role was not assigned', async () => {
+    await assert.rejects(
+      () => client.removeRole({ user_id: userId, role_id: 'user' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for unknown user', async () => {
+    await assert.rejects(
+      () => client.removeRole({ user_id: UNKNOWN_ID, role_id: 'user' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('rejects empty user_id', async () => {
+    await assert.rejects(
+      () => client.removeRole({ user_id: '', role_id: 'user' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('rejects empty role_id', async () => {
+    await assert.rejects(
+      () => client.removeRole({ user_id: userId, role_id: '' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'role_id'); return true; },
+    );
+  });
+});
+
+// ── GetProfile ────────────────────────────────────────────────────────────────
+
+describe('GetProfile', () => {
+  let userId: string;
+
+  before(async () => { userId = (await createTempUser('profile')).id; });
+  after(async ()  => { await client.deleteUser({ id: userId }); });
+
+  test('returns the profile for a user', async () => {
+    const profile = await client.getProfile({ id: userId });
+    assert.ok(profile.id, 'profile should have an id');
+    assert.equal(profile.language, 'en');
+    assert.equal(profile.dark_theme, false);
+  });
+
+  test('rejects empty id', async () => {
+    await assert.rejects(
+      () => client.getProfile({ id: '' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for user with no profile', async () => {
+    await assert.rejects(
+      () => client.getProfile({ id: UNKNOWN_ID }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('reflects profile updates', async () => {
+    await client.updateUser({ id: userId, dark_theme: true, language: 'pt' });
+    const profile = await client.getProfile({ id: userId });
+    assert.equal(profile.dark_theme, true);
+    assert.equal(profile.language, 'pt');
   });
 });
