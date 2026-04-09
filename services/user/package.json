@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "prisma migrate deploy && node dist/main.js",
     "studio": "prisma studio",
-    "test": "tsx test/user.test.ts",
+    "test": "prisma migrate deploy && tsx prisma/seed.ts && node --import tsx/esm --test test/user.test.ts",
     "generate": "prisma generate",
     "postinstall": "prisma generate"
   },

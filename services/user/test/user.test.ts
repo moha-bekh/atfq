@@ -464,6 +464,103 @@ describe('RemoveRole', () => {
   });
 });
 
+// ── Moderator role ────────────────────────────────────────────────────────────
+
+describe('Moderator role', () => {
+  test('can be assigned and is reflected in roles', async () => {
+    const user = await createTempUser('mod_assign');
+    try {
+      const updated = await client.assignRole({ user_id: user.id, role_id: 'moderator' });
+      assert.ok(updated.roles.includes('moderator'), 'should include moderator');
+      assert.ok(updated.roles.includes('user'), 'should retain default user role');
+    } finally {
+      await client.deleteUser({ id: user.id });
+    }
+  });
+
+  test('grants article:write in addition to base user permissions', async () => {
+    const user = await createTempUser('mod_perms');
+    try {
+      await client.assignRole({ user_id: user.id, role_id: 'moderator' });
+      const fetched = await client.getUser({ id: user.id });
+      assert.ok(fetched.permissions.includes('article:read'));
+      assert.ok(fetched.permissions.includes('article:write'));
+      assert.ok(fetched.permissions.includes('profile:edit'));
+    } finally {
+      await client.deleteUser({ id: user.id });
+    }
+  });
+
+  test('does not grant user:manage', async () => {
+    const user = await createTempUser('mod_no_manage');
+    try {
+      await client.assignRole({ user_id: user.id, role_id: 'moderator' });
+      const fetched = await client.getUser({ id: user.id });
+      assert.ok(!fetched.permissions.includes('user:manage'));
+    } finally {
+      await client.deleteUser({ id: user.id });
+    }
+  });
+
+  test('returns ALREADY_EXISTS when assigned twice', async () => {
+    const user = await createTempUser('mod_dup');
+    try {
+      await client.assignRole({ user_id: user.id, role_id: 'moderator' });
+      await assert.rejects(
+        () => client.assignRole({ user_id: user.id, role_id: 'moderator' }),
+        (err) => { assertGrpcError(err, grpc.status.ALREADY_EXISTS); return true; },
+      );
+    } finally {
+      await client.deleteUser({ id: user.id });
+    }
+  });
+
+  test('can be removed; user role is retained', async () => {
+    const user = await createTempUser('mod_remove');
+    try {
+      await client.assignRole({ user_id: user.id, role_id: 'moderator' });
+      const updated = await client.removeRole({ user_id: user.id, role_id: 'moderator' });
+      assert.ok(!updated.roles.includes('moderator'), 'moderator should be gone');
+      assert.ok(updated.roles.includes('user'), 'user role should remain');
+    } finally {
+      await client.deleteUser({ id: user.id });
+    }
+  });
+
+  test('after removal, article:write permission is revoked', async () => {
+    const user = await createTempUser('mod_revert');
+    try {
+      await client.assignRole({ user_id: user.id, role_id: 'moderator' });
+      await client.removeRole({ user_id: user.id, role_id: 'moderator' });
+      const fetched = await client.getUser({ id: user.id });
+      assert.ok(!fetched.permissions.includes('article:write'), 'article:write should be revoked');
+      assert.ok(fetched.permissions.includes('article:read'), 'base permissions should remain');
+      assert.ok(fetched.permissions.includes('profile:edit'), 'base permissions should remain');
+    } finally {
+      await client.deleteUser({ id: user.id });
+    }
+  });
+
+  test('returns NOT_FOUND when assigning to unknown user', async () => {
+    await assert.rejects(
+      () => client.assignRole({ user_id: UNKNOWN_ID, role_id: 'moderator' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND when removing moderator not yet assigned', async () => {
+    const user = await createTempUser('mod_no_role');
+    try {
+      await assert.rejects(
+        () => client.removeRole({ user_id: user.id, role_id: 'moderator' }),
+        (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+      );
+    } finally {
+      await client.deleteUser({ id: user.id });
+    }
+  });
+});
+
 // ── GetProfile ────────────────────────────────────────────────────────────────
 
 describe('GetProfile', () => {

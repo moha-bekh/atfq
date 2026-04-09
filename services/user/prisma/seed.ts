@@ -84,7 +84,16 @@ async function main() {
     permissionIds: ['article:read', 'profile:edit'],
   });
 
-  // Step 3: Example of adding future roles easily
+  // Step 3: Create the 'moderator' role
+  await upsertRoleWithPermissions({
+    id: 'moderator',
+    name: 'Moderator',
+    priority: 5,
+    description: 'Can moderate content',
+    permissionIds: ['article:read', 'article:write', 'profile:edit'],
+  });
+
+  // Step 4: Create the 'admin' role
   await upsertRoleWithPermissions({
     id: 'admin',
     name: 'Administrator',
