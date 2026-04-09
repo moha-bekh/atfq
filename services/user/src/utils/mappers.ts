@@ -1,12 +1,29 @@
 import { Prisma } from '@prisma/client';
-import type { UserResponse } from '../types/grpc.js';
+import type { UserResponse, ThemeResponse } from '../types/grpc.js';
 
 type UserWithRelations = Prisma.UserGetPayload<{
   include: {
     profile: true;
+    activeTheme: true;
     roles: { include: { role: { include: { permissions: true } } } };
   };
 }>;
+
+type ThemeModel = Prisma.ThemeGetPayload<{}>;
+
+export const mapThemeToProto = (theme: ThemeModel): ThemeResponse => ({
+  id: theme.id,
+  user_id: theme.userId,
+  name: theme.name,
+  color_bg: theme.colorBg,
+  color_main: theme.colorMain,
+  color_caret: theme.colorCaret,
+  color_text: theme.colorText,
+  color_sub: theme.colorSub,
+  color_sub_alt: theme.colorSubAlt,
+  color_error: theme.colorError,
+  color_extra_error: theme.colorExtraError,
+});
 
 export const mapUserToProto = (user: UserWithRelations): UserResponse => {
   const roles = user.roles.map((ur) => ur.roleId);
@@ -25,8 +42,10 @@ export const mapUserToProto = (user: UserWithRelations): UserResponse => {
       ? {
           id: user.profile.id,
           profile_picture: user.profile.profilePicture ?? '',
-          dark_theme: user.profile.darkTheme,
           language: user.profile.language,
+          active_theme: user.activeTheme
+            ? mapThemeToProto(user.activeTheme)
+            : null,
         }
       : null,
     roles,

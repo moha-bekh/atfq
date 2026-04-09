@@ -1,5 +1,6 @@
 import * as grpc from '@grpc/grpc-js';
 import { prisma } from '../database.js';
+import { mapThemeToProto } from '../utils/mappers.js';
 import { validateId } from '../utils/validate.js';
 import type { GrpcCall, GrpcCallback, UserRequest, ProfileResponse } from '../types/grpc.js';
 
@@ -7,16 +8,17 @@ export const getProfile = async (call: GrpcCall<UserRequest>, callback: GrpcCall
   try {
     validateId(call.request.id);
 
-    const profile = await prisma.profile.findUnique({
-      where: { userId: call.request.id }
+    const user = await prisma.user.findUnique({
+      where: { id: call.request.id },
+      include: { profile: true, activeTheme: true },
     });
 
-    if (profile) {
+    if (user?.profile) {
       callback(null, {
-        id: profile.id,
-        profile_picture: profile.profilePicture ?? '',
-        dark_theme: profile.darkTheme,
-        language: profile.language,
+        id: user.profile.id,
+        profile_picture: user.profile.profilePicture ?? '',
+        language: user.profile.language,
+        active_theme: user.activeTheme ? mapThemeToProto(user.activeTheme) : null,
       });
     } else {
       callback({ code: grpc.status.NOT_FOUND, details: 'Profile not found' });

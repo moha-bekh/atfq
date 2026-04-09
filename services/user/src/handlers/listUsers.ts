@@ -8,6 +8,7 @@ export const listUsers = async (_call: GrpcCall<Empty>, callback: GrpcCallback<U
     const users = await prisma.user.findMany({
       include: {
         profile: true,
+        activeTheme: true,
         roles: { include: { role: { include: { permissions: true } } } }
       }
     });

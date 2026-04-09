@@ -18,26 +18,48 @@ model User {
 	firstname		String			@db.VarChar(255)
 	lastname  		String			@db.VarChar(255)
 	email			String			@unique @db.VarChar(255)
+	activeThemeId	String?			@unique @map("active_theme_id") @db.Uuid
 	createdAt 		DateTime		@default(now()) @map("created_at") @db.Timestamptz
 	updatedAt 		DateTime		@default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 	profile   		Profile?
 	roles     		UserRole[]
 	contributions	Contribution[]
+	themes      	Theme[]			@relation("UserThemes")
+	activeTheme		Theme?			@relation("ActiveTheme", fields: [activeThemeId], references: [id], onDelete: SetNull)
 
 	@@map("users")
 }
 
 model Profile {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String   @unique @map("user_id") @db.Uuid
-  profilePicture String?  @map("profile_picture")
-  darkTheme      Boolean  @default(false) @map("dark_theme")
-  language       String   @default("en") @db.VarChar(10)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  profilePicture  String?  @map("profile_picture")
+  language        String   @default("en") @db.VarChar(10)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("profile")
+}
+
+model Theme {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  name            String   @db.VarChar(100)
+  colorBg         String   @map("color_bg") @db.VarChar(20)
+  colorMain       String   @map("color_main") @db.VarChar(20)
+  colorCaret      String   @map("color_caret") @db.VarChar(20)
+  colorText       String   @map("color_text") @db.VarChar(20)
+  colorSub        String   @map("color_sub") @db.VarChar(20)
+  colorSubAlt     String   @map("color_sub_alt") @db.VarChar(20)
+  colorError      String   @map("color_error") @db.VarChar(20)
+  colorExtraError String   @map("color_extra_error") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  user            User     @relation("UserThemes", fields: [userId], references: [id], onDelete: Cascade)
+  activeInUser    User?    @relation("ActiveTheme")
+
+  @@map("themes")
 }
 
 model Role {

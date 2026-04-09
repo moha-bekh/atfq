@@ -18,7 +18,7 @@ export const createUser = async (call: GrpcCall<CreateUserRequest>, callback: Gr
       return tx.user.create({
         data: {
           username, firstname, lastname, email,
-          profile: { create: { language: "en", darkTheme: false } },
+          profile: { create: { language: "en" } },
           roles: { create: { roleId: DEFAULT_ROLE } }
         },
         include: {

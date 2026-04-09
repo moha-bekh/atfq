@@ -6,7 +6,7 @@ import type { GrpcCall, GrpcCallback, UpdateUserRequest, UserResponse } from '..
 
 export const updateUser = async (call: GrpcCall<UpdateUserRequest>, callback: GrpcCallback<UserResponse>) => {
   try {
-    const { id, firstname, lastname, profile_picture, dark_theme, language } = call.request;
+    const { id, firstname, lastname, profile_picture, language } = call.request;
 
     validateId(id);
     validateUpdateUser({ firstname, lastname, profile_picture, language });
@@ -20,13 +20,13 @@ export const updateUser = async (call: GrpcCall<UpdateUserRequest>, callback: Gr
           profile: {
             update: {
               profilePicture: profile_picture ?? undefined,
-              darkTheme: dark_theme !== undefined ? dark_theme : undefined,
               language: language ?? undefined,
             }
           }
         },
         include: {
           profile: true,
+          activeTheme: true,
           roles: { include: { role: { include: { permissions: true } } } }
         }
       });

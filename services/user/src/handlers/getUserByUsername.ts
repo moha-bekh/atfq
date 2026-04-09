@@ -14,6 +14,7 @@ export const getUserByUsername = async (call: GrpcCall<UsernameRequest>, callbac
       where: { username },
       include: {
         profile: true,
+        activeTheme: true,
         roles: { include: { role: { include: { permissions: true } } } }
       }
     });

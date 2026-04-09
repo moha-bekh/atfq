@@ -13,6 +13,12 @@ service UserService {
   rpc AssignRole (RoleRequest) returns (UserResponse);
   rpc RemoveRole (RoleRequest) returns (UserResponse);
   rpc GetProfile (UserRequest) returns (ProfileResponse);
+  rpc CreateTheme (CreateThemeRequest) returns (ThemeResponse);
+  rpc GetTheme (ThemeRequest) returns (ThemeResponse);
+  rpc ListThemes (UserRequest) returns (ThemeListResponse);
+  rpc UpdateTheme (UpdateThemeRequest) returns (ThemeResponse);
+  rpc DeleteTheme (DeleteThemeRequest) returns (ThemeResponse);
+  rpc SetActiveTheme (SetActiveThemeRequest) returns (ThemeResponse);
 }
 
 message Empty {}
@@ -31,7 +37,16 @@ message RoleRequest {
 }
 
 message UserRequest {
-  string    id = 1;
+  string id = 1;
+}
+
+message ThemeRequest {
+  string id = 1;
+}
+
+message DeleteThemeRequest {
+  string id = 1;
+  string user_id = 2;
 }
 
 message UpdateUserRequest {
@@ -39,22 +54,71 @@ message UpdateUserRequest {
   optional string firstname = 2;
   optional string lastname = 3;
   optional string profile_picture = 4;
-  optional bool   dark_theme = 5;
-  optional string language = 6;
+  optional string language = 5;
 }
 
 message CreateUserRequest {
-  string    username = 1;
-  string    firstname = 2;
-  string    lastname = 3;
-  string    email = 4;
+  string username = 1;
+  string firstname = 2;
+  string lastname = 3;
+  string email = 4;
+}
+
+message CreateThemeRequest {
+  string user_id = 1;
+  string name = 2;
+  string color_bg = 3;
+  string color_main = 4;
+  string color_caret = 5;
+  string color_text = 6;
+  string color_sub = 7;
+  string color_sub_alt = 8;
+  string color_error = 9;
+  string color_extra_error = 10;
+}
+
+message UpdateThemeRequest {
+  string id = 1;
+  string user_id = 2;
+  optional string name = 3;
+  optional string color_bg = 4;
+  optional string color_main = 5;
+  optional string color_caret = 6;
+  optional string color_text = 7;
+  optional string color_sub = 8;
+  optional string color_sub_alt = 9;
+  optional string color_error = 10;
+  optional string color_extra_error = 11;
+}
+
+message SetActiveThemeRequest {
+  string user_id = 1;
+  string theme_id = 2;
+}
+
+message ThemeResponse {
+  string id = 1;
+  string user_id = 2;
+  string name = 3;
+  string color_bg = 4;
+  string color_main = 5;
+  string color_caret = 6;
+  string color_text = 7;
+  string color_sub = 8;
+  string color_sub_alt = 9;
+  string color_error = 10;
+  string color_extra_error = 11;
+}
+
+message ThemeListResponse {
+  repeated ThemeResponse themes = 1;
 }
 
 message ProfileResponse {
   string id = 1;
   string profile_picture = 2;
-  bool   dark_theme = 3;
-  string language = 4;
+  string language = 3;
+  ThemeResponse active_theme = 4;
 }
 
 message UserResponse {

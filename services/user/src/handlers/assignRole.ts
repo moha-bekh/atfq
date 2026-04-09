@@ -31,6 +31,7 @@ export const assignRole = async (call: GrpcCall<RoleRequest>, callback: GrpcCall
       where: { id: user_id },
       include: {
         profile: true,
+        activeTheme: true,
         roles: { include: { role: { include: { permissions: true } } } }
       }
     });

@@ -6,14 +6,21 @@ import path from 'path';
 import type {
   Empty,
   UserRequest,
+  ThemeRequest,
   CreateUserRequest,
   UpdateUserRequest,
   UsernameRequest,
   EmailRequest,
   RoleRequest,
+  CreateThemeRequest,
+  UpdateThemeRequest,
+  DeleteThemeRequest,
+  SetActiveThemeRequest,
   UserResponse,
   UserListResponse,
   ProfileResponse,
+  ThemeResponse,
+  ThemeListResponse,
 } from '../src/types/grpc.js';
 
 // ── gRPC client setup ─────────────────────────────────────────────────────────
@@ -36,7 +43,13 @@ interface UserServiceClient {
   DeleteUser(req: UserRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
   AssignRole(req: RoleRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
   RemoveRole(req: RoleRequest,          cb: (e: GrpcServiceError | null, r: UserResponse) => void): void;
-  GetProfile(req: UserRequest,          cb: (e: GrpcServiceError | null, r: ProfileResponse) => void): void;
+  GetProfile(req: UserRequest,              cb: (e: GrpcServiceError | null, r: ProfileResponse) => void): void;
+  CreateTheme(req: CreateThemeRequest,      cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  GetTheme(req: ThemeRequest,               cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  ListThemes(req: UserRequest,              cb: (e: GrpcServiceError | null, r: ThemeListResponse) => void): void;
+  UpdateTheme(req: UpdateThemeRequest,      cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  DeleteTheme(req: DeleteThemeRequest,      cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
+  SetActiveTheme(req: SetActiveThemeRequest, cb: (e: GrpcServiceError | null, r: ThemeResponse) => void): void;
 }
 
 const raw: UserServiceClient = new userProto.UserService(
@@ -65,6 +78,18 @@ const client = {
     new Promise((res, rej) => raw.RemoveRole(req, (e, r) => (e ? rej(e) : res(r)))),
   getProfile: (req: UserRequest): Promise<ProfileResponse> =>
     new Promise((res, rej) => raw.GetProfile(req, (e, r) => (e ? rej(e) : res(r)))),
+  createTheme: (req: CreateThemeRequest): Promise<ThemeResponse> =>
+    new Promise((res, rej) => raw.CreateTheme(req, (e, r) => (e ? rej(e) : res(r)))),
+  getTheme: (req: ThemeRequest): Promise<ThemeResponse> =>
+    new Promise((res, rej) => raw.GetTheme(req, (e, r) => (e ? rej(e) : res(r)))),
+  listThemes: (req: UserRequest): Promise<ThemeListResponse> =>
+    new Promise((res, rej) => raw.ListThemes(req, (e, r) => (e ? rej(e) : res(r)))),
+  updateTheme: (req: UpdateThemeRequest): Promise<ThemeResponse> =>
+    new Promise((res, rej) => raw.UpdateTheme(req, (e, r) => (e ? rej(e) : res(r)))),
+  deleteTheme: (req: DeleteThemeRequest): Promise<ThemeResponse> =>
+    new Promise((res, rej) => raw.DeleteTheme(req, (e, r) => (e ? rej(e) : res(r)))),
+  setActiveTheme: (req: SetActiveThemeRequest): Promise<ThemeResponse> =>
+    new Promise((res, rej) => raw.SetActiveTheme(req, (e, r) => (e ? rej(e) : res(r)))),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -92,6 +117,20 @@ const createTempUser = (name: string) =>
     email: `${uid(name)}@example.com`,
   });
 
+const BASE_THEME_COLORS = {
+  color_bg:          '#7766BD',
+  color_main:        '#F4EFFA',
+  color_caret:       '#F4EFFA',
+  color_text:        '#F4EFFA',
+  color_sub:         '#4B3A91',
+  color_sub_alt:     '#4B3A91',
+  color_error:       '#00F5FF',
+  color_extra_error: '#20C2CC',
+};
+
+const createTempTheme = (userId: string, name = 'My Theme') =>
+  client.createTheme({ user_id: userId, name, ...BASE_THEME_COLORS });
+
 const UNKNOWN_ID = '00000000-0000-0000-0000-000000000000';
 
 // ── CreateUser ────────────────────────────────────────────────────────────────
@@ -108,7 +147,6 @@ describe('CreateUser', () => {
       assert.deepEqual(user.roles, ['user']);
       assert.ok(user.profile, 'should have a profile');
       assert.equal(user.profile?.language, 'en');
-      assert.equal(user.profile?.dark_theme, false);
     } finally {
       await client.deleteUser({ id: user.id });
     }
@@ -219,15 +257,13 @@ describe('UpdateUser', () => {
     assert.equal(updated.lastname, 'Name');
   });
 
-  test('updates profile picture, dark_theme, and language', async () => {
+  test('updates profile picture and language', async () => {
     const updated = await client.updateUser({
       id: userId,
       profile_picture: 'https://example.com/pic.png',
-      dark_theme: true,
       language: 'fr',
     });
     assert.equal(updated.profile?.profile_picture, 'https://example.com/pic.png');
-    assert.equal(updated.profile?.dark_theme, true);
     assert.equal(updated.profile?.language, 'fr');
   });
 
@@ -573,7 +609,6 @@ describe('GetProfile', () => {
     const profile = await client.getProfile({ id: userId });
     assert.ok(profile.id, 'profile should have an id');
     assert.equal(profile.language, 'en');
-    assert.equal(profile.dark_theme, false);
   });
 
   test('rejects empty id', async () => {
@@ -591,9 +626,312 @@ describe('GetProfile', () => {
   });
 
   test('reflects profile updates', async () => {
-    await client.updateUser({ id: userId, dark_theme: true, language: 'pt' });
+    await client.updateUser({ id: userId, language: 'pt' });
     const profile = await client.getProfile({ id: userId });
-    assert.equal(profile.dark_theme, true);
     assert.equal(profile.language, 'pt');
+  });
+});
+
+// ── CreateTheme ───────────────────────────────────────────────────────────────
+
+describe('CreateTheme', () => {
+  let userId: string;
+
+  before(async () => { userId = (await createTempUser('theme_create')).id; });
+  after(async ()  => { await client.deleteUser({ id: userId }); });
+
+  test('creates a theme with all fields', async () => {
+    const theme = await createTempTheme(userId, 'Test Theme');
+    assert.ok(theme.id, 'should have an id');
+    assert.equal(theme.user_id, userId);
+    assert.equal(theme.name, 'Test Theme');
+    assert.equal(theme.color_bg, '#7766BD');
+    assert.equal(theme.color_main, '#F4EFFA');
+    assert.equal(theme.color_caret, '#F4EFFA');
+    assert.equal(theme.color_text, '#F4EFFA');
+    assert.equal(theme.color_sub, '#4B3A91');
+    assert.equal(theme.color_sub_alt, '#4B3A91');
+    assert.equal(theme.color_error, '#00F5FF');
+    assert.equal(theme.color_extra_error, '#20C2CC');
+  });
+
+  test('accepts 3-digit hex colors', async () => {
+    const theme = await client.createTheme({
+      user_id: userId,
+      name: 'Short Hex',
+      ...BASE_THEME_COLORS,
+      color_bg: '#ABC',
+    });
+    assert.equal(theme.color_bg, '#ABC');
+  });
+
+  test('rejects empty user_id', async () => {
+    await assert.rejects(
+      () => client.createTheme({ user_id: '', name: 'X', ...BASE_THEME_COLORS }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('rejects empty name', async () => {
+    await assert.rejects(
+      () => client.createTheme({ user_id: userId, name: '', ...BASE_THEME_COLORS }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'name'); return true; },
+    );
+  });
+
+  test('rejects name longer than 100 characters', async () => {
+    await assert.rejects(
+      () => client.createTheme({ user_id: userId, name: 'a'.repeat(101), ...BASE_THEME_COLORS }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'name'); return true; },
+    );
+  });
+
+  test('rejects invalid hex color', async () => {
+    await assert.rejects(
+      () => client.createTheme({ user_id: userId, name: 'Bad Color', ...BASE_THEME_COLORS, color_bg: 'red' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'color_bg'); return true; },
+    );
+  });
+
+  test('rejects unknown user', async () => {
+    await assert.rejects(
+      () => client.createTheme({ user_id: UNKNOWN_ID, name: 'Ghost', ...BASE_THEME_COLORS }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+});
+
+// ── GetTheme ──────────────────────────────────────────────────────────────────
+
+describe('GetTheme', () => {
+  let userId: string;
+  let themeId: string;
+
+  before(async () => {
+    userId = (await createTempUser('theme_get')).id;
+    themeId = (await createTempTheme(userId)).id;
+  });
+  after(async () => { await client.deleteUser({ id: userId }); });
+
+  test('returns the correct theme by id', async () => {
+    const theme = await client.getTheme({ id: themeId });
+    assert.equal(theme.id, themeId);
+    assert.equal(theme.user_id, userId);
+    assert.equal(theme.color_bg, '#7766BD');
+  });
+
+  test('rejects empty id', async () => {
+    await assert.rejects(
+      () => client.getTheme({ id: '' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for unknown theme id', async () => {
+    await assert.rejects(
+      () => client.getTheme({ id: UNKNOWN_ID }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+});
+
+// ── ListThemes ────────────────────────────────────────────────────────────────
+
+describe('ListThemes', () => {
+  let userId: string;
+
+  before(async () => { userId = (await createTempUser('theme_list')).id; });
+  after(async ()  => { await client.deleteUser({ id: userId }); });
+
+  test('returns empty list when user has no themes', async () => {
+    const { themes } = await client.listThemes({ id: userId });
+    assert.ok(Array.isArray(themes));
+    assert.equal(themes.length, 0);
+  });
+
+  test('returns all themes belonging to the user', async () => {
+    await createTempTheme(userId, 'Theme A');
+    await createTempTheme(userId, 'Theme B');
+    const { themes } = await client.listThemes({ id: userId });
+    assert.ok(themes.length >= 2);
+    assert.ok(themes.every((t) => t.user_id === userId));
+  });
+
+  test('rejects empty id', async () => {
+    await assert.rejects(
+      () => client.listThemes({ id: '' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+});
+
+// ── UpdateTheme ───────────────────────────────────────────────────────────────
+
+describe('UpdateTheme', () => {
+  let userId: string;
+  let themeId: string;
+
+  before(async () => {
+    userId = (await createTempUser('theme_update')).id;
+    themeId = (await createTempTheme(userId)).id;
+  });
+  after(async () => { await client.deleteUser({ id: userId }); });
+
+  test('updates the name', async () => {
+    const updated = await client.updateTheme({ id: themeId, user_id: userId, name: 'Renamed' });
+    assert.equal(updated.name, 'Renamed');
+  });
+
+  test('updates a single color field', async () => {
+    const updated = await client.updateTheme({ id: themeId, user_id: userId, color_bg: '#123456' });
+    assert.equal(updated.color_bg, '#123456');
+  });
+
+  test('partial update leaves other fields unchanged', async () => {
+    const before = await client.getTheme({ id: themeId });
+    await client.updateTheme({ id: themeId, user_id: userId, color_bg: '#FFFFFF' });
+    const after = await client.getTheme({ id: themeId });
+    assert.equal(after.color_main, before.color_main);
+    assert.equal(after.color_text, before.color_text);
+  });
+
+  test('rejects invalid hex color', async () => {
+    await assert.rejects(
+      () => client.updateTheme({ id: themeId, user_id: userId, color_error: 'notahex' }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'color_error'); return true; },
+    );
+  });
+
+  test('rejects empty theme id', async () => {
+    await assert.rejects(
+      () => client.updateTheme({ id: '', user_id: userId }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('returns PERMISSION_DENIED when user does not own the theme', async () => {
+    const other = await createTempUser('tu_other');
+    try {
+      await assert.rejects(
+        () => client.updateTheme({ id: themeId, user_id: other.id, color_bg: '#000000' }),
+        (err) => { assertGrpcError(err, grpc.status.PERMISSION_DENIED); return true; },
+      );
+    } finally {
+      await client.deleteUser({ id: other.id });
+    }
+  });
+
+  test('returns NOT_FOUND for unknown theme id', async () => {
+    await assert.rejects(
+      () => client.updateTheme({ id: UNKNOWN_ID, user_id: userId, name: 'X' }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+});
+
+// ── DeleteTheme ───────────────────────────────────────────────────────────────
+
+describe('DeleteTheme', () => {
+  let userId: string;
+
+  before(async () => { userId = (await createTempUser('theme_delete')).id; });
+  after(async ()  => { await client.deleteUser({ id: userId }); });
+
+  test('deletes a theme and makes it unreachable', async () => {
+    const theme = await createTempTheme(userId);
+    await client.deleteTheme({ id: theme.id, user_id: userId });
+    await assert.rejects(
+      () => client.getTheme({ id: theme.id }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('returns PERMISSION_DENIED when user does not own the theme', async () => {
+    const theme = await createTempTheme(userId);
+    const other = await createTempUser('td_other');
+    try {
+      await assert.rejects(
+        () => client.deleteTheme({ id: theme.id, user_id: other.id }),
+        (err) => { assertGrpcError(err, grpc.status.PERMISSION_DENIED); return true; },
+      );
+    } finally {
+      await client.deleteUser({ id: other.id });
+      await client.deleteTheme({ id: theme.id, user_id: userId });
+    }
+  });
+
+  test('rejects empty theme id', async () => {
+    await assert.rejects(
+      () => client.deleteTheme({ id: '', user_id: userId }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('returns NOT_FOUND for unknown theme id', async () => {
+    await assert.rejects(
+      () => client.deleteTheme({ id: UNKNOWN_ID, user_id: userId }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+});
+
+// ── SetActiveTheme ────────────────────────────────────────────────────────────
+
+describe('SetActiveTheme', () => {
+  let userId: string;
+  let themeId: string;
+
+  before(async () => {
+    userId = (await createTempUser('theme_active')).id;
+    themeId = (await createTempTheme(userId)).id;
+  });
+  after(async () => { await client.deleteUser({ id: userId }); });
+
+  test('sets the active theme and reflects it in the profile', async () => {
+    await client.setActiveTheme({ user_id: userId, theme_id: themeId });
+    const profile = await client.getProfile({ id: userId });
+    assert.ok(profile.active_theme, 'profile should have an active theme');
+    assert.equal(profile.active_theme?.id, themeId);
+    assert.equal(profile.active_theme?.color_bg, '#7766BD');
+  });
+
+  test('active theme is included in GetUser response', async () => {
+    const user = await client.getUser({ id: userId });
+    assert.equal(user.profile?.active_theme?.id, themeId);
+  });
+
+  test('returns PERMISSION_DENIED when theme belongs to another user', async () => {
+    const other = await createTempUser('ta_other');
+    const otherTheme = await createTempTheme(other.id);
+    try {
+      await assert.rejects(
+        () => client.setActiveTheme({ user_id: userId, theme_id: otherTheme.id }),
+        (err) => { assertGrpcError(err, grpc.status.PERMISSION_DENIED); return true; },
+      );
+    } finally {
+      await client.deleteUser({ id: other.id });
+    }
+  });
+
+  test('returns NOT_FOUND for unknown theme', async () => {
+    await assert.rejects(
+      () => client.setActiveTheme({ user_id: userId, theme_id: UNKNOWN_ID }),
+      (err) => { assertGrpcError(err, grpc.status.NOT_FOUND); return true; },
+    );
+  });
+
+  test('rejects empty user_id', async () => {
+    await assert.rejects(
+      () => client.setActiveTheme({ user_id: '', theme_id: themeId }),
+      (err) => { assertGrpcError(err, grpc.status.INVALID_ARGUMENT, 'id'); return true; },
+    );
+  });
+
+  test('deleting active theme clears it from the profile', async () => {
+    const tempTheme = await createTempTheme(userId, 'Temp Active');
+    await client.setActiveTheme({ user_id: userId, theme_id: tempTheme.id });
+    await client.deleteTheme({ id: tempTheme.id, user_id: userId });
+    const profile = await client.getProfile({ id: userId });
+    assert.ok(!profile.active_theme?.id, 'active_theme should be cleared after deletion');
   });
 });
