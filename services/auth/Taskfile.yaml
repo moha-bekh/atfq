@@ -1,0 +1,48 @@
+version: "3"
+
+vars:
+  ADDR: "127.0.0.1:8082"
+  DATABASE_URL: "postgresql://atfq:atfq@localhost:5432/atfq_db"
+
+env:
+  DATABASE_URL: "{{.DATABASE_URL}}"
+
+tasks:
+  list:
+    desc: "List available gRPC services (via Reflection)"
+    cmds:
+      - grpcurl -plaintext {{.ADDR}} list
+      - grpcurl -plaintext {{.ADDR}} list auth.AuthService
+
+  migrate-add:
+    desc: "Create a new migration file (Usage: task migrate-add NAME=your_migration_name)"
+    requires:
+      vars: [NAME]
+    cmds:
+      - sqlx migrate add {{.NAME}}
+
+  migrate-run:
+    desc: "Run pending database migrations manually"
+    cmds:
+      - sqlx migrate run
+
+  offline-prepare:
+    desc: "Update SQLx offline metadata (requires active DB connection)"
+    cmds:
+      - cargo sqlx prepare -- --all-targets
+
+  db-users:
+    desc: "Quickly list all users in the database"
+    cmds:
+      - |
+        docker exec -it db-auth \
+        psql -U {{.POSTGRES_USER | default "atfq"}} -d {{.POSTGRES_DB | default "atfq_db"}} \
+        -c "SELECT id, username, email, is_2fa_enabled, created_at FROM users;"
+
+  db-shell:
+    desc: "Open an interactive Postgres shell inside the container"
+    interactive: true
+    cmds:
+      - |
+        docker exec -it services-db-auth-1 \
+        psql -U {{.POSTGRES_USER | default "atfq"}} -d {{.POSTGRES_DB | default "atfq_db"}}
