@@ -4,27 +4,18 @@ use std::env;
 use std::sync::Arc;
 use dotenvy::dotenv;
 
-pub mod domain;
-pub mod app;
-pub mod infra;
-pub mod api;
-
-pub mod auth_proto {
-    tonic::include_proto!("auth");
-    pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("auth_descriptor");
-}
-
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
-use crate::infra::security::jwt_adapter::JwtAdapter;
-use crate::infra::security::password_hasher::Argon2Hasher;
-use crate::app::auth::register::RegisterUseCase;
-use crate::api::grpc::handler::AuthHandler;
-use crate::auth_proto::auth_service_server::AuthServiceServer;
+use auth::infra::persistence::postgres_user_repo::PostgresUserRepository;
+use auth::infra::security::jwt_adapter::JwtAdapter;
+use auth::infra::security::password_hasher::Argon2Hasher;
+use auth::app::auth::register::RegisterUseCase;
+use auth::api::grpc::handler::AuthHandler;
+use auth::auth_proto::auth_service_server::AuthServiceServer;
+use auth::auth_proto;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
-    dotenvy::from_path("/vault/secrets/.env").expect("Failed to load secrets from Vault");
+    dotenvy::from_path("/vault/secrets/.env").ok();
     dotenv().ok();
 
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
