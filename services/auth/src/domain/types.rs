@@ -75,3 +75,56 @@ impl TryFrom<String> for Email {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_username_valid() {
+        let username = Username::new("johndoe");
+        assert!(username.is_ok());
+        assert_eq!(username.unwrap().to_string(), "johndoe");
+    }
+
+    #[test]
+    fn test_username_too_short() {
+        let username = Username::new("jo");
+        assert!(username.is_err());
+        if let Err(DomainError::InvalidInput(msg)) = username {
+            assert!(msg.contains("at least 3 characters"));
+        } else {
+            panic!("Expected InvalidInput error");
+        }
+    }
+
+    #[test]
+    fn test_username_contains_at_symbol() {
+        let username = Username::new("user@name");
+        assert!(username.is_err());
+        if let Err(DomainError::InvalidInput(msg)) = username {
+            assert!(msg.contains("cannot be empty or contain '@'"));
+        } else {
+            panic!("Expected InvalidInput error");
+        }
+    }
+
+    #[test]
+    fn test_email_valid() {
+        let email = Email::new("Test@Example.Com");
+        assert!(email.is_ok());
+        // Check automatic lowercasing
+        assert_eq!(email.unwrap().to_string(), "test@example.com");
+    }
+
+    #[test]
+    fn test_email_invalid_format() {
+        let email = Email::new("invalid-email");
+        assert!(email.is_err());
+        if let Err(DomainError::InvalidInput(msg)) = email {
+            assert_eq!(msg, "Invalid email format");
+        } else {
+            panic!("Expected InvalidInput error");
+        }
+    }
+}
+
