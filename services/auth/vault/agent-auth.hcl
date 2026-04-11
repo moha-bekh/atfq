@@ -22,6 +22,7 @@ template {
 {{ with secret "secret/data/auth" }}
 DATABASE_URL="postgresql://{{ .Data.data.db_user }}:{{ .Data.data.db_password }}@db-auth:5432/{{ .Data.data.db_name }}"
 SERVER_ADDR="{{ .Data.data.server_addr }}"
+JWT_SECRET="{{ .Data.data.jwt_secret }}"
 {{ end }}
 EOH
   destination = "/vault/secrets/.env"

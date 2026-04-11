@@ -1,31 +1,53 @@
 use crate::domain::ports::user_repository::UserRepository;
-use crate::domain::entities::{User, UserDto};
+use crate::domain::entities::{User};
+use crate::domain::ports::user_repository::UserDto;
+use crate::domain::error::DomainError;
+use crate::domain::types::{Username, Email};
 use async_trait::async_trait;
-use sqlx::PgPool;
-use uuid::Uuid;
-use chrono::Utc;
+use sqlx::{PgPool, Error as SqlxError};
 
 pub struct PostgresUserRepository {
-    _pool: PgPool,
+    pub pool: PgPool,
 }
 
 impl PostgresUserRepository {
-    pub fn new(pool: PgPool) -> Self { Self { _pool: pool } }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
 }
 
 #[async_trait]
 impl UserRepository for PostgresUserRepository {
-    async fn save(&self, data: UserDto) -> User {
+    async fn save_user(&self, data: UserDto) -> Result<User, DomainError> {
+        let row = sqlx::query_as!(
+            User,
+            r#"
+            INSERT INTO users (id, username, email, password_hash)
+            VALUES ($1, $2, $3, $4)
+            RETURNING 
+                id, 
+                username as "username: Username", 
+                email as "email: Email", 
+                password_hash, 
+                is_2fa_enabled, 
+                created_at
+            "#,
+            uuid::Uuid::new_v4(),
+            data.username as _,
+            data.email as _,
+            data.password_hash
+        )
+        .fetch_one(&self.pool)
+        .await;
 
-        println!("[INFRA] SQL INSERT: user={}, email={}", *data.username, *data.email);
-        
-        User {
-            id: Uuid::new_v4(),
-            username: data.username,
-            email: data.email,
-            password_hash: Some(data.password_hash),
-            is_2fa_enabled: false,
-            created_at: Utc::now(),
+        match row {
+            Ok(user) => Ok(user),
+            Err(e) => match e {
+                SqlxError::Database(db_err) if db_err.is_unique_violation() => {
+                    Err(DomainError::AlreadyExists)
+                }
+                _ => Err(DomainError::Internal(e.to_string())),
+            },
         }
     }
 }

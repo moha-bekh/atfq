@@ -2,12 +2,6 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use crate::domain::types::{Username, Email};
 
-pub struct UserDto {
-    pub username: Username,
-    pub email: Email,
-    pub password_hash: String,
-}
-
 pub struct User {
     pub id: Uuid,
     pub username: Username,

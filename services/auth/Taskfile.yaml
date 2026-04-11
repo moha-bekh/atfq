@@ -1,7 +1,8 @@
 version: "3"
 
 vars:
-  ADDR: "127.0.0.1:8082"
+  IP: "127.0.0.1"
+  PORT: "8082"
   DATABASE_URL: "postgresql://atfq:atfq@localhost:5432/atfq_db"
 
 env:
@@ -11,8 +12,8 @@ tasks:
   list:
     desc: "List available gRPC services (via Reflection)"
     cmds:
-      - grpcurl -plaintext {{.ADDR}} list
-      - grpcurl -plaintext {{.ADDR}} list auth.AuthService
+      - grpcurl -plaintext {{.IP}}:{{.PORT}} list
+      - grpcurl -plaintext {{.IP}}:{{.PORT}} list auth.AuthService
 
   migrate-add:
     desc: "Create a new migration file (Usage: task migrate-add NAME=your_migration_name)"

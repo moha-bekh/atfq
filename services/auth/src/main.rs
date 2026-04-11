@@ -4,21 +4,19 @@ use std::env;
 use std::sync::Arc;
 use dotenvy::dotenv;
 
-// Module declarations for the hexagonal architecture
 pub mod domain;
 pub mod app;
 pub mod infra;
 pub mod api;
 
-// Inclusion of generated code from Tonic
 pub mod auth_proto {
     tonic::include_proto!("auth");
     pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("auth_descriptor");
 }
 
-// Imports of concrete implementations
 use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use crate::infra::security::jwt_adapter::JwtAdapter;
+use crate::infra::security::password_hasher::Argon2Hasher;
 use crate::app::auth::register::RegisterUseCase;
 use crate::api::grpc::handler::AuthHandler;
 use crate::auth_proto::auth_service_server::AuthServiceServer;
@@ -39,27 +37,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&db_url)
         .await?;
 
-    // --- DEPENDENCY INJECTION ---
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     // 1. Infrastructure Layer (Adapters)
-    // We wrap them in Arc to allow safe sharing across threads
     let user_repo = Arc::new(PostgresUserRepository::new(pool.clone()));
-    let jwt_service = Arc::new(JwtAdapter);
+
+    let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let jwt_service = Arc::new(JwtAdapter::new(jwt_secret));
+    let crypto_service = Arc::new(Argon2Hasher);
 
     // 2. Application Layer (Use Cases)
-    // Injecting ports (repository and token service) into the use case
-    let register_uc = RegisterUseCase::new(user_repo, jwt_service);
+    let register_uc = Arc::new(RegisterUseCase::new(
+        user_repo,
+        jwt_service,
+        crypto_service,
+    ));
 
     // 3. API Layer (Handlers)
-    // The gRPC handler holds the application logic (use cases)
-    let auth_handler = AuthHandler::new(register_uc);
+    let auth_handler = AuthHandler::new(
+        register_uc
+    );
 
     // 4. Additional gRPC Services
     let reflection_service = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(auth_proto::FILE_DESCRIPTOR_SET)
         .build()?;
 
-    println!("Auth Service [api-app-domain-infra] starting on {}", addr);
+    println!("Auth Service starting on {}", addr);
 
     Server::builder()
         .add_service(reflection_service)

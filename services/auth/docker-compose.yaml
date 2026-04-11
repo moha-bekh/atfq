@@ -47,8 +47,8 @@ services:
         source: auth-shared-secrets
         target: /vault/secrets
         read_only: true
-    # ports:
-    #   - "127.0.0.1:5432:5432"
+    ports:
+      - "127.0.0.1:5432:5432"
     command: >
       sh -c "
       until [ -s /vault/secrets/POSTGRES_PASSWORD ]; do 
