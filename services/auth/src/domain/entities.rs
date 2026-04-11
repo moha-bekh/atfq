@@ -2,6 +2,7 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use crate::domain::types::{Username, Email};
 
+#[derive(Debug, Clone)]
 pub struct User {
     pub id: Uuid,
     pub username: Username,

@@ -50,4 +50,50 @@ impl UserRepository for PostgresUserRepository {
             },
         }
     }
+
+    async fn find_by_email(&self, email: &str) -> Result<Option<User>, DomainError> {
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            SELECT 
+                id, 
+                username as "username: Username", 
+                email as "email: Email", 
+                password_hash, 
+                is_2fa_enabled, 
+                created_at
+            FROM users 
+            WHERE email = $1
+            "#,
+            email
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(user)
+    }
+
+    async fn find_by_id(&self, id: uuid::Uuid) -> Result<Option<User>, DomainError> {
+        let user = sqlx::query_as!(
+            User,
+            r#"
+            SELECT 
+                id, 
+                username as "username: Username", 
+                email as "email: Email", 
+                password_hash, 
+                is_2fa_enabled, 
+                created_at
+            FROM users 
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(user)
+    }
 }

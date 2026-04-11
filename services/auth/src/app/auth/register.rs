@@ -10,6 +10,8 @@ use crate::domain::entities::User;
 use crate::domain::types::{Username, Email};
 use crate::domain::error::DomainError;
 
+// #[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RegistrationResult {
     pub user: User,
     pub access_token: String,
