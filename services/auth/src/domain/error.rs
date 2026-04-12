@@ -12,6 +12,12 @@ pub enum DomainError {
     #[error("Invalid credentials")]
     Unauthenticated,
 
+    #[error("Unauthorized access")]
+    Unauthorized,
+
+    #[error("User not found")]
+    NotFound,
+
     #[error("Internal server error: {0}")]
     Internal(String),
 }

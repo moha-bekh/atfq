@@ -1,5 +1,10 @@
 version: "3"
 
+includes:
+  api:
+    taskfile: ./task/Taskapi.yaml
+    internal: false
+
 vars:
   IP: "127.0.0.1"
   PORT: "8082"
@@ -9,12 +14,6 @@ env:
   DATABASE_URL: "{{.DATABASE_URL}}"
 
 tasks:
-  list:
-    desc: "List available gRPC services (via Reflection)"
-    cmds:
-      - grpcurl -plaintext {{.IP}}:{{.PORT}} list
-      - grpcurl -plaintext {{.IP}}:{{.PORT}} list auth.AuthService
-
   migrate-add:
     desc: "Create a new migration file (Usage: task migrate-add NAME=your_migration_name)"
     requires:

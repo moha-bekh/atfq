@@ -3,15 +3,17 @@ use tonic::{Request, Response, Status};
 use crate::auth_proto::auth_service_server::AuthService;
 use crate::auth_proto::{RegisterRequest, LoginRequest, AuthResponse};
 use crate::app::auth::register::RegisterUseCase;
+use crate::app::auth::login::LoginUseCase;
 use crate::domain::error::DomainError;
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
+    pub login_uc: Arc<LoginUseCase>,
 }
 
 impl AuthHandler {
-    pub fn new(register_uc: Arc<RegisterUseCase>) -> Self {
-        Self { register_uc }
+    pub fn new(register_uc: Arc<RegisterUseCase>, login_uc: Arc<LoginUseCase>) -> Self {
+        Self { register_uc, login_uc }
     }
 }
 
@@ -21,8 +23,8 @@ impl AuthService for AuthHandler {
         self.register_handler(request).await
     }
 
-    async fn login(&self, _request: Request<LoginRequest>) -> Result<Response<AuthResponse>, Status> {
-        Err(Status::unimplemented("Login not implemented yet"))
+    async fn login(&self, request: Request<LoginRequest>) -> Result<Response<AuthResponse>, Status> {
+        self.login_handler(request).await
     }
 }
 
@@ -30,7 +32,8 @@ pub fn map_domain_error(err: DomainError) -> Status {
     match err {
         DomainError::AlreadyExists => Status::already_exists("User already exists"),
         DomainError::InvalidInput(msg) => Status::invalid_argument(msg),
-        DomainError::Unauthenticated => Status::unauthenticated("Unauthorized"),
+        DomainError::Unauthenticated | DomainError::Unauthorized => Status::unauthenticated("Unauthorized"),
+        DomainError::NotFound => Status::not_found("Not found"),
         DomainError::Internal(msg) => Status::internal(msg),
     }
 }

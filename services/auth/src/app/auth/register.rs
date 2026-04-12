@@ -6,17 +6,9 @@ use crate::domain::ports::{
 };
 
 use crate::domain::ports::user_repository::UserDto; 
-use crate::domain::entities::User;
 use crate::domain::types::{Username, Email};
 use crate::domain::error::DomainError;
-
-// #[derive(Debug, Clone)]
-#[derive(Debug)]
-pub struct RegistrationResult {
-    pub user: User,
-    pub access_token: String,
-    pub refresh_token: String,
-}
+use crate::app::auth::types::AuthResult;
 
 pub struct RegisterUseCase {
     repo: Arc<dyn UserRepository>,
@@ -38,7 +30,7 @@ impl RegisterUseCase {
         username_raw: &str, 
         email_raw: &str, 
         password_raw: &str
-    ) -> Result<RegistrationResult, DomainError> {
+    ) -> Result<AuthResult, DomainError> {
 
         let username = Username::new(username_raw)?;
         let email = Email::new(email_raw)?;
@@ -57,7 +49,7 @@ impl RegisterUseCase {
 
         let token_pair = self.tokens.generate_tokens(user.id);
 
-        Ok(RegistrationResult {
+        Ok(AuthResult {
             user,
             access_token: token_pair.access,
             refresh_token: token_pair.refresh,

@@ -23,7 +23,7 @@ impl JwtAdapter {
 
 impl TokenService for JwtAdapter {
     fn generate_tokens(&self, user_id: Uuid) -> TokenPair {
-        
+
         let access_token = self.create_token(&user_id, &self.secret, Duration::minutes(15));
         let refresh_token = self.create_token(&user_id, &self.secret, Duration::days(7));
 

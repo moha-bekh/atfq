@@ -12,6 +12,7 @@ pub struct UserDto {
 #[async_trait]
 pub trait UserRepository: Send + Sync {
     async fn save_user(&self, data: UserDto) -> Result<User, DomainError>;
-    async fn find_by_email(&self, email: &str) -> Result<Option<User>, DomainError>;
     async fn find_by_id(&self, id: uuid::Uuid) -> Result<Option<User>, DomainError>;
+    async fn find_by_email(&self, email: &str) -> Result<Option<User>, DomainError>;
+    async fn find_by_username(&self, username: &str) -> Result<Option<User>, DomainError>;
 }

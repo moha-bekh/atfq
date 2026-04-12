@@ -8,6 +8,7 @@ use auth::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use auth::infra::security::jwt_adapter::JwtAdapter;
 use auth::infra::security::password_hasher::Argon2Hasher;
 use auth::app::auth::register::RegisterUseCase;
+use auth::app::auth::login::LoginUseCase;
 use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
 use auth::auth_proto;
@@ -39,6 +40,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. Application Layer (Use Cases)
     let register_uc = Arc::new(RegisterUseCase::new(
+        user_repo.clone(),
+        jwt_service.clone(),
+        crypto_service.clone(),
+    ));
+
+    let login_uc = Arc::new(LoginUseCase::new(
         user_repo,
         jwt_service,
         crypto_service,
@@ -46,7 +53,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. API Layer (Handlers)
     let auth_handler = AuthHandler::new(
-        register_uc
+        register_uc,
+        login_uc,
     );
 
     // 4. Additional gRPC Services

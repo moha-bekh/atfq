@@ -9,6 +9,7 @@ use crate::domain::ports::{
 use crate::domain::entities::User;
 use crate::domain::error::DomainError;
 use crate::app::auth::register::RegisterUseCase;
+use crate::app::auth::login::LoginUseCase;
 
 // --- MOCKS ---
 
@@ -21,8 +22,6 @@ impl UserRepository for MockUserRepo {
     async fn save_user(&self, data: UserDto) -> Result<User, DomainError> {
         let mut users = self.users.lock().unwrap();
         
-        // Simuler la violation d'unicité (email/username)
-        // On vérifie sur les Deref de Username et Email
         if users.iter().any(|u| *u.email == *data.email || *u.username == *data.username) {
             return Err(DomainError::AlreadyExists);
         }
@@ -39,12 +38,19 @@ impl UserRepository for MockUserRepo {
         Ok(user)
     }
 
-    async fn find_by_email(&self, _email: &str) -> Result<Option<User>, DomainError> {
-        Ok(None)
+    async fn find_by_email(&self, email: &str) -> Result<Option<User>, DomainError> {
+        let users = self.users.lock().unwrap();
+        Ok(users.iter().find(|u| *u.email == email).cloned())
     }
 
-    async fn find_by_id(&self, _id: Uuid) -> Result<Option<User>, DomainError> {
-        Ok(None)
+    async fn find_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
+        let users = self.users.lock().unwrap();
+        Ok(users.iter().find(|u| *u.username == username).cloned())
+    }
+
+    async fn find_by_id(&self, id: Uuid) -> Result<Option<User>, DomainError> {
+        let users = self.users.lock().unwrap();
+        Ok(users.iter().find(|u| u.id == id).cloned())
     }
 }
 
@@ -123,5 +129,83 @@ async fn test_register_invalid_input() {
     match result.unwrap_err() {
         DomainError::InvalidInput(msg) => assert!(msg.contains("email")),
         e => panic!("Expected InvalidInput, got {:?}", e),
+    }
+}
+
+#[tokio::test]
+async fn test_login_success_with_email() {
+    let repo = Arc::new(MockUserRepo { users: Mutex::new(vec![]) });
+    let tokens = Arc::new(MockTokenService);
+    let crypto = Arc::new(MockCryptoService);
+    
+    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone());
+    let login_uc = LoginUseCase::new(repo, tokens, crypto);
+    
+    // Register first
+    register_uc.execute("johndoe", "john@example.com", "password123").await.unwrap();
+    
+    // Login with email
+    let result = login_uc.execute("john@example.com", "password123").await;
+    
+    assert!(result.is_ok());
+    let res = result.unwrap();
+    assert_eq!(res.user.username.to_string(), "johndoe");
+}
+
+#[tokio::test]
+async fn test_login_success_with_username() {
+    let repo = Arc::new(MockUserRepo { users: Mutex::new(vec![]) });
+    let tokens = Arc::new(MockTokenService);
+    let crypto = Arc::new(MockCryptoService);
+    
+    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone());
+    let login_uc = LoginUseCase::new(repo, tokens, crypto);
+    
+    // Register first
+    register_uc.execute("johndoe", "john@example.com", "password123").await.unwrap();
+    
+    // Login with username
+    let result = login_uc.execute("johndoe", "password123").await;
+    
+    assert!(result.is_ok());
+    let res = result.unwrap();
+    assert_eq!(res.user.email.to_string(), "john@example.com");
+}
+
+#[tokio::test]
+async fn test_login_wrong_password() {
+    let repo = Arc::new(MockUserRepo { users: Mutex::new(vec![]) });
+    let tokens = Arc::new(MockTokenService);
+    let crypto = Arc::new(MockCryptoService);
+    
+    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone());
+    let login_uc = LoginUseCase::new(repo, tokens, crypto);
+    
+    register_uc.execute("johndoe", "john@example.com", "password123").await.unwrap();
+    
+    // Wrong password
+    let result = login_uc.execute("john@example.com", "wrongpassword").await;
+    
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        DomainError::Unauthenticated => (),
+        e => panic!("Expected Unauthenticated, got {:?}", e),
+    }
+}
+
+#[tokio::test]
+async fn test_login_user_not_found() {
+    let repo = Arc::new(MockUserRepo { users: Mutex::new(vec![]) });
+    let tokens = Arc::new(MockTokenService);
+    let crypto = Arc::new(MockCryptoService);
+    
+    let login_uc = LoginUseCase::new(repo, tokens, crypto);
+    
+    let result = login_uc.execute("nonexistent@example.com", "password123").await;
+    
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        DomainError::Unauthenticated => (),
+        e => panic!("Expected Unauthenticated, got {:?}", e),
     }
 }

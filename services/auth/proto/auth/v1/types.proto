@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package auth.v1;
+
+import "google/protobuf/empty.proto";
+// google.protobuf.Empty
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+}
+
+message AuthSuccess {
+  string access_token = 1;
+  string refresh_token = 2;
+  User user = 3;
+}
+
+message MfaRequired {
+  string mfa_token = 1;
+  enum Method {
+    METHOD_TOTP = 0;
+    METHOD_SMS = 1;
+  }
+  Method preferred_method = 2;
+}
+
+message AuthResponse {
+  oneof result {
+    AuthSuccess success = 1;
+    MfaRequired mfa_required = 2;
+  }
+}
+
+message RegisterRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message Identifier {
+  oneof id {
+    string email = 1;
+    string username = 2;
+  }
+}
+
+message LoginRequest {
+  Identifier id = 1;
+  string password = 2;
+}

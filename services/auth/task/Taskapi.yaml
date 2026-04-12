@@ -1,0 +1,36 @@
+version: "3"
+
+vars:
+  IP: '{{.IP | default "127.0.0.1"}}'
+  PORT: '{{.PORT | default "8082"}}'
+
+tasks:
+  list:
+    desc: "List available gRPC services (via Reflection)"
+    cmds:
+      - grpcurl -plaintext {{.IP}}:{{.PORT}} list
+      - grpcurl -plaintext {{.IP}}:{{.PORT}} list auth.v1.AuthService
+
+  ui:
+    desc: "Launch gRPCUI for interactive testing"
+    cmds:
+      - grpcui -plaintext {{.IP}}:{{.PORT}}
+
+  register:
+    desc: "Register a new user (Usage: task api:register USERNAME=... EMAIL=... PASSWORD=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "username": "{{.USERNAME}}",
+          "email": "{{.EMAIL}}",
+          "password": "{{.PASSWORD}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Register
+
+  login:
+    desc: "Login with an existing user (Usage: task api:login EMAIL=... PASSWORD=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "id": { "email": "{{.EMAIL}}" },
+          "password": "{{.PASSWORD}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Login
