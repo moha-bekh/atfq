@@ -4,7 +4,7 @@ CREATE TABLE questions (
     metadata JSONB DEFAULT '{}',
 
   CONSTRAINT fk_questions_to_nodes
-        FOREIGN KEY (node_id)
-        REFERENCES nodes(id),
+        FOREIGN KEY (node_version_id)
+        REFERENCES node_versions(id)
 
 );
