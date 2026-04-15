@@ -1,0 +1,29 @@
+version: "3"
+
+tasks:
+  up:
+    desc: "Run a service in development mode"
+    cmds:
+      - docker compose up {{.CLI_ARGS}}
+
+  down:
+    desc: "Stop and remove all containers"
+    cmds:
+      - docker compose down {{.CLI_ARGS}}
+
+  prod:
+    desc: "Run services in production mode"
+    cmds:
+      - docker compose {{.COMPOSE_PROD}} up {{.CLI_ARGS}} -d
+
+  logs:
+    desc: "Stream logs"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}}
+
+  clean:
+    desc: "Deep clean of containers and volumes"
+    prompt: "Warning: This deletes ALL data. Continue?"
+    cmds:
+      - docker compose --profile dev --profile full down --rmi local --volumes --remove-orphans
+      - rm -rf data/*
