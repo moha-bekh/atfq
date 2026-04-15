@@ -5,16 +5,20 @@ volumes:
 
 services:
   api-gateway:
+    # profiles: ["dev"]
     build:
       target: dev
     ports:
-      - "8085:8080"
+      - "8081:8080"
     volumes:
       # Hot Reload
       - type: bind
         source: ./api-gateway
         target: /app
         consistency: cached
+      - type: bind
+        source: ./auth/proto/auth
+        target: /app/proto/auth
       # Cargo cache
       - type: volume
         source: cargo-cache
@@ -23,27 +27,29 @@ services:
       - type: volume
         source: api-gateway-target-cache
         target: /app/target
+    # depends_on:
+    #   - auth
   app:
+    # profiles: ["dev"]
     build:
       target: dev
     ports:
-      - "8081:8080"
+      - "8080:8080"
     volumes:
       - type: bind
         source: ./app
         target: /app
       - type: volume
         target: /app/node_modules
+    # depends_on:
+    #   - api-gateway
   auth:
+    # profiles: ["dev"]
     build:
       target: dev
     ports:
       - "8082:8080"
     volumes:
-      - type: bind
-        source: ./auth/.env
-        target: /vault/secrets/config
-        read_only: true
       - type: bind
         source: ./auth
         target: /app
@@ -54,33 +60,35 @@ services:
       - type: volume
         source: auth-target-cache
         target: /app/target
+  # net-gateway:
+  # profiles: ["dev"]
   user:
+    # profiles: ["full"]
     build:
       target: dev
     ports:
       - "8083:8080"
     volumes:
       - type: bind
-        source: ./user/.env
-        target: /vault/secrets/config
-        read_only: true
-      - type: bind
         source: ./user
         target: /app
         consistency: cached
       - type: volume
         target: /app/node_modules
+  # db-user:
+  # profiles: ["full"]
   wiki:
+    # profiles: ["full"]
     build:
       target: dev
     ports:
       - "8084:8080"
     volumes:
       - type: bind
-        source: ./wiki/.env
-        target: /vault/secrets/config
-        read_only: true
-      - type: bind
         source: ./wiki
         target: /app
         consistency: cached
+  # db-wiki:
+  # profiles: ["full"]
+  # vault:
+  # profiles: ["dev"]

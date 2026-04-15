@@ -7,101 +7,22 @@ vars:
   VERSION: '{{.VERSION | default "latest"}}'
   TARGET: '{{.TARGET | default "prod"}}'
 
+includes:
+  auth:
+    taskfile: ./auth/Taskfile.yaml
+    dir: ./auth
+  vault:
+    taskfile: ./vault/Taskfile.yaml
+    dir: ./vault
+
+  docker:
+    taskfile: ./tasks/Taskcompose.yaml
+    aliases: [dc]
+  img:
+    taskfile: ./tasks/Taskregistry.yaml
+
 tasks:
-  # --- LOCAL DEVELOPMENT ---
-  # Start a service in development mode (hot-reload enabled)
-  # Usage: task dev -- <service-name>
-  dev:
-    desc: "Run a service in development mode"
-    summary: |
-      Runs the specified service using the default docker-compose.yaml 
-      and docker-compose.override.yml files.
+  list-files:
+    desc: "List project files excluding noise"
     cmds:
-      - docker compose up {{.CLI_ARGS}}
-
-  # Build or rebuild services
-  build:
-    desc: "Build or rebuild all services"
-    cmds:
-      - docker compose build {{.CLI_ARGS}}
-
-  # Stop and remove all containers and networks
-  down:
-    desc: "Stop and remove all containers"
-    cmds:
-      - docker compose down {{.CLI_ARGS}}
-
-  # View logs for a specific service
-  # Usage: task logs -- <service-name>
-  logs:
-    desc: "Stream logs from a service"
-    cmds:
-      - docker compose logs -f {{.CLI_ARGS}}
-
-  clean:
-    desc: "Remove project containers, networks and local images"
-    cmds:
-      - |
-        echo "⚠️  WARNING: This will delete containers, local images and ALL volumes (databases) for this project."
-        printf "Are you sure you want to proceed? [y/N]: "
-        read -r CONFIRM
-        if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
-          echo "Operation cancelled."
-          exit 1
-        fi
-      - docker compose down --rmi local --volumes --remove-orphans
-    silent: true
-
-  # --- REGISTRY & SHARING (GHCR) ---
-
-  push-all:
-    desc: "Build and push all microservices to GHCR"
-    cmds:
-      - task: push-svc
-        vars: { NAME: "api-gateway", PATH: "./api-gateway" }
-      - task: push-svc
-        vars: { NAME: "auth-service", PATH: "./auth" }
-      - task: push-svc
-        vars: { NAME: "user-service", PATH: "./user" }
-      - task: push-svc
-        vars: { NAME: "wiki-service", PATH: "./wiki" }
-      - task: push-svc
-        vars: { NAME: "app", PATH: "./app" }
-
-  push-svc:
-    desc: "Generic task to build and push an image (Usage: task push-svc NAME=... PATH=... TOKEN=...)"
-    deps: [login]
-    preconditions:
-      - sh: "[ -n '{{.NAME}}' ]"
-        msg: "❌ NAME is missing"
-      - sh: "[ -n '{{.PATH}}' ]"
-        msg: "❌ PATH is missing"
-    cmds:
-      - |
-        docker buildx build \
-          --platform linux/amd64 \
-          --target {{.TARGET}} \
-          -t {{.REGISTRY}}/{{.GH_USER}}/atfq-{{.NAME}}:{{.VERSION}} \
-          --push \
-          {{.PATH}}
-
-  login:
-    internal: true
-    desc: "Login to GitHub Container Registry"
-    cmds:
-      - |
-        if [ -z "{{.TOKEN}}" ]; then
-          echo "❌ TOKEN is required. Pass it with TOKEN=your_pat"
-          exit 1
-        fi
-        echo "{{.TOKEN}}" | docker login {{.REGISTRY}} -u {{.GH_USER}} --password-stdin
-    silent: true
-
-  # --- PRODUCTION (DOCKER) ---
-
-  # Start a service in production mode (secure, minimal image)
-  # Usage: task prod -- <service-name>
-  prod:
-    desc: "Run services in production mode (Docker)"
-    cmds:
-      - docker compose {{.COMPOSE_PROD}} up {{.CLI_ARGS}} -d
+      - (cd {{.CLI_ARGS}} && tree -I "target|node_modules|.git|.cargo-ok|.step")
