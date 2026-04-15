@@ -1,8 +1,21 @@
+volumes:
+  net-gateway-shared-secrets:
+    name: vault-net-gateway-shared-secrets
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=64m,mode=775"
+
 services:
   net-gateway:
-    image: nginx:1.27-alpine
+    image: owasp/modsecurity-crs:nginx-alpine
     container_name: net-gateway
     init: true
+    environment:
+      - MODSEC_RULE_ENGINE=On
+      - MODSEC_AUDIT_ENGINE=RelevantOnly
+      - MODSEC_AUDIT_LOG=/var/log/modsec_audit.log
     networks:
       - frontend
       - backend
@@ -12,6 +25,50 @@ services:
     volumes:
       - type: bind
         source: ./nginx.conf
-        target: /etc/nginx/nginx.conf
+        target: /etc/nginx/templates/nginx.conf.template
         read_only: true
+      - type: bind
+        source: ./modsecurity.conf
+        target: /etc/nginx/templates/modsecurity.d/modsecurity-override.conf.template                                                          │
+        read_only: true
+      - type: volume
+        source: net-gateway-shared-secrets
+        target: /app/secrets
+        read_only: true
+    depends_on:
+      vault-agent-net-gateway:
+        condition: service_started
     restart: unless-stopped
+
+  vault-agent-net-gateway:
+    image: hashicorp/vault:1.13.3
+    container_name: vault-agent-net-gateway
+    init: true
+    networks:
+      - backend
+    environment:
+      - VAULT_ADDR=http://vault:8200
+    volumes:
+      - type: bind
+        source: ./vault/agent-net-gateway.hcl
+        target: /etc/vault/agent-config.hcl
+      - type: bind
+        source: ./vault/agent_ids/role-id
+        target: /etc/vault/role-id
+        read_only: true
+      - type: bind
+        source: ./vault/agent_ids/secret-id
+        target: /etc/vault/secret-id
+        read_only: true
+      - type: volume
+        source: net-gateway-shared-secrets
+        target: /app/secrets
+    cap_add:
+      - IPC_LOCK
+    restart: unless-stopped
+    user: "root"
+    command: >
+      sh -c "
+      chown -R 100:101 /app/secrets && 
+      chmod -R 750 /app/secrets && 
+      exec su-exec vault vault agent -config=/etc/vault/agent-config.hcl"
