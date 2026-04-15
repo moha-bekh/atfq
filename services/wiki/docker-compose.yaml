@@ -10,10 +10,6 @@ services:
     init: true
     networks:
       - backend
-    env_file:
-      - ./.env
-    # ports:
-    #   - "$PORT:8080"
     depends_on:
       db-wiki:
         condition: service_healthy
@@ -24,8 +20,6 @@ services:
     image: postgres:16-alpine
     networks:
       - backend
-    env_file:
-      - ./.env
     volumes:
       - type: volume
         source: wiki-postgres_data
