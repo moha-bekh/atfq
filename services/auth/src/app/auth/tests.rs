@@ -62,6 +62,13 @@ impl TokenService for MockTokenService {
             refresh: "mock_refresh".into(),
         }
     }
+
+    fn decode_token(&self, _token: &str) -> Result<crate::domain::ports::token_service::TokenClaims, DomainError> {
+        Ok(crate::domain::ports::token_service::TokenClaims {
+            user_id: Uuid::new_v4(),
+            exp: 0,
+        })
+    }
 }
 
 struct MockCryptoService;

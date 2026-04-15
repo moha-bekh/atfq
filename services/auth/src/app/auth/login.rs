@@ -1,10 +1,9 @@
 use std::sync::Arc;
 use crate::domain::ports::{
-    user_repository::UserRepository, 
+    user_repository::UserRepository,
     token_service::TokenService,
     crypto_service::CryptoService
 };
-
 use crate::domain::types::{Username, Email};
 use crate::domain::error::DomainError;
 use crate::app::auth::types::AuthResult;

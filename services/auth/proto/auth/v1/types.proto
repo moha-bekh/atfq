@@ -50,3 +50,8 @@ message LoginRequest {
   Identifier id = 1;
   string password = 2;
 }
+
+message LogoutRequest {
+  string access_token = 1;
+  string refresh_token = 2;
+}

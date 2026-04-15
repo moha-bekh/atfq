@@ -1,8 +1,10 @@
-use crate::domain::ports::token_service::{TokenService, TokenPair};
+use crate::domain::ports::token_service::{TokenService, TokenPair, TokenClaims};
+use crate::domain::error::DomainError;
 use uuid::Uuid;
-use jsonwebtoken::{encode, Header, EncodingKey};
+use jsonwebtoken::{encode, decode, Header, EncodingKey, DecodingKey, Validation};
 use serde::{Serialize, Deserialize};
 use chrono::{Utc, Duration};
+use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JwtClaims {
@@ -31,6 +33,23 @@ impl TokenService for JwtAdapter {
             access: access_token,
             refresh: refresh_token,
         }
+    }
+
+    fn decode_token(&self, token: &str) -> Result<TokenClaims, DomainError> {
+        let decoded = decode::<JwtClaims>(
+            token,
+            &DecodingKey::from_secret(self.secret.as_ref()),
+            &Validation::default(),
+        )
+        .map_err(|_| DomainError::Unauthenticated)?;
+
+        let user_id = Uuid::from_str(&decoded.claims.sub)
+            .map_err(|_| DomainError::Unauthenticated)?;
+
+        Ok(TokenClaims {
+            user_id,
+            exp: decoded.claims.exp,
+        })
     }
 }
 

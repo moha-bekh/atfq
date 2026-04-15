@@ -22,9 +22,13 @@ services:
         source: auth-shared-secrets
         target: /vault/secrets
         read_only: true
+    environment:
+      - REDIS_URL=redis://redis-auth:6379
     depends_on:
       db-auth:
         condition: service_healthy
+      redis-auth:
+        condition: service_started
       vault-agent-auth:
         condition: service_started
     restart: unless-stopped
@@ -66,6 +70,16 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  # ------------------------------
+  # CACHE
+  redis-auth:
+    image: redis:alpine
+    container_name: redis-auth
+    networks:
+      - backend
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
   # ------------------------------
   # VAULT AGENT
   vault-agent-auth:

@@ -34,3 +34,12 @@ tasks:
           "id": { "email": "{{.EMAIL}}" },
           "password": "{{.PASSWORD}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Login
+
+  logout:
+    desc: "Logout a user (Usage: task api:logout ACCESS_TOKEN=... REFRESH_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "refresh_token": "{{.REFRESH_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Logout

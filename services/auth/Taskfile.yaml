@@ -46,3 +46,19 @@ tasks:
       - |
         docker exec -it services-db-auth-1 \
         psql -U {{.POSTGRES_USER | default "atfq"}} -d {{.POSTGRES_DB | default "atfq_db"}}
+
+  redis-cache:
+    desc: "List keys in the Redis cache"
+    cmds:
+      - docker exec -it redis-auth redis-cli SCAN 0 COUNT 1000
+
+  redis-all:
+    desc: "List all keys and values in the Redis cache"
+    cmds:
+      - |
+        docker exec -i redis-auth sh -c 'redis-cli --raw keys "*" | while read key; do echo "Key: $key"; echo "Value: $(redis-cli --raw get "$key")"; echo ""; done'
+
+  redis-blacklist:
+    desc: "List all blacklisted tokens in Redis"
+    cmds:
+      - docker exec -it redis-auth redis-cli KEYS "blacklist:*"

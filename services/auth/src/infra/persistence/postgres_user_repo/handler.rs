@@ -5,6 +5,7 @@ use crate::domain::error::DomainError;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
+#[derive(Clone)]
 pub struct PostgresUserRepository {
     pub pool: PgPool,
 }
@@ -33,4 +34,3 @@ impl UserRepository for PostgresUserRepository {
         self.find_by_username_handler(username).await
     }
 }
-

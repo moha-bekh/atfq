@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 async-trait = "0.1"
 tokio = { version = "1.37", features = ["full"] }
-tonic = "0.11"
+tonic = { version = "0.11", features = ["transport"] }
 prost = "0.12"
 tonic-reflection = "0.11"
 
@@ -26,6 +26,13 @@ chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
 argon2 = "0.5"
 jsonwebtoken = "9.3"
+
+tower = "0.4"
+futures-util = "0.3"
+pin-project = "1.1"
+http = "0.2"
+
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
 
 [build-dependencies]
 tonic-build = "0.11"
