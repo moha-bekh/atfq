@@ -1,0 +1,28 @@
+services:
+  vault:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vault
+    user: "100:1000"
+    init: true
+    networks:
+      - backend
+    environment:
+      - SKIP_SETCAP=true
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    volumes:
+      - type: bind
+        source: ./config
+        target: /vault/config
+        read_only: true
+      - type: bind
+        source: ../data/vault/data
+        target: /vault/data
+    cap_add:
+      - IPC_LOCK
+    restart: unless-stopped
+    command: ["vault", "server", "-config=/vault/config/vault.hcl"]

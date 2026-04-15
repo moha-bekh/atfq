@@ -1,0 +1,85 @@
+version: "3"
+
+vars:
+  VAULT_ADDR: "http://127.0.0.1:8200"
+  AGE_KEY: "~/.config/sops/age/atfq-dev.txt"
+
+tasks:
+
+  up:
+    desc: "Init and Setup Vault"
+    cmds:
+      - task: init
+      - task: unseal
+      - task: setup
+      - task: secrets-set
+
+  secrets-edit:
+    desc: "Edit business secrets"
+    cmds:
+      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops --input-type dotenv --output-type dotenv .env.enc
+
+  init:
+    desc: "Initialize Vault"
+    vars:
+      AGE_PK: { sh: "grep -o 'age1[a-z0-9]*' ../.sops.yaml | head -n 1" }
+    cmds:
+      - ./scripts/setup.sh init {{.AGE_PK}} {{.AGE_KEY}}
+
+  unseal:
+    desc: "Unseal Vault"
+    vars:
+      K1: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^KEY1=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      K2: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^KEY2=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      K3: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^KEY3=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+    cmds:
+      - docker exec vault vault operator unseal {{.K1}}
+      - docker exec vault vault operator unseal {{.K2}}
+      - docker exec vault vault operator unseal {{.K3}}
+    silent: true
+
+  setup:
+    desc: "Setup engines and secrets"
+    vars:
+      TOKEN: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^VAULT_TOKEN=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      DB_URL: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^AUTH_DB_URL=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      DB_NAME: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^AUTH_DB_NAME=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      DB_USER: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^AUTH_DB_USER=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      DB_PASS: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^AUTH_DB_PASSWORD=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      SRV_ADDR: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^AUTH_SERVER_ADDR=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      JWT_SECRET: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^AUTH_JWT=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+      NET_GATEWAY_SSL_CRT: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^NET_GATEWAY_SSL_CRT=' | cut -d'=' -f2- | sed 's/^\"//;s/\"$//'" }
+      NET_GATEWAY_SSL_KEY: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^NET_GATEWAY_SSL_KEY=' | cut -d'=' -f2- | sed 's/^\"//;s/\"$//'" }
+    cmds:
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault secrets enable -path=secret kv-v2 2>/dev/null || true
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault auth enable approle 2>/dev/null || true
+      - |
+        docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault kv put secret/auth \
+          db_url="{{.DB_URL}}" \
+          db_name="{{.DB_NAME}}" \
+          db_user="{{.DB_USER}}" \
+          db_password="{{.DB_PASS}}" \
+          server_addr="{{.SRV_ADDR}}" \
+          jwt_secret="{{.JWT_SECRET}}"
+      - |
+        docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault kv put secret/net-gateway \
+          ssl_crt="{{.NET_GATEWAY_SSL_CRT}}" \
+          ssl_key="{{.NET_GATEWAY_SSL_KEY}}"
+
+  secrets-set:
+    desc: "Configure AppRole and generate IDs"
+    vars:
+      TOKEN: { sh: "SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops -d --input-type dotenv --output-type dotenv .env.enc | grep '^VAULT_TOKEN=' | cut -d'=' -f2 | tr -d '\" \n\r'" }
+    cmds:
+      - docker exec -i -e VAULT_TOKEN={{.TOKEN}} vault vault policy write auth-service - < ./policies/auth-policy.hcl
+      - docker exec -i -e VAULT_TOKEN={{.TOKEN}} vault vault policy write net-gateway-service - < ./policies/net-gateway-policy.hcl
+
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault write auth/approle/role/auth-service token_policies="auth-service" token_ttl=1h
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault write auth/approle/role/net-gateway-service token_policies="net-gateway-service" token_ttl=1h
+
+      - mkdir -p ../auth/vault/agent_ids/ ../net-gateway/vault/agent_ids/
+
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault read -field=role_id auth/approle/role/auth-service/role-id > ../auth/vault/agent_ids/role-id
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault write -f -field=secret_id auth/approle/role/auth-service/secret-id > ../auth/vault/agent_ids/secret-id
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault read -field=role_id auth/approle/role/net-gateway-service/role-id > ../net-gateway/vault/agent_ids/role-id
+      - docker exec -e VAULT_TOKEN={{.TOKEN}} vault vault write -f -field=secret_id auth/approle/role/net-gateway-service/secret-id > ../net-gateway/vault/agent_ids/secret-id
