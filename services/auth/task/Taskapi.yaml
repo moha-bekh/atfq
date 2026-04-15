@@ -43,3 +43,11 @@ tasks:
           "access_token": "{{.ACCESS_TOKEN}}",
           "refresh_token": "{{.REFRESH_TOKEN}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Logout
+
+  refresh:
+    desc: "Refresh tokens (Usage: task api:refresh REFRESH_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "refresh_token": "{{.REFRESH_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/RefreshToken

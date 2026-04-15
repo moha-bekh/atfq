@@ -14,6 +14,7 @@ pub enum AuthServiceMethod {
     Register,
     Login,
     Logout,
+    RefreshToken,
 }
 
 impl AuthServiceMethod {
@@ -22,13 +23,14 @@ impl AuthServiceMethod {
             "/auth.v1.AuthService/Register" => Some(Self::Register),
             "/auth.v1.AuthService/Login" => Some(Self::Login),
             "/auth.v1.AuthService/Logout" => Some(Self::Logout),
+            "/auth.v1.AuthService/RefreshToken" => Some(Self::RefreshToken),
             _ => None,
         }
     }
 
     pub fn requires_auth(&self) -> bool {
         match self {
-            Self::Register | Self::Login => false,
+            Self::Register | Self::Login | Self::RefreshToken => false,
             Self::Logout => true,
         }
     }

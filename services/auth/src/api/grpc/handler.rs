@@ -1,10 +1,11 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use crate::auth_proto::auth_service_server::AuthService;
-use crate::auth_proto::{AuthResponse, RegisterRequest, LoginRequest, LogoutRequest};
+use crate::auth_proto::{AuthResponse, RegisterRequest, LoginRequest, LogoutRequest, RefreshRequest};
 use crate::app::auth::register::RegisterUseCase;
 use crate::app::auth::login::LoginUseCase;
 use crate::app::auth::logout::LogoutUseCase;
+use crate::app::auth::refresh::RefreshTokenUseCase;
 use crate::domain::error::DomainError;
 
 use crate::domain::ports::cache_service::CacheService;
@@ -14,6 +15,7 @@ pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
     pub login_uc: Arc<LoginUseCase>,
     pub logout_uc: Arc<LogoutUseCase>,
+    pub refresh_uc: Arc<RefreshTokenUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
 }
@@ -23,10 +25,11 @@ impl AuthHandler {
         register_uc: Arc<RegisterUseCase>,
         login_uc: Arc<LoginUseCase>,
         logout_uc: Arc<LogoutUseCase>,
+        refresh_uc: Arc<RefreshTokenUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
     ) -> Self {
-        Self { register_uc, login_uc, logout_uc, cache_service, token_service }
+        Self { register_uc, login_uc, logout_uc, refresh_uc, cache_service, token_service }
     }
 }
 
@@ -42,6 +45,10 @@ impl AuthService for AuthHandler {
 
     async fn logout(&self, request: Request<LogoutRequest>) -> Result<Response<()>, Status> {
         self.logout_handler(request).await
+    }
+
+    async fn refresh_token(&self, request: Request<RefreshRequest>) -> Result<Response<AuthResponse>, Status> {
+        self.refresh_handler(request).await
     }
 }
 

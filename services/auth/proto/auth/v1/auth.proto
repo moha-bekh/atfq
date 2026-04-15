@@ -9,4 +9,9 @@ service AuthService {
   rpc Register(RegisterRequest) returns (AuthResponse);
   rpc Login(LoginRequest) returns (AuthResponse);
   rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
+  rpc RefreshToken(RefreshRequest) returns (AuthResponse);
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
 }

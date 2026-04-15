@@ -11,6 +11,7 @@ use auth::infra::security::password_hasher::Argon2Hasher;
 use auth::app::auth::register::RegisterUseCase;
 use auth::app::auth::login::LoginUseCase;
 use auth::app::auth::logout::LogoutUseCase;
+use auth::app::auth::refresh::RefreshTokenUseCase;
 use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
 use auth::auth_proto;
@@ -61,11 +62,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cache_service.clone(),
     ));
 
+    let refresh_uc = Arc::new(RefreshTokenUseCase::new(
+        user_repo.clone(),
+        cache_service.clone(),
+        jwt_service.clone(),
+    ));
+
     // API
     let auth_handler = AuthHandler::new(
         register_uc,
         login_uc,
         logout_uc,
+        refresh_uc,
         cache_service.clone(),
         jwt_service.clone(),
     );

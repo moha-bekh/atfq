@@ -11,6 +11,7 @@ struct JwtClaims {
     sub: String,
     iat: usize,
     exp: usize,
+    jti: String,
 }
 
 pub struct JwtAdapter {
@@ -57,11 +58,13 @@ impl JwtAdapter {
     fn create_token(&self, user_id: &Uuid, secret: &str, duration: Duration) -> String {
         let now = Utc::now();
         let expiry = now + duration;
+        let jti = Uuid::new_v4().to_string();
 
         let claims = JwtClaims {
             sub: user_id.to_string(),
             iat: now.timestamp() as usize,
             exp: expiry.timestamp() as usize,
+            jti,
         };
 
         encode(
