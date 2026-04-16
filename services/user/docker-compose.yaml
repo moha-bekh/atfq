@@ -24,6 +24,10 @@ services:
       - type: volume
         source: user-postgres_data
         target: /var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=atfq_db
+      - POSTGRES_USER=atfq
+      - POSTGRES_PASSWORD=atfq
     # ports:
     #   - "127.0.0.1:5432:5432"
     healthcheck:

@@ -62,32 +62,32 @@ services:
         target: /app/target
   # net-gateway:
   # profiles: ["dev"]
-  # user:
-  #   # profiles: ["full"]
-  #   build:
-  #     target: dev
-  #   ports:
-  #     - "8083:8080"
-  #   volumes:
-  #     - type: bind
-  #       source: ./user
-  #       target: /app
-  #       consistency: cached
-  #     - type: volume
-  #       target: /app/node_modules
+  user:
+    # profiles: ["full"]
+    build:
+      target: dev
+    ports:
+      - "8083:8080"
+    volumes:
+      - type: bind
+        source: ./user
+        target: /app
+        consistency: cached
+      - type: volume
+        target: /app/node_modules
   # db-user:
   # profiles: ["full"]
-  # wiki:
-  #   # profiles: ["full"]
-  #   build:
-  #     target: dev
-  #   ports:
-  #     - "8084:8080"
-  #   volumes:
-  #     - type: bind
-  #       source: ./wiki
-  #       target: /app
-  #       consistency: cached
+  wiki:
+    # profiles: ["full"]
+    build:
+      target: dev
+    ports:
+      - "8084:8080"
+    volumes:
+      - type: bind
+        source: ./wiki
+        target: /app
+        consistency: cached
   # db-wiki:
   # profiles: ["full"]
   # vault:

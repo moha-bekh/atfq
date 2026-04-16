@@ -3,8 +3,8 @@ include:
   - ./app/docker-compose.yaml
   - ./auth/docker-compose.yaml
   - ./net-gateway/docker-compose.yaml
-  # - ./user/docker-compose.yaml
-  # - ./wiki/docker-compose.yaml
+  - ./user/docker-compose.yaml
+  - ./wiki/docker-compose.yaml
   - ./vault/docker-compose.yaml
   # - ./monitoring/docker-compose.yaml
 
