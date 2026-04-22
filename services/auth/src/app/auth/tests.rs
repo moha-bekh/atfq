@@ -33,7 +33,7 @@ impl UserRepository for MockUserRepo {
             username: data.username,
             email: data.email,
             password_hash: Some(data.password_hash),
-            is_2fa_enabled: false,
+            mfa_secret: None,
             created_at: chrono::Utc::now(),
         };
         users.push(user.clone());

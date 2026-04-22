@@ -37,7 +37,7 @@ tasks:
       - |
         docker exec -it db-auth \
         psql -U {{.POSTGRES_USER | default "atfq"}} -d {{.POSTGRES_DB | default "atfq_db"}} \
-        -c "SELECT id, username, email, is_2fa_enabled, created_at FROM users;"
+        -c "SELECT id, username, email, mfa_secret, created_at FROM users;"
 
   db-shell:
     desc: "Open an interactive Postgres shell inside the container"

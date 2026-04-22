@@ -13,7 +13,7 @@ impl PostgresUserRepository {
                 username as "username: Username", 
                 email as "email: Email", 
                 password_hash, 
-                is_2fa_enabled, 
+                mfa_secret,
                 created_at
             FROM users 
             WHERE id = $1
