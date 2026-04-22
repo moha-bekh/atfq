@@ -17,13 +17,14 @@ message AuthSuccess {
   User user = 3;
 }
 
+enum MfaMethod {
+  METHOD_TOTP = 0;
+  METHOD_SMS = 1;
+}
+
 message MfaRequired {
   string mfa_token = 1;
-  enum Method {
-    METHOD_TOTP = 0;
-    METHOD_SMS = 1;
-  }
-  Method preferred_method = 2;
+  MfaMethod preferred_method = 2;
 }
 
 message AuthResponse {
@@ -54,4 +55,13 @@ message LoginRequest {
 message LogoutRequest {
   string access_token = 1;
   string refresh_token = 2;
+}
+
+message EnableMFARequest {
+  string access_token = 1;
+  MfaMethod method = 2;
+}
+
+message EnableMFAResponse {
+  string secret_base64 = 1;
 }
