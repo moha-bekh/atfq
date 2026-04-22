@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use crate::auth_proto::auth_service_server::AuthService;
-use crate::auth_proto::{AuthResponse, RegisterRequest, LoginRequest, LogoutRequest, RefreshRequest};
+use crate::auth_proto::{AuthResponse, RegisterRequest, LoginRequest, LogoutRequest, RefreshRequest, EnableMfaRequest, EnableMfaResponse};
 use crate::app::auth::register::RegisterUseCase;
 use crate::app::auth::login::LoginUseCase;
 use crate::app::auth::logout::LogoutUseCase;
@@ -49,6 +49,10 @@ impl AuthService for AuthHandler {
 
     async fn refresh_token(&self, request: Request<RefreshRequest>) -> Result<Response<AuthResponse>, Status> {
         self.refresh_handler(request).await
+    }
+
+    async fn enable_mfa(&self, request: Request<EnableMfaRequest>) -> Result<Response<EnableMfaResponse>, Status> {
+        self.enable_mfa_handler(request).await
     }
 }
 
