@@ -35,6 +35,15 @@ tasks:
           "password": "{{.PASSWORD}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Login
 
+  enablemfa:
+    desc: "Enable two factor authentication for a given user (Usage: task api:enablemfa ACCESS_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "method": 0
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/EnableMFA
+
   logout:
     desc: "Logout a user (Usage: task api:logout ACCESS_TOKEN=... REFRESH_TOKEN=...)"
     cmds:
