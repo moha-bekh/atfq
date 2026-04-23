@@ -27,6 +27,8 @@ services:
       - DATABASE_URL=postgresql://atfq:atfq@db-auth:5432/atfq_db
       - SERVER_ADDR=0.0.0.0:8080
       - JWT_SECRET=jwt_secret
+      - GITHUB_REDIRECT_URL=http://localhost:8080/auth/callback/github
+      - GOOGLE_REDIRECT_URL=http://localhost:8080/auth/callback/google
     depends_on:
       db-auth:
         condition: service_started

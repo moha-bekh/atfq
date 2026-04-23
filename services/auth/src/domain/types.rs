@@ -109,10 +109,10 @@ mod tests {
     }
 
     #[test]
+    // Check automatic lowercasing
     fn test_email_valid() {
         let email = Email::new("Test@Example.Com");
         assert!(email.is_ok());
-        // Check automatic lowercasing
         assert_eq!(email.unwrap().to_string(), "test@example.com");
     }
 

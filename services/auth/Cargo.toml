@@ -34,5 +34,8 @@ http = "0.2"
 
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
 
+oauth2 = "4.4"
+reqwest = { version = "0.11", features = ["json"] }
+
 [build-dependencies]
 tonic-build = "0.11"

@@ -1,0 +1,19 @@
+version: "3"
+
+vars:
+  PROVIDER: '{{default "0" .PROVIDER}}' # 0 for GOOGLE, 1 for GITHUB
+
+tasks:
+  url:
+    desc: "Get OAuth URL. Usage: task auth:oauth:url [PROVIDER=0|1]"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"provider": {{.PROVIDER}}}' localhost:8082 auth.v1.AuthService/GetOAuthUrl
+
+  callback:
+    desc: "Handle OAuth callback. Usage: task auth:oauth:callback CODE=... STATE=... [PROVIDER=0|1]"
+    requires:
+      vars: [CODE, STATE]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{ "provider": {{.PROVIDER}}, "code": "{{.CODE}}", "state": "{{.STATE}}" }' localhost:8082 auth.v1.AuthService/OAuthCallback

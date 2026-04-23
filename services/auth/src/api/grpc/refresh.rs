@@ -5,7 +5,7 @@ use crate::api::grpc::handler::{AuthHandler, map_domain_error};
 impl AuthHandler {
     pub async fn refresh_handler(&self, request: Request<RefreshRequest>) -> Result<Response<AuthResponse>, Status> {
         let req = request.into_inner();
-        
+
         let result = self.refresh_uc
             .execute(&req.refresh_token)
             .await
