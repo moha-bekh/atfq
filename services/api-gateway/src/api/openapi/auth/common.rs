@@ -6,6 +6,7 @@ pub struct UserSchema {
     pub id: String,
     pub username: String,
     pub email: String,
+    pub avatar_url: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

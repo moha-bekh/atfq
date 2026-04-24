@@ -19,7 +19,13 @@ impl CacheService for RedisCache {
     async fn set(&self, key: &str, value: &str, ttl: Duration) -> Result<(), DomainError> {
         self.set_handler(key, value, ttl).await
     }
+    async fn get(&self, key: &str) -> Result<Option<String>, DomainError> {
+        self.get_handler(key).await
+    }
     async fn exists(&self, key: &str) -> Result<bool, DomainError> {
         self.exists_handler(key).await
+    }
+    async fn delete(&self, key: &str) -> Result<(), DomainError> {
+        self.delete_handler(key).await
     }
 }

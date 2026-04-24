@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
 
-import { useLogin } from '../hooks';
+import { useLogin, useOAuth } from '../hooks';
 import { loginSchema, type LoginInput } from '../utils/validation';
 
 import { Input } from '@/components/ui/Input';
@@ -12,6 +12,7 @@ import { GithubCircle } from '@/assets/icons/GithubCircle';
 
 export function LoginForm() {
   const mutation = useLogin();
+  const { getOAuthUrl, isProcessing } = useOAuth();
 
   const {
     register,
@@ -66,7 +67,7 @@ export function LoginForm() {
       <Button
         type="submit"
         variant="primary"
-        disabled={mutation.isPending}
+        disabled={mutation.isPending || isProcessing}
         className="mt-2"
       >
         {mutation.isPending ? "Authenticating..." : "Sign In"}
@@ -80,12 +81,24 @@ export function LoginForm() {
 
       {/* Social Logins */}
       <div className="flex flex-col gap-3">
-        <Button variant="outline" type="button" className="text-sm group">
+        <Button 
+          variant="outline" 
+          type="button" 
+          className="text-sm group"
+          onClick={() => getOAuthUrl('google')}
+          disabled={isProcessing}
+        >
           <GoogleCircle className="w-4 h-4 text-sub group-hover:text-main transition-colors" />
           Google
         </Button>
 
-        <Button variant="outline" type="button" className="text-sm group">
+        <Button 
+          variant="outline" 
+          type="button" 
+          className="text-sm group"
+          onClick={() => getOAuthUrl('github')}
+          disabled={isProcessing}
+        >
           <GithubCircle className="w-4 h-4 text-sub group-hover:text-main transition-colors" />
           GitHub
         </Button>

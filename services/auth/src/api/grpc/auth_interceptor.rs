@@ -97,7 +97,7 @@ where
                     return inner.call(req).await;
                 }
                 Some(_) => {
-                    // Requires Auth
+
                     let auth_header = req.headers()
                         .get("authorization")
                         .and_then(|v: &HeaderValue| v.to_str().ok());
@@ -106,7 +106,6 @@ where
                         if auth_header_str.starts_with("Bearer ") {
                             let token = &auth_header_str[7..];
 
-                            // 1. Blacklist check
                             let is_blacklisted = cache_service.exists(&format!("blacklist:{}", token))
                                 .await
                                 .unwrap_or(false);
@@ -115,10 +114,8 @@ where
                                 return Ok(status_to_http(Status::unauthenticated("Token is revoked")));
                             }
 
-                            // 2. Decode token
                             match token_service.decode_token(token) {
                                 Ok(claims) => {
-                                    // Inject claims
                                     let mut req = req;
                                     req.extensions_mut().insert(claims);
                                     return inner.call(req).await;
@@ -132,7 +129,6 @@ where
                     return Ok(status_to_http(Status::unauthenticated("Missing or invalid authorization header")));
                 }
                 None => {
-                    // Unknown method (e.g. Reflection), let it pass
                     inner.call(req).await
                 }
             }

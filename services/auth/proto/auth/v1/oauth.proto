@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package auth.v1;
+
+enum OAuthProvider {
+  GOOGLE = 0;
+  GITHUB = 1;
+}
+
+message OAuthUrlRequest {
+  OAuthProvider provider = 1;
+}
+
+message OAuthUrlResponse {
+  string url = 1;
+}
+
+message OAuthCallbackRequest {
+  OAuthProvider provider = 1;
+  string code = 2;
+  string state = 3;
+}

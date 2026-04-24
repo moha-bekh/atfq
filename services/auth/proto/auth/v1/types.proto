@@ -3,7 +3,6 @@ syntax = "proto3";
 package auth.v1;
 
 import "google/protobuf/empty.proto";
-// google.protobuf.Empty
 
 message User {
   string id = 1;
@@ -54,4 +53,8 @@ message LoginRequest {
 message LogoutRequest {
   string access_token = 1;
   string refresh_token = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
 }

@@ -9,28 +9,29 @@ export type User = {
   id: string;
   username: string;
   email: string;
-};
-
-export type AuthSuccess = {
-  access_token: string;
-  refresh_token: string;
-  user: User;
-};
-
-export type MfaRequired = {
-  mfa_token: string;
-  preferred_method: 'METHOD_TOTP' | 'METHOD_SMS';
-};
-
-export type AuthResponse = {
-  success?: AuthSuccess;
-  mfa_required?: MfaRequired;
+  avatar_url?: string;
 };
 
 export type LoginRequest = {
-  identifier: {
-    email?: string;
-    username?: string;
-  };
+  identifier: string;
   password: string;
+};
+
+export type LoginResponse = {
+  status: string;
+  access_token?: string;
+  refresh_token?: string;
+  user?: User;
+};
+
+// OAuth Types
+export type OAuthProvider = 'google' | 'github';
+
+export type OAuthUrlResponse = {
+  url: string;
+};
+
+export type OAuthCallbackParams = {
+  code: string;
+  state: string;
 };

@@ -7,7 +7,7 @@ impl AuthHandler {
         let req = request.into_inner();
 
         let id_msg = req.id.ok_or_else(|| Status::invalid_argument("Missing identifier"))?;
-        
+
         let identifier_str = match id_msg.id {
             Some(identifier::Id::Email(email)) => email,
             Some(identifier::Id::Username(username)) => username,

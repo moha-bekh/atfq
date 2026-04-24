@@ -12,6 +12,8 @@ use auth::app::auth::register::RegisterUseCase;
 use auth::app::auth::login::LoginUseCase;
 use auth::app::auth::logout::LogoutUseCase;
 use auth::app::auth::refresh::RefreshTokenUseCase;
+use auth::app::auth::oauth::OAuthUseCase;
+use auth::infra::oauth::google_adapter::GoogleAdapter;
 use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
 use auth::auth_proto;
@@ -27,6 +29,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server_addr = env::var("SERVER_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string()).parse()?;
     let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+
+    let google_client_id = env::var("GOOGLE_CLIENT_ID").ok();
+    let google_client_secret = env::var("GOOGLE_CLIENT_SECRET").ok();
+    let google_redirect_url = env::var("GOOGLE_REDIRECT_URL").ok();
+
+    let github_client_id = env::var("GITHUB_CLIENT_ID").ok();
+    let github_client_secret = env::var("GITHUB_CLIENT_SECRET").ok();
+    let github_redirect_url = env::var("GITHUB_REDIRECT_URL").ok();
 
     println!("Connecting to database...");
     let pool = PgPoolOptions::new()
@@ -68,14 +78,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         jwt_service.clone(),
     ));
 
+    let oauth_uc = Arc::new(OAuthUseCase::new(
+        user_repo.clone(),
+        jwt_service.clone(),
+        cache_service.clone(),
+    ));
+
+    let google_provider = if let (Some(id), Some(secret), Some(url)) = (google_client_id, google_client_secret, google_redirect_url) {
+        Some(Arc::new(GoogleAdapter::new(id, secret, url)) as Arc<dyn auth::domain::ports::oauth_service::OAuthProvider>)
+    } else {
+        None
+    };
+
+    let github_provider = if let (Some(id), Some(secret), Some(url)) = (github_client_id, github_client_secret, github_redirect_url) {
+        Some(Arc::new(auth::infra::oauth::github_adapter::GithubAdapter::new(id, secret, url)) as Arc<dyn auth::domain::ports::oauth_service::OAuthProvider>)
+    } else {
+        None
+    };
+
     // API
     let auth_handler = AuthHandler::new(
         register_uc,
         login_uc,
         logout_uc,
         refresh_uc,
+        oauth_uc,
         cache_service.clone(),
         jwt_service.clone(),
+        google_provider,
+        github_provider,
     );
 
     let auth_layer = auth::api::grpc::auth_interceptor::AuthLayer::new(
