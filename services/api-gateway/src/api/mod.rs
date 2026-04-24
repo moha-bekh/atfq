@@ -9,7 +9,13 @@ pub mod auth;
 pub mod openapi;
 
 pub fn create_router(state: Arc<AppState>) -> Router {
-    let cors = CorsLayer::permissive();
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+        ]);
 
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()))

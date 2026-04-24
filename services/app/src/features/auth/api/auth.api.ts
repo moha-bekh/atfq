@@ -18,6 +18,15 @@ export const authApi = {
     return await api.post('auth/login', { json: payload }).json<LoginResponse>();
   },
 
+  logout: async (accessToken: string, refreshToken: string): Promise<void> => {
+    await api.post('auth/logout', { 
+      json: { 
+        access_token: accessToken, 
+        refresh_token: refreshToken 
+      } 
+    });
+  },
+
   getOAuthUrl: async (provider: OAuthProvider): Promise<OAuthUrlResponse> => {
     return await api.get(`auth/oauth/url/${provider}`).json<OAuthUrlResponse>();
   },

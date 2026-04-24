@@ -83,8 +83,9 @@ pub fn map_domain_error(err: DomainError) -> Status {
     match err {
         DomainError::AlreadyExists => Status::already_exists("User already exists"),
         DomainError::InvalidInput(msg) => Status::invalid_argument(msg),
-        DomainError::Unauthenticated | DomainError::Unauthorized => Status::unauthenticated("Unauthorized"),
-        DomainError::NotFound => Status::not_found("Not found"),
+        DomainError::Unauthenticated => Status::unauthenticated("Invalid identifier or password"),
+        DomainError::Unauthorized => Status::permission_denied("You do not have permission to perform this action"),
+        DomainError::NotFound => Status::not_found("The requested resource was not found"),
         DomainError::Internal(msg) => Status::internal(msg),
     }
 }

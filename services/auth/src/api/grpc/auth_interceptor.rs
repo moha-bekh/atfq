@@ -30,8 +30,8 @@ impl AuthServiceMethod {
 
     pub fn requires_auth(&self) -> bool {
         match self {
-            Self::Register | Self::Login | Self::RefreshToken => false,
             Self::Logout => true,
+            Self::Register | Self::Login | Self::RefreshToken => false,
         }
     }
 }
@@ -96,7 +96,7 @@ where
                 Some(m) if !m.requires_auth() => {
                     return inner.call(req).await;
                 }
-                Some(_) => {
+                Some(m) => {
 
                     let auth_header = req.headers()
                         .get("authorization")
@@ -111,11 +111,18 @@ where
                                 .unwrap_or(false);
 
                             if is_blacklisted {
-                                return Ok(status_to_http(Status::unauthenticated("Token is revoked")));
+                                if let AuthServiceMethod::Logout = m {
+                                    // Proceed to allow blacklisting the refresh token
+                                } else {
+                                    return Ok(status_to_http(Status::unauthenticated("Token is revoked")));
+                                }
                             }
 
                             match token_service.decode_token(token) {
                                 Ok(claims) => {
+                                    if claims.typ != "access" {
+                                        return Ok(status_to_http(Status::unauthenticated("Invalid token type")));
+                                    }
                                     let mut req = req;
                                     req.extensions_mut().insert(claims);
                                     return inner.call(req).await;

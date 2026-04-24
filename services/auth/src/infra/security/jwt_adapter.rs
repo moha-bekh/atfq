@@ -12,6 +12,7 @@ struct JwtClaims {
     iat: usize,
     exp: usize,
     jti: String,
+    typ: String,
 }
 
 pub struct JwtAdapter {
@@ -27,8 +28,8 @@ impl JwtAdapter {
 impl TokenService for JwtAdapter {
     fn generate_tokens(&self, user_id: Uuid) -> TokenPair {
 
-        let access_token = self.create_token(&user_id, &self.secret, Duration::minutes(15));
-        let refresh_token = self.create_token(&user_id, &self.secret, Duration::days(7));
+        let access_token = self.create_token(&user_id, &self.secret, Duration::minutes(15), "access");
+        let refresh_token = self.create_token(&user_id, &self.secret, Duration::days(7), "refresh");
 
         TokenPair {
             access: access_token,
@@ -50,12 +51,13 @@ impl TokenService for JwtAdapter {
         Ok(TokenClaims {
             user_id,
             exp: decoded.claims.exp,
+            typ: decoded.claims.typ,
         })
     }
 }
 
 impl JwtAdapter {
-    fn create_token(&self, user_id: &Uuid, secret: &str, duration: Duration) -> String {
+    fn create_token(&self, user_id: &Uuid, secret: &str, duration: Duration, typ: &str) -> String {
         let now = Utc::now();
         let expiry = now + duration;
         let jti = Uuid::new_v4().to_string();
@@ -65,6 +67,7 @@ impl JwtAdapter {
             iat: now.timestamp() as usize,
             exp: expiry.timestamp() as usize,
             jti,
+            typ: typ.to_string(),
         };
 
         encode(

@@ -38,7 +38,7 @@ export function LoginForm() {
     >
       {mutation.isError && (
         <div className="p-3 text-[10px] bg-red-500/10 border border-red-500/20 text-red-500 uppercase tracking-tighter">
-          System Error: {mutation.error?.message || "Invalid credentials"}
+          {mutation.error?.message || "Invalid credentials"}
         </div>
       )}
 

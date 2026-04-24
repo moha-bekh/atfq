@@ -23,7 +23,6 @@ impl RefreshTokenUseCase {
     }
 
     pub async fn execute(&self, refresh_token: &str) -> Result<AuthResult, DomainError> {
-
         let is_blacklisted = self.cache.exists(&format!("blacklist:{}", refresh_token))
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?;
@@ -33,6 +32,11 @@ impl RefreshTokenUseCase {
         }
 
         let claims = self.tokens.decode_token(refresh_token)?;
+
+        if claims.typ != "refresh" {
+            println!("AuthService: Refresh attempt with invalid token type: {}", claims.typ);
+            return Err(DomainError::Unauthenticated);
+        }
 
         let user = self.repo.find_by_id(claims.user_id)
             .await?

@@ -24,6 +24,17 @@ export type LoginResponse = {
   user?: User;
 };
 
+export type AuthSuccess = {
+  access_token: string;
+  refresh_token: string;
+  user: User;
+};
+
+export type LogoutRequest = {
+  access_token: string;
+  refresh_token: string;
+};
+
 // OAuth Types
 export type OAuthProvider = 'google' | 'github';
 

@@ -1,17 +1,17 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api';
-import { useAuthStore } from '../stores/auth.store'; // Import du store
+import { useAuthStore } from '../stores/auth.store';
 import type { LoginRequest } from '../types';
+import type { HTTPError } from 'ky';
 
 export function useLogin() {
   const navigate = useNavigate();
-  const setAuth = useAuthStore(state => state.setAuth); // On récupère l'action du store
+  const setAuth = useAuthStore(state => state.setAuth);
 
   return useMutation({
     mutationFn: (payload: LoginRequest) => authApi.login(payload),
     onSuccess: (data: any) => {
-      // Les données sont maintenant à plat dans la réponse du Gateway
       if (data.access_token) {
         setAuth({
           user: data.user,
@@ -23,8 +23,14 @@ export function useLogin() {
         console.log("MFA required");
       }
     },
-    onError: (error: any) => {
-      console.error("Login Failed:", error);
+    onError: async (error: HTTPError) => {
+      try {
+        const errorData = await error.response.json();
+        // On attache le message d'erreur du backend à l'objet error pour React Query
+        error.message = errorData.error || "Authentication failed";
+      } catch (e) {
+        error.message = "An unexpected error occurred";
+      }
     }
   });
 }

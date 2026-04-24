@@ -106,10 +106,11 @@ impl TokenService for MockTokenService {
         }
     }
 
-    fn decode_token(&self, _token: &str) -> Result<TokenClaims, DomainError> {
+    fn decode_token(&self, token: &str) -> Result<TokenClaims, DomainError> {
         Ok(TokenClaims {
             user_id: *self.next_user_id.lock().unwrap(),
             exp: 0,
+            typ: if token.contains("refresh") { "refresh".into() } else { "access".into() },
         })
     }
 }
@@ -211,6 +212,29 @@ async fn test_refresh_token_fails_if_blacklisted() {
     
     let token = "some_token";
     cache.set(&format!("blacklist:{}", token), "revoked", std::time::Duration::from_secs(60)).await.unwrap();
+    
+    let result = refresh_uc.execute(token).await;
+    
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        DomainError::Unauthenticated => (),
+        e => panic!("Expected Unauthenticated, got {:?}", e),
+    }
+}
+
+#[tokio::test]
+async fn test_refresh_token_fails_with_access_token() {
+    let repo = Arc::new(MockUserRepo { 
+        users: Mutex::new(vec![]),
+        oauth_accounts: Mutex::new(HashMap::new()),
+    });
+    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
+    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
+    
+    let refresh_uc = RefreshTokenUseCase::new(repo.clone(), cache.clone(), tokens.clone());
+    
+    // By default MockTokenService returns "access" if token doesn't contain "refresh"
+    let token = "mock_access";
     
     let result = refresh_uc.execute(token).await;
     
