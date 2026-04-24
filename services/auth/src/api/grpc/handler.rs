@@ -4,6 +4,7 @@ use crate::auth_proto::auth_service_server::AuthService;
 use crate::auth_proto::{AuthResponse, RegisterRequest, LoginRequest, LogoutRequest, RefreshRequest, EnableMfaRequest, EnableMfaResponse};
 use crate::app::auth::register::RegisterUseCase;
 use crate::app::auth::login::LoginUseCase;
+use crate::app::auth::enable_mfa::EnableMfaUseCase;
 use crate::app::auth::logout::LogoutUseCase;
 use crate::app::auth::refresh::RefreshTokenUseCase;
 use crate::domain::error::DomainError;
@@ -14,6 +15,7 @@ use crate::domain::ports::token_service::TokenService;
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
     pub login_uc: Arc<LoginUseCase>,
+    pub enable_mfa_uc: Arc<EnableMfaUseCase>,
     pub logout_uc: Arc<LogoutUseCase>,
     pub refresh_uc: Arc<RefreshTokenUseCase>,
     pub cache_service: Arc<dyn CacheService>,
@@ -24,12 +26,13 @@ impl AuthHandler {
     pub fn new(
         register_uc: Arc<RegisterUseCase>,
         login_uc: Arc<LoginUseCase>,
+        enable_mfa_uc: Arc<EnableMfaUseCase>,
         logout_uc: Arc<LogoutUseCase>,
         refresh_uc: Arc<RefreshTokenUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
     ) -> Self {
-        Self { register_uc, login_uc, logout_uc, refresh_uc, cache_service, token_service }
+        Self { register_uc, login_uc, enable_mfa_uc, logout_uc, refresh_uc, cache_service, token_service }
     }
 }
 
