@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use uuid::Uuid;
 use crate::domain::ports::{
+    mfa_service::EncryptedMfaSecret,
     user_repository::{UserRepository, UserDto},
     token_service::{TokenService, TokenPair, TokenClaims},
     cache_service::CacheService,
@@ -39,6 +40,10 @@ impl UserRepository for MockUserRepo {
         };
         users.push(user.clone());
         Ok(user)
+    }
+
+    async fn enable_mfa(&self, id: uuid::Uuid, mfa: EncryptedMfaSecret) -> Result<(), DomainError> {
+        unimplemented!()
     }
 
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, DomainError> {
