@@ -1,13 +1,21 @@
 #!/bin/bash
+# This script handles the automated initialization of HashiCorp Vault.
+# It performs the following steps:
+# 1. Waits for the Vault container to be ready.
+# 2. Initializes Vault if it hasn't been done yet.
+# 3. Securely extracts Unseal Keys and the Root Token.
+# 4. Merges these keys into the existing SOPS-encrypted secrets file (YAML).
 set -e
 
-ACTION=$1
-AGE_PK=$2
-AGE_KEY_PATH=$3
+ACTION=$1        # The action to perform (currently only 'init')
+AGE_PK=$2        # The Public Key (age1...) used for encryption
+AGE_KEY_PATH=$3  # Path to the local private key file (~/.config/sops/age/...)
 VAULT_ADDR="http://127.0.0.1:8200"
-ENV_ENC=".env.enc"
+SECRETS_FILE="secrets.enc.yaml"
 
 init_vault() {
+  # --- Step 1: Connectivity Check ---
+  # Ensure Vault is up and responding before attempting initialization.
   echo "--- Waiting for Vault to be reachable ---"
   MAX_RETRIES=15
   COUNT=0
@@ -22,38 +30,50 @@ init_vault() {
     exit 1
   fi
 
+  # --- Step 2: Initialization Check ---
+  # Only initialize if Vault is not already set up.
   IS_INIT=$(docker exec vault vault status -format=json 2>/dev/null | jq -r '.initialized')
   if [ "$IS_INIT" == "true" ]; then
     echo "Vault already initialized. Skipping."
     return 0
   fi
 
+  # --- Step 3: Initialization ---
+  # Generate the unseal keys and root token in memory (RAM).
   echo "--- Initializing Vault (RAM Process) ---"
   JSON_INIT=$(docker exec -e VAULT_ADDR=$VAULT_ADDR vault vault operator init -format=json)
 
   K1=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[0]')
   K2=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[1]')
   K3=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[2]')
-  K4=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[3]')
-  K5=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[4]')
   TK=$(echo "$JSON_INIT" | jq -r '.root_token')
 
-  EXISTING=""
-  if [ -f "$ENV_ENC" ]; then
-    EXISTING=$(SOPS_AGE_KEY_FILE="$AGE_KEY_PATH" sops -d --input-type dotenv --output-type dotenv "$ENV_ENC" | grep -vE "^(KEY[0-9]|VAULT_TOKEN)=" || true)
+  # --- Step 4: Secrets Management (SOPS) ---
+  # Load existing secrets if the file exists to avoid overwriting business data.
+  if [ -f "$SECRETS_FILE" ]; then
+    echo "Decrypting existing $SECRETS_FILE..."
+    EXISTING_YAML=$(SOPS_AGE_KEY_FILE="$AGE_KEY_PATH" sops -d "$SECRETS_FILE")
+  else
+    EXISTING_YAML="{}"
   fi
 
-  mv ../.sops.yaml ../.sops.yaml.bak 2>/dev/null || true
+  echo "--- Merging Vault keys into $SECRETS_FILE ---"
+  
+  # Merge new Vault metadata (Unseal keys + Root Token) into the YAML structure.
+  # We use 'jq' to perform the merge safely.
+  FINAL_YAML=$(echo "$EXISTING_YAML" | jq --arg k1 "$K1" --arg k2 "$K2" --arg k3 "$K3" --arg tk "$TK" \
+    '. + {KEY1: $k1, KEY2: $k2, KEY3: $k3, VAULT_TOKEN: $tk}')
 
-  FINAL_CONTENT=$(printf "%s\nKEY1=%s\nKEY2=%s\nKEY3=%s\nKEY4=%s\nKEY5=%s\nVAULT_TOKEN=%s\n" "$EXISTING" "$K1" "$K2" "$K3" "$K4" "$K5" "$TK" | grep -v '^$')
-
-  TMP_FILE=$(mktemp)
-  echo "$FINAL_CONTENT" >"$TMP_FILE"
-  SOPS_AGE_KEY_FILE="$AGE_KEY_PATH" sops --encrypt --age "$AGE_PK" --input-type dotenv --output-type dotenv "$TMP_FILE" >"$ENV_ENC"
+  # --- Step 5: Secure Encryption ---
+  # Write to a temporary file, encrypt it with SOPS, then replace the target file.
+  # The extension .enc.yaml ensures SOPS finds the correct rules in .sops.yaml.
+  TMP_FILE=$(mktemp --suffix=.enc.yaml)
+  echo "$FINAL_YAML" > "$TMP_FILE"
+  
+  SOPS_AGE_KEY_FILE="$AGE_KEY_PATH" sops --encrypt --age "$AGE_PK" "$TMP_FILE" > "$SECRETS_FILE"
+  
   rm "$TMP_FILE"
-
-  mv ../.sops.yaml.bak ../.sops.yaml 2>/dev/null || true
-  echo "Success: Vault keys merged into $ENV_ENC"
+  echo "Success: Vault keys merged into $SECRETS_FILE"
 }
 
 case "$ACTION" in
