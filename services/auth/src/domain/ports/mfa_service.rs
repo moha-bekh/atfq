@@ -4,5 +4,6 @@ pub type MfaSecret = [u8; 20];
 pub type EncryptedMfaSecret = Ciphertext;
 
 pub trait MfaService: Send + Sync {
-    fn generate_mfa_secret() -> MfaSecret;
+	fn generate_mfa_secret() -> MfaSecret;
+	fn make_human_readable_secret(secret: &MfaSecret) -> String;
 }

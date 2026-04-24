@@ -10,4 +10,11 @@ impl MfaService for TotpMfa {
 		rand::rng().fill_bytes(&mut bytes);
 		bytes
 	}
+
+	fn make_human_readable_secret(secret: &MfaSecret) -> String {
+		base32::encode(
+			base32::Alphabet::Rfc4648 { padding: false },
+			secret,
+		)
+	}
 }
