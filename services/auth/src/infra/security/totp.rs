@@ -6,7 +6,7 @@ pub struct TotpMfa {
 
 impl MfaService for TotpMfa {
 	fn generate_mfa_secret() -> MfaSecret {
-		let mut bytes = [0u8; 21];
+		let mut bytes: MfaSecret = MfaSecret::default();
 		rand::rng().fill_bytes(&mut bytes);
 		bytes
 	}
