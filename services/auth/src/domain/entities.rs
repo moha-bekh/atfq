@@ -8,7 +8,7 @@ pub struct User {
     pub username: Username,
     pub email: Email,
     pub password_hash: Option<String>,
-    pub mfa_secret: Option<String>,
+    pub mfa_secret: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
 }
 
