@@ -33,6 +33,7 @@ pin-project = "1.1"
 http = "0.2"
 
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+rand = "0.10.1"
 
 [build-dependencies]
 tonic-build = "0.11"
