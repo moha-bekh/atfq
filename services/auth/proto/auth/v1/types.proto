@@ -63,5 +63,5 @@ message EnableMFARequest {
 }
 
 message EnableMFAResponse {
-  string secret_base64 = 1;
+  string secret_base32 = 1;
 }
