@@ -1,0 +1,15 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: "Provision Vault for Net-Gateway"
+    cmds:
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault policy write net-gateway-service - < ./policy.hcl
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault write auth/approle/role/net-gateway-service - < ./role.json
+      - |
+        docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault kv put secret/net-gateway \
+          ssl_crt="$NET_GATEWAY_SSL_CRT" \
+          ssl_key="$NET_GATEWAY_SSL_KEY"
+      - mkdir -p ../../../net-gateway/vault/agent_ids/
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/net-gateway-service/role-id > ../../../net-gateway/vault/agent_ids/role-id
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/net-gateway-service/secret-id > ../../../net-gateway/vault/agent_ids/secret-id
