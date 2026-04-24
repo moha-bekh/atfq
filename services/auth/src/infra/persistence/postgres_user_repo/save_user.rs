@@ -18,6 +18,7 @@ impl PostgresUserRepository {
                 email as "email: Email", 
                 password_hash, 
                 mfa_secret,
+                mfa_nonce,
                 created_at
             "#,
             uuid::Uuid::new_v4(),
