@@ -19,6 +19,8 @@ use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
 use auth::auth_proto;
 
+const CHA_CHA_KEY: &[u8; 32] = &[42; 32];
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
@@ -42,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // INFRA
     let user_repo = Arc::new(PostgresUserRepository::new(pool));
 
-    let encryption_service = Arc::new(ChaChaEncryption::from_key(&[]));
+    let encryption_service = Arc::new(ChaChaEncryption::from_key(CHA_CHA_KEY));
 
     let mfa_service = Arc::new(TotpMfa);
 
