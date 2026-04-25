@@ -4,6 +4,10 @@ pub struct Ciphertext {
 }
 
 impl Ciphertext {
+	pub fn new(data: Vec<u8>, nonce: Vec<u8>) -> Self {
+		Self { data, nonce }
+	}
+
 	pub fn data(&self) -> &Vec<u8> {
 		&self.data
 	}
