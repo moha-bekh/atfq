@@ -102,6 +102,9 @@ impl CacheService for MockCacheService {
         }
         Ok(())
     }
+    async fn get(&self, key: &str) -> Result<String, DomainError> {
+        unimplemented!()
+    }
     async fn increment(&self, key: &str) -> Result<u64, DomainError> {
         unimplemented!()
     }
