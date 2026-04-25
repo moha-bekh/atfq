@@ -102,6 +102,9 @@ impl CacheService for MockCacheService {
         }
         Ok(())
     }
+    async fn increment(&self, key: &str) -> Result<u64, DomainError> {
+        unimplemented!()
+    }
     async fn exists(&self, key: &str) -> Result<bool, DomainError> {
         Ok(self.blacklist.lock().unwrap().contains(&key.to_string()))
     }
