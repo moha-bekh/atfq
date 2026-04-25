@@ -19,12 +19,7 @@ pub struct AuthenticatedUser {
     pub refresh_token: String,
 }
 
-pub struct TwoFactorPending {
-    pub user_id: Uuid,
-    pub tmp_session_id: String,
-}
-
 pub enum LoginResult {
     Success(AuthenticatedUser),
-    Requires2FA(TwoFactorPending),
+    Requires2FA(User),
 }

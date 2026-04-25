@@ -5,8 +5,8 @@ use crate::domain::ports::{
     crypto_service::CryptoService
 };
 use crate::domain::types::{Username, Email};
+use crate::domain::entities::{LoginResult, AuthenticatedUser};
 use crate::domain::error::DomainError;
-use crate::app::auth::types::AuthResult;
 
 pub struct LoginUseCase {
     repo: Arc<dyn UserRepository>,
@@ -27,7 +27,7 @@ impl LoginUseCase {
         &self,
         identifier: &str,
         password_raw: &str
-    ) -> Result<AuthResult, DomainError> {
+    ) -> Result<LoginResult, DomainError> {
 
         let user = if identifier.contains('@') {
             let email = Email::new(identifier)?;
@@ -47,12 +47,16 @@ impl LoginUseCase {
             return Err(DomainError::Unauthenticated);
         }
 
+        if user.mfa_secret.is_some() && user.mfa_nonce.is_some() {
+            return Ok(LoginResult::Requires2FA(user));
+        }
+
         let tokens = self.tokens.generate_tokens(user.id);
 
-        Ok(AuthResult {
+        Ok(LoginResult::Success(AuthenticatedUser {
             user,
             access_token: tokens.access,
             refresh_token: tokens.refresh,
-        })
+        }))
     }
 }

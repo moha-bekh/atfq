@@ -23,7 +23,7 @@ enum MfaMethod {
 }
 
 message MfaRequired {
-  string mfa_token = 1;
+  string login_request_id = 1;
   MfaMethod preferred_method = 2;
 }
 
