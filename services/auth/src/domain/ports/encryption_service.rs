@@ -1,3 +1,5 @@
+use crate::domain::error::DomainError;
+
 pub struct Ciphertext {
 	data: Vec<u8>,
 	nonce: Vec<u8>
@@ -18,6 +20,6 @@ impl Ciphertext {
 }
 
 pub trait EncryptionService: Send + Sync {
-	fn encrypt(&self, data: &[u8]) -> Ciphertext;
-	fn decrypt(&self, data: &Ciphertext) -> Vec<u8>;
+	fn encrypt(&self, data: &[u8]) -> Result<Ciphertext, DomainError>;
+	fn decrypt(&self, data: &Ciphertext) -> Result<Vec<u8>, DomainError>;
 }

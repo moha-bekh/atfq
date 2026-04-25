@@ -29,7 +29,7 @@ impl EnableMfaUseCase {
         let claims = self.tokens.decode_token(access_token)?;
 
         let secret = self.mfa.generate_mfa_secret();
-        let ciphertext = self.enc.encrypt(&secret);
+        let ciphertext = self.enc.encrypt(&secret)?;
 
         self.repo.enable_mfa(claims.user_id, ciphertext).await?;
 

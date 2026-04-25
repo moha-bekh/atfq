@@ -13,11 +13,11 @@ impl ChaChaEncryption {
 }
 
 impl EncryptionService for ChaChaEncryption {
-    fn encrypt(&self, data: &[u8]) -> Ciphertext {
+    fn encrypt(&self, data: &[u8]) -> Result<Ciphertext, DomainError> {
         unimplemented!()
     }
 
-    fn decrypt(&self, data: &Ciphertext) -> Vec<u8> {
+    fn decrypt(&self, data: &Ciphertext) -> Result<Vec<u8>, DomainError> {
         unimplemented!()
     }
 }
