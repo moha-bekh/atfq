@@ -14,8 +14,12 @@ async fn make_login_request(cache: &dyn CacheService, user: &User) -> Result<Uui
     let id = Uuid::new_v4();
 
     let key = format!("mfa:{}", id);
+    let counter_key = format!("mfa_attempts:{}", id);
     let value = user.id.to_string();
     cache.set(key.as_str(), value.as_str(), DEFAULT_MFA_REQUEST_TTL)
+         .await
+         .map_err(|e| DomainError::Internal(e.to_string()))?;
+    cache.set(counter_key.as_str(), "0", DEFAULT_MFA_REQUEST_TTL)
          .await
          .map_err(|e| DomainError::Internal(e.to_string()))?;
 
