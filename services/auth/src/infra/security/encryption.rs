@@ -34,7 +34,7 @@ impl EncryptionService for ChaChaEncryption {
     fn decrypt(&self, data: &Ciphertext) -> Result<Vec<u8>, DomainError> {
         let (data, nonce) = (data.data().as_slice(), data.nonce().as_slice());
 
-        self.cipher.decrypt(data.into(), nonce)
+        self.cipher.decrypt(nonce.into(), data)
             .map_err(|e| DomainError::Internal(e.to_string()))
     }
 }
