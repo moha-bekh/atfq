@@ -16,7 +16,9 @@ async fn get_requesting_user_id(cache: &dyn CacheService, id: &str) -> Result<St
     }
 
     let key = format!("mfa:{}", id);
-    cache.get(&key).await
+    cache.get(&key)
+         .await?
+         .ok_or_else(|| DomainError::Internal("auth request not found".to_string()))
 }
 
 impl AuthHandler {
