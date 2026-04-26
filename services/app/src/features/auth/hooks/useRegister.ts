@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api';
 import { useAuthStore } from '../stores/auth.store';
 import type { RegisterInput } from '../utils/validation';
+import type { HTTPError } from 'ky';
 
 export function useRegister() {
   const navigate = useNavigate();
@@ -26,8 +27,13 @@ export function useRegister() {
         navigate('/login');
       }
     },
-    onError: (error: any) => {
-      console.error("Registration Failed:", error);
+    onError: async (error: HTTPError) => {
+      try {
+        const errorData = await error.response.json();
+        error.message = errorData.error || "Registration failed";
+      } catch (e) {
+        error.message = "An unexpected error occurred";
+      }
     }
   });
 }

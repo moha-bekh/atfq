@@ -9,6 +9,7 @@ pub struct TokenPair {
 pub struct TokenClaims {
     pub user_id: Uuid,
     pub exp: usize,
+    pub typ: String,
 }
 
 pub trait TokenService: Send + Sync {

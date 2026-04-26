@@ -26,3 +26,11 @@ tasks:
     desc: "List project files excluding noise"
     cmds:
       - (cd {{.CLI_ARGS}} && tree -I "target|node_modules|.git|.cargo-ok|.step")
+
+  auth-up:
+    cmds:
+      - task dc:up -- auth -d
+      - sleep 5
+      - task auth:migrate-run
+      - task auth:offline-prepare
+      - task dc:up -- api-gateway app net-gateway -d

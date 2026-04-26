@@ -1,5 +1,5 @@
-use tower_http::cors::{Any, CorsLayer};
-use axum::{http::Method, Router};
+use tower_http::cors::CorsLayer;
+use axum::Router;
 use std::sync::Arc;
 use crate::state::AppState;
 use utoipa::OpenApi;
@@ -10,12 +10,14 @@ pub mod openapi;
 
 pub fn create_router(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
-        .allow_headers(Any)
-        .allow_origin(Any);
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+        ]);
 
     Router::new()
-        // SwaggerUi gère déjà l'exposition du JSON à l'URL spécifiée dans .url()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()))
         .nest("/api/v1", v1_routes(state))
         .layer(cors)

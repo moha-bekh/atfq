@@ -38,4 +38,10 @@ impl UserRepository for PostgresUserRepository {
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
         self.find_by_username_handler(username).await
     }
+    async fn find_by_oauth_id(&self, provider: &str, provider_id: &str) -> Result<Option<User>, DomainError> {
+        self.find_by_oauth_id_handler(provider, provider_id).await
+    }
+    async fn link_oauth_account(&self, user_id: uuid::Uuid, provider: &str, provider_id: &str) -> Result<(), DomainError> {
+        self.link_oauth_account_handler(user_id, provider, provider_id).await
+    }
 }

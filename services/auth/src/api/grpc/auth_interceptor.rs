@@ -30,8 +30,8 @@ impl AuthServiceMethod {
 
     pub fn requires_auth(&self) -> bool {
         match self {
-            Self::Register | Self::Login | Self::RefreshToken => false,
             Self::Logout => true,
+            Self::Register | Self::Login | Self::RefreshToken => false,
         }
     }
 }
@@ -96,8 +96,8 @@ where
                 Some(m) if !m.requires_auth() => {
                     return inner.call(req).await;
                 }
-                Some(_) => {
-                    // Requires Auth
+                Some(m) => {
+
                     let auth_header = req.headers()
                         .get("authorization")
                         .and_then(|v: &HeaderValue| v.to_str().ok());
@@ -106,19 +106,23 @@ where
                         if auth_header_str.starts_with("Bearer ") {
                             let token = &auth_header_str[7..];
 
-                            // 1. Blacklist check
                             let is_blacklisted = cache_service.exists(&format!("blacklist:{}", token))
                                 .await
                                 .unwrap_or(false);
 
                             if is_blacklisted {
-                                return Ok(status_to_http(Status::unauthenticated("Token is revoked")));
+                                if let AuthServiceMethod::Logout = m {
+                                    // Proceed to allow blacklisting the refresh token
+                                } else {
+                                    return Ok(status_to_http(Status::unauthenticated("Token is revoked")));
+                                }
                             }
 
-                            // 2. Decode token
                             match token_service.decode_token(token) {
                                 Ok(claims) => {
-                                    // Inject claims
+                                    if claims.typ != "access" {
+                                        return Ok(status_to_http(Status::unauthenticated("Invalid token type")));
+                                    }
                                     let mut req = req;
                                     req.extensions_mut().insert(claims);
                                     return inner.call(req).await;
@@ -132,7 +136,6 @@ where
                     return Ok(status_to_http(Status::unauthenticated("Missing or invalid authorization header")));
                 }
                 None => {
-                    // Unknown method (e.g. Reflection), let it pass
                     inner.call(req).await
                 }
             }

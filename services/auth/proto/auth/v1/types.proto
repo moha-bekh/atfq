@@ -3,7 +3,6 @@ syntax = "proto3";
 package auth.v1;
 
 import "google/protobuf/empty.proto";
-// google.protobuf.Empty
 
 message User {
   string id = 1;
@@ -69,4 +68,8 @@ message EnableMFAResponse {
 message VerifyMFARequest {
   string login_request_id = 1;
   string code = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
 }

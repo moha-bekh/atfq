@@ -52,9 +52,11 @@ pub async fn login_handler(
                     refresh_token: Some(success.refresh_token),
                     user: Some(UserSchema {
                         id: user.id,
-                        username: user.username,
+                        username: user.username.clone(),
                         email: user.email,
+                        avatar_url: Some(user.username),
                     })
+
                 })
             ))
         },

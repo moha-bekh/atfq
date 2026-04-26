@@ -34,9 +34,17 @@ export function Navbar() {
               </Button>
             ) : (
               <div className="flex items-center gap-4">
-                <span className="text-xs uppercase tracking-widest text-text/60">
-                  {user?.username || "Account"}
-                </span>
+                {user?.avatar_url ? (
+                  <img 
+                    src={user.avatar_url} 
+                    alt={user.username} 
+                    className="w-8 h-8 rounded-full border border-main/20"
+                  />
+                ) : (
+                  <span className="text-xs uppercase tracking-widest text-text/60">
+                    {user?.username || "Account"}
+                  </span>
+                )}
                 <button 
                   onClick={logout}
                   className="text-[10px] uppercase tracking-tighter text-red-500/50 hover:text-red-500 transition-colors"

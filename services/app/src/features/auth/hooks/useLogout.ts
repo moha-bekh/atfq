@@ -7,9 +7,9 @@ export function useLogout() {
   const queryClient = useQueryClient();
   const logoutAction = useAuthStore((state) => state.logout);
 
-  const logout = () => {
-    // clear Zustand store
-    logoutAction();
+  const logout = async () => {
+    // clear Zustand store (calls API if tokens exist)
+    await logoutAction();
 
     // clear React Query cache
     queryClient.clear();
