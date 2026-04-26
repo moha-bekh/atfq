@@ -38,16 +38,4 @@ impl RedisCache {
 
         Ok(exists)
     }
-
-    pub async fn get_handler(&self, key: &str) -> Result<String, DomainError> {
-        let mut conn = self.client.get_multiplexed_async_connection()
-            .await
-            .map_err(|e| { DomainError::Internal(format!("Failed to connect to Redis: {}", e)) })?;
-
-        let value = conn.get(key)
-            .await
-            .map_err(|e| { DomainError::Internal(format!("Failed to check key existence in Redis: {}", e)) })?;
-
-        Ok(value)
-    }
 }
