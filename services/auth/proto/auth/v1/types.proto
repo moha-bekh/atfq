@@ -65,3 +65,8 @@ message EnableMFARequest {
 message EnableMFAResponse {
   string secret_base32 = 1;
 }
+
+message VerifyMFARequest {
+  string login_request_id = 1;
+  string code = 2;
+}

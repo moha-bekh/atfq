@@ -15,6 +15,7 @@ use auth::app::auth::login::LoginUseCase;
 use auth::app::auth::enable_mfa::EnableMfaUseCase;
 use auth::app::auth::logout::LogoutUseCase;
 use auth::app::auth::refresh::RefreshTokenUseCase;
+use auth::app::auth::verify_mfa::VerifyMfaUseCase;
 use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
 use auth::auth_proto;
@@ -74,6 +75,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         jwt_service.clone(),
     ));
 
+    let verify_mfa_uc = Arc::new(VerifyMfaUseCase::new(
+        user_repo.clone(),
+        encryption_service.clone(),
+        mfa_service.clone(),
+        jwt_service.clone(),
+    ));
+
     let logout_uc = Arc::new(LogoutUseCase::new(
         cache_service.clone(),
     ));
@@ -89,6 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         register_uc,
         login_uc,
         enable_mfa_uc,
+        verify_mfa_uc,
         logout_uc,
         refresh_uc,
         cache_service.clone(),

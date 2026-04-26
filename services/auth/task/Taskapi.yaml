@@ -44,6 +44,15 @@ tasks:
           "method": 0
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/EnableMFA
 
+  verifymfa:
+    desc: "Validate login request using multi-factor authentication (Usage: task api:verifymfa LOGIN_REQUEST_ID=... CODE=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "login_request_id": "{{.LOGIN_REQUEST_ID}}",
+          "code": "{{.CODE}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/VerifyMFA
+
   logout:
     desc: "Logout a user (Usage: task api:logout ACCESS_TOKEN=... REFRESH_TOKEN=...)"
     cmds:
