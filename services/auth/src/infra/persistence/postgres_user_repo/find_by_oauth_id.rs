@@ -17,7 +17,8 @@ impl PostgresUserRepository {
                 u.username as "username: Username", 
                 u.email as "email: Email", 
                 u.password_hash, 
-                u.is_2fa_enabled, 
+                u.mfa_secret,
+                u.mfa_nonce,
                 u.created_at
             FROM users u
             JOIN user_oauth uo ON u.id = uo.user_id
