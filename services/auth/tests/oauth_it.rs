@@ -33,6 +33,7 @@ impl CacheService for MockCache {
     async fn get(&self, key: &str) -> Result<Option<String>, DomainError> {
         Ok(self.storage.lock().unwrap().get(key).cloned())
     }
+    #[allow(unused)]
     async fn increment(&self, key: &str) -> Result<u64, DomainError> {
         unimplemented!()
     }

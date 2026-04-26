@@ -63,6 +63,7 @@ impl UserRepository for MockUserRepo {
         Ok(user)
     }
 
+    #[allow(unused)]
     async fn enable_mfa(&self, id: uuid::Uuid, mfa: EncryptedMfaSecret) -> Result<(), DomainError> {
         unimplemented!()
     }
@@ -143,6 +144,7 @@ impl CacheService for MockCacheService {
     async fn get(&self, key: &str) -> Result<Option<String>, DomainError> {
         Ok(self.storage.lock().unwrap().get(key).cloned())
     }
+    #[allow(unused)]
     async fn increment(&self, key: &str) -> Result<u64, DomainError> {
         unimplemented!()
     }
