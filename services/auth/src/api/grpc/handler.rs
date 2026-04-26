@@ -108,6 +108,7 @@ impl AuthService for AuthHandler {
 pub fn map_domain_error(err: DomainError) -> Status {
     match err {
         DomainError::AlreadyExists => Status::already_exists("User already exists"),
+        DomainError::MfaAlreadyEnabled => Status::already_exists("2FA already enabled"),
         DomainError::InvalidInput(msg) => Status::invalid_argument(msg),
         DomainError::Unauthenticated => Status::unauthenticated("Invalid identifier or password"),
         DomainError::Unauthorized => Status::permission_denied("You do not have permission to perform this action"),

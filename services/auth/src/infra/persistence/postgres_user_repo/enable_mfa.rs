@@ -4,11 +4,12 @@ use crate::domain::error::DomainError;
 
 impl PostgresUserRepository {
     pub async fn enable_mfa_handler(&self, id: uuid::Uuid, mfa: EncryptedMfaSecret) -> Result<(), DomainError> {
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"
             UPDATE users
             SET mfa_secret = $1, mfa_nonce = $2
             WHERE id = $3
+            AND mfa_secret IS NULL AND mfa_nonce IS NULL
             "#,
             mfa.data().as_slice(),
             mfa.nonce().as_slice(),
@@ -17,6 +18,10 @@ impl PostgresUserRepository {
         .execute(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        if result.rows_affected() == 0 {
+            return Err(DomainError::MfaAlreadyEnabled);
+        }
 
         Ok(())
     }
