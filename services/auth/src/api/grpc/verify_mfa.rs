@@ -9,16 +9,18 @@ use std::convert::AsRef;
 const MAX_MFA_ATTEMPTS: u64 = 5;
 
 async fn get_requesting_user_id(cache: &dyn CacheService, id: &str) -> Result<String, DomainError> {
+    let key = format!("mfa:{}", id);
+    let user_id = cache.get(&key)
+         .await?
+         .ok_or_else(|| DomainError::Internal("auth request not found".to_string()))?;
+
     let counter_key = format!("mfa_attempts:{}", id);
     let attempt_count = cache.increment(&counter_key).await?;
     if attempt_count > MAX_MFA_ATTEMPTS {
         return Err(DomainError::Unauthorized);
     }
 
-    let key = format!("mfa:{}", id);
-    cache.get(&key)
-         .await?
-         .ok_or_else(|| DomainError::Internal("auth request not found".to_string()))
+    Ok(user_id)
 }
 
 async fn remove_auth_request(cache: &dyn CacheService, id: &str) -> Result<(), DomainError> {
