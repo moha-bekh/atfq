@@ -9,7 +9,7 @@ use crate::domain::ports::{
     cache_service::CacheService,
     crypto_service::CryptoService
 };
-use crate::domain::entities::User;
+use crate::domain::entities::{LoginResult, User};
 use crate::domain::error::DomainError;
 use crate::app::auth::register::RegisterUseCase;
 use crate::app::auth::login::LoginUseCase;
@@ -273,7 +273,11 @@ async fn test_login_success_with_email() {
     let result = login_uc.execute("john@example.com", "password123").await;
     
     assert!(result.is_ok());
-    let res = result.unwrap();
+    assert!(matches!(result, Ok(LoginResult::Success(_))));
+    let Ok(LoginResult::Success(res)) = result else {
+        unreachable!();
+    };
+
     assert_eq!(res.user.username.to_string(), "johndoe");
 }
 
