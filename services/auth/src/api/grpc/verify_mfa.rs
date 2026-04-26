@@ -21,6 +21,15 @@ async fn get_requesting_user_id(cache: &dyn CacheService, id: &str) -> Result<St
          .ok_or_else(|| DomainError::Internal("auth request not found".to_string()))
 }
 
+async fn remove_auth_request(cache: &dyn CacheService, id: &str) -> Result<(), DomainError> {
+    let counter_key = format!("mfa_attempts:{}", id);
+    let key = format!("mfa:{}", id);
+    cache.delete(&key).await?;
+    cache.delete(&counter_key).await?;
+
+    Ok(())
+}
+
 impl AuthHandler {
     pub async fn verify_mfa_handler(&self, request: Request<VerifyMfaRequest>) -> Result<Response<AuthSuccess>, Status> {
         let req = request.into_inner();
@@ -34,6 +43,10 @@ impl AuthHandler {
             .await
             .map_err(map_domain_error)?;
         let user = &authenticated_user.user;
+
+        remove_auth_request(self.cache_service.as_ref(), &req.login_request_id)
+            .await
+            .ok();
 
         Ok(Response::new(AuthSuccess {
             user: Some(ProtoUser {
