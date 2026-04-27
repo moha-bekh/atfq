@@ -1,0 +1,71 @@
+version: "3"
+
+vars:
+  IP: '{{.IP | default "127.0.0.1"}}'
+  PORT: '{{.PORT | default "8082"}}'
+
+tasks:
+  list:
+    desc: "List available gRPC services (via Reflection)"
+    cmds:
+      - grpcurl -plaintext {{.IP}}:{{.PORT}} list
+      - grpcurl -plaintext {{.IP}}:{{.PORT}} list auth.v1.AuthService
+
+  ui:
+    desc: "Launch gRPCUI for interactive testing"
+    cmds:
+      - grpcui -plaintext {{.IP}}:{{.PORT}}
+
+  register:
+    desc: "Register a new user (Usage: task api:register USERNAME=... EMAIL=... PASSWORD=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "username": "{{.USERNAME}}",
+          "email": "{{.EMAIL}}",
+          "password": "{{.PASSWORD}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Register
+
+  login:
+    desc: "Login with an existing user (Usage: task api:login EMAIL=... PASSWORD=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "id": { "email": "{{.EMAIL}}" },
+          "password": "{{.PASSWORD}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Login
+
+  enablemfa:
+    desc: "Enable two factor authentication for a given user (Usage: task api:enablemfa ACCESS_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "method": 0
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/EnableMFA
+
+  verifymfa:
+    desc: "Validate login request using multi-factor authentication (Usage: task api:verifymfa LOGIN_REQUEST_ID=... CODE=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "login_request_id": "{{.LOGIN_REQUEST_ID}}",
+          "code": "{{.CODE}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/VerifyMFA
+
+  logout:
+    desc: "Logout a user (Usage: task api:logout ACCESS_TOKEN=... REFRESH_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "refresh_token": "{{.REFRESH_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/Logout
+
+  refresh:
+    desc: "Refresh tokens (Usage: task api:refresh REFRESH_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "refresh_token": "{{.REFRESH_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/RefreshToken

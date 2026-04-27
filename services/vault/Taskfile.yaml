@@ -1,0 +1,88 @@
+version: "3"
+
+vars:
+  AGE_KEY: "~/.config/sops/age/atfq-dev.txt"
+  SECRETS_FILE: "secrets.enc.yaml"
+
+includes:
+  auth:
+    taskfile: ./services/auth/Taskfile.yaml
+    dir: ./services/auth
+  net-gateway:
+    taskfile: ./services/net-gateway/Taskfile.yaml
+    dir: ./services/net-gateway
+
+tasks:
+  # --- Core Infrastructure ---
+  
+  up:
+    desc: "Full Vault Stack: Infrastructure + Provisioning"
+    cmds:
+      - task: init
+      - task: unseal
+      - task: provision
+
+  init:
+    desc: "Initialize Vault"
+    vars:
+      AGE_PK: { sh: "grep -o 'age1[a-z0-9]*' ../.sops.yaml | head -n 1" }
+    cmds:
+      - ./scripts/setup.sh init {{.AGE_PK}} {{.AGE_KEY}}
+
+  unseal:
+    desc: "Unseal Vault (Secure isolation)"
+    cmds:
+      # We use exec-env to pass KEY1,2,3 only to the unseal commands
+      - |
+        SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops exec-env {{.SECRETS_FILE}} '
+          docker exec vault vault operator unseal $KEY1
+          docker exec vault vault operator unseal $KEY2
+          docker exec vault vault operator unseal $KEY3
+        '
+    silent: true
+
+  bootstrap:
+    desc: "Enable Vault engines and auth methods"
+    cmds:
+      - docker exec vault vault secrets enable -path=secret kv-v2 2>/dev/null || true
+      - docker exec vault vault auth enable approle 2>/dev/null || true
+
+  # --- Provisioning ---
+
+  provision:
+    desc: "Provision all services (Secure isolation)"
+    cmds:
+      - task: bootstrap
+      # sops exec-env injects secrets into the sub-tasks without leaking to the parent shell
+      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops exec-env {{.SECRETS_FILE}} 'task auth:setup net-gateway:setup'
+    silent: true
+
+  # --- Secret Management (SOPS) ---
+
+  "secrets:edit":
+    desc: "Edit encrypted secrets"
+    cmds:
+      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops {{.SECRETS_FILE}}
+
+  "secrets:keygen":
+    desc: "Generate a new Age key pair"
+    cmds:
+      - mkdir -p $(dirname {{.AGE_KEY}})
+      - |
+        if [ -f {{.AGE_KEY}} ]; then
+          echo "Warning: Key already exists in {{.AGE_KEY}}"
+          echo "Public Key: $(grep -o 'age1[a-z0-9]*' {{.AGE_KEY}})"
+        else
+          age-keygen -o {{.AGE_KEY}}
+          echo "Success: Key generated in {{.AGE_KEY}}"
+          echo "Give this Public Key to the admin: $(grep -o 'age1[a-z0-9]*' {{.AGE_KEY}})"
+        fi
+    silent: true
+
+  "secrets:update":
+    desc: "Update secrets.enc.yaml with keys from .sops.yaml"
+    cmds:
+      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops updatekeys {{.SECRETS_FILE}}
+    preconditions:
+      - sh: test -f {{.SECRETS_FILE}}
+        msg: "File {{.SECRETS_FILE}} not found."

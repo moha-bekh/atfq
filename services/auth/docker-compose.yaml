@@ -1,5 +1,12 @@
 volumes:
   auth-postgres_data:
+  # auth-shared-secrets:
+  #   name: vault-auth-shared-secrets
+  #   driver: local
+  #   driver_opts:
+  #     type: tmpfs
+  #     device: tmpfs
+  #     o: "size=64m,mode=770"
 
 services:
   # SERVICE
@@ -10,30 +17,107 @@ services:
     init: true
     networks:
       - backend
-    env_file:
-      - ./.env
-    # ports:
-    #   - "$PORT:8080"
+    # volumes:
+    #   - type: volume
+    #     source: auth-shared-secrets
+    #     target: /vault/secrets
+    #     read_only: true
+    environment:
+      - REDIS_URL=redis://redis-auth:6379
+      - DATABASE_URL=postgresql://atfq:atfq@db-auth:5432/atfq_db
+      - SERVER_ADDR=0.0.0.0:8080
+      - JWT_SECRET=jwt_secret
+      - GITHUB_REDIRECT_URL=http://localhost:8080/auth/callback/github
+      - GOOGLE_REDIRECT_URL=http://localhost:8080/auth/callback/google
     depends_on:
       db-auth:
-        condition: service_healthy
+        condition: service_started
+      redis-auth:
+        condition: service_started
+      # vault-agent-auth:
+      #   condition: service_started
     restart: unless-stopped
   # ------------------------------
   # DATABASE
   db-auth:
     image: postgres:16-alpine
+    container_name: db-auth
     networks:
       - backend
-    env_file:
-      - ./.env
+    environment:
+      - POSTGRES_DB=atfq_db
+      - POSTGRES_USER=atfq
+      - POSTGRES_PASSWORD=atfq
+      # - POSTGRES_USER_FILE=/vault/secrets/POSTGRES_USER
+      # - POSTGRES_PASSWORD_FILE=/vault/secrets/POSTGRES_PASSWORD
+      # - POSTGRES_DB_FILE=/vault/secrets/POSTGRES_DB
     volumes:
       - type: volume
         source: auth-postgres_data
         target: /var/lib/postgresql/data
-    # ports:
-    #   - "127.0.0.1:5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      # - type: volume
+      #   source: auth-shared-secrets
+      #   target: /vault/secrets
+      # read_only: true
+    ports:
+      - "127.0.0.1:5432:5432"
+    command: >
+      sh -c "exec docker-entrypoint.sh postgres"
+    # command: >
+    #   sh -c "
+    #   until [ -s /vault/secrets/POSTGRES_PASSWORD ]; do
+    #     echo 'Waiting for Vault Agent to write secrets...';
+    #     sleep 1;
+    #   done;
+    #   echo 'Secrets found, starting Postgres...';
+    #   exec docker-entrypoint.sh postgres"
+    # healthcheck:
+    #   test:
+    #     [
+    #       "CMD-SHELL",
+    #       "pg_isready -U $$(cat /vault/secrets/POSTGRES_USER) -d $$(cat /vault/secrets/POSTGRES_DB)",
+    #     ]
+    #   interval: 5s
+    #   timeout: 5s
+    #   retries: 5
+  # ------------------------------
+  # CACHE
+  redis-auth:
+    image: redis:alpine
+    container_name: redis-auth
+    networks:
+      - backend
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+  # ------------------------------
+  # VAULT AGENT
+  # vault-agent-auth:
+  #   image: hashicorp/vault:1.13.3
+  #   container_name: vault-agent-auth
+  #   init: true
+  #   networks:
+  #     - backend
+  #   environment:
+  #     - VAULT_ADDR=http://vault:8200
+  #   volumes:
+  #     - type: bind
+  #       source: ./vault/agent-auth.hcl
+  #       target: /etc/vault/agent-config.hcl
+  #     - type: bind
+  #       source: ./vault/agent_ids/role-id
+  #       target: /etc/vault/role-id
+  #       read_only: true
+  #     - type: bind
+  #       source: ./vault/agent_ids/secret-id
+  #       target: /etc/vault/secret-id
+  #       read_only: true
+  #     - type: volume
+  #       source: auth-shared-secrets
+  #       target: /vault/secrets
+  #   cap_add:
+  #     - IPC_LOCK
+  #   restart: unless-stopped
+  #   user: "root"
+  #   command: >
+  #     sh -c "chown -R vault:vault /vault/secrets && exec su-exec vault vault agent -config=/etc/vault/agent-config.hcl"

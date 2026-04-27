@@ -27,14 +27,16 @@ services:
     image: postgres:16-alpine
     networks:
       - backend
-    env_file:
-      - ./.env
     volumes:
       - type: volume
         source: user-postgres_data
         target: /var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
+    environment:
+      - POSTGRES_DB=atfq_db
+      - POSTGRES_USER=atfq
+      - POSTGRES_PASSWORD=atfq
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s

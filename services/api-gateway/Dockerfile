@@ -21,12 +21,14 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 FROM rust:1.94-bookworm AS dev
 WORKDIR /app
+RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev
 RUN cargo install cargo-watch
 COPY . .
 CMD ["cargo-watch", "-x", "run"]
 
 FROM gcr.io/distroless/cc-debian12 AS prod
 WORKDIR /app
+RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /app/gateway /app/gateway
 USER 65532:65532
