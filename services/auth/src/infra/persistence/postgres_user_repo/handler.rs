@@ -1,6 +1,7 @@
 use crate::domain::ports::user_repository::UserRepository;
 use crate::domain::entities::{User};
 use crate::domain::ports::user_repository::UserDto;
+use crate::domain::ports::mfa_service::EncryptedMfaSecret;
 use crate::domain::error::DomainError;
 use async_trait::async_trait;
 use sqlx::PgPool;
@@ -20,6 +21,10 @@ impl PostgresUserRepository {
 impl UserRepository for PostgresUserRepository {
     async fn save_user(&self, data: UserDto) -> Result<User, DomainError> {
         self.save_user_handler(data).await
+    }
+
+    async fn enable_mfa(&self, id: uuid::Uuid, mfa: EncryptedMfaSecret) -> Result<(), DomainError> {
+        self.enable_mfa_handler(id, mfa).await
     }
 
     async fn find_by_id(&self, id: uuid::Uuid) -> Result<Option<User>, DomainError> {

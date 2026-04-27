@@ -9,6 +9,9 @@ pub enum DomainError {
     #[error("User with this email or username already exists")]
     AlreadyExists,
 
+    #[error("Multi-factor authentication already enabled")]
+    MfaAlreadyEnabled,
+
     #[error("Invalid credentials")]
     Unauthenticated,
 

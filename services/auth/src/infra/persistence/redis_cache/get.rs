@@ -35,7 +35,7 @@ impl RedisCache {
         let exists: bool = conn.exists(key)
             .await
             .map_err(|e| { DomainError::Internal(format!("Failed to check key existence in Redis: {}", e)) })?;
-        
+
         Ok(exists)
     }
 }

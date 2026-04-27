@@ -8,7 +8,8 @@ pub struct User {
     pub username: Username,
     pub email: Email,
     pub password_hash: Option<String>,
-    pub is_2fa_enabled: bool,
+    pub mfa_secret: Option<Vec<u8>>,
+    pub mfa_nonce: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -18,12 +19,7 @@ pub struct AuthenticatedUser {
     pub refresh_token: String,
 }
 
-pub struct TwoFactorPending {
-    pub user_id: Uuid,
-    pub tmp_session_id: String,
-}
-
 pub enum LoginResult {
     Success(AuthenticatedUser),
-    Requires2FA(TwoFactorPending),
+    Requires2FA(User),
 }

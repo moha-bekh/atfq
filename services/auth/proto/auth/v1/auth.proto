@@ -10,6 +10,8 @@ service AuthService {
   rpc Register(RegisterRequest) returns (AuthResponse);
   rpc Login(LoginRequest) returns (AuthResponse);
   rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
+  rpc EnableMFA(EnableMFARequest) returns (EnableMFAResponse);
+  rpc VerifyMFA(VerifyMFARequest) returns (AuthSuccess);
   rpc RefreshToken(RefreshRequest) returns (AuthResponse);
 
   rpc GetOAuthUrl(OAuthUrlRequest) returns (OAuthUrlResponse);

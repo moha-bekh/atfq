@@ -7,6 +7,7 @@ use auth::infra::security::jwt_adapter::JwtAdapter;
 use auth::infra::security::password_hasher::Argon2Hasher;
 use auth::domain::ports::token_service::TokenPair;
 use auth::domain::ports::cache_service::CacheService;
+use auth::domain::entities::LoginResult;
 use sqlx::PgPool;
 use std::sync::Arc;
 use std::env;
@@ -69,7 +70,12 @@ async fn test_logout_full_flow() {
         .execute(test_email, test_pass)
         .await
         .expect("Login should succeed");
-    
+
+    assert!(matches!(login_res, LoginResult::Success(_)));
+    let LoginResult::Success(login_res) = login_res else {
+        unreachable!();
+    };
+
     let access_token = login_res.access_token.clone();
     let refresh_token = login_res.refresh_token.clone();
 

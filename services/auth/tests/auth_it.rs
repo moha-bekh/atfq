@@ -3,6 +3,7 @@ use auth::app::auth::login::LoginUseCase;
 use auth::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use auth::infra::security::jwt_adapter::JwtAdapter;
 use auth::infra::security::password_hasher::Argon2Hasher;
+use auth::domain::entities::LoginResult;
 use sqlx::PgPool;
 use std::sync::Arc;
 use std::env;
@@ -58,7 +59,12 @@ async fn test_auth_full_flow() {
         .execute(test_email, test_pass)
         .await
         .expect("Login with email should succeed");
-    
+
+    assert!(matches!(login_email_res, LoginResult::Success(_)));
+    let LoginResult::Success(login_email_res) = login_email_res else {
+        unreachable!();
+    };
+
     assert_eq!(login_email_res.user.email.to_string(), test_email);
     assert!(!login_email_res.access_token.is_empty());
 
@@ -67,7 +73,12 @@ async fn test_auth_full_flow() {
         .execute(test_user, test_pass)
         .await
         .expect("Login with username should succeed");
-    
+
+    assert!(matches!(login_user_res, LoginResult::Success(_)));
+    let LoginResult::Success(login_user_res) = login_user_res else {
+        unreachable!();
+    };
+
     assert_eq!(login_user_res.user.username.to_string(), test_user);
 
     // 4. Login Failure - Wrong Password

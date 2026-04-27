@@ -3,12 +3,13 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use uuid::Uuid;
 use crate::domain::ports::{
+    mfa_service::EncryptedMfaSecret,
     user_repository::{UserRepository, UserDto},
     token_service::{TokenService, TokenPair, TokenClaims},
     cache_service::CacheService,
     crypto_service::CryptoService
 };
-use crate::domain::entities::User;
+use crate::domain::entities::{LoginResult, User};
 use crate::domain::error::DomainError;
 use crate::app::auth::register::RegisterUseCase;
 use crate::app::auth::login::LoginUseCase;
@@ -54,11 +55,17 @@ impl UserRepository for MockUserRepo {
             username: data.username,
             email: data.email,
             password_hash: if data.password_hash.is_empty() { None } else { Some(data.password_hash) },
-            is_2fa_enabled: false,
+            mfa_secret: None,
+            mfa_nonce: None,
             created_at: chrono::Utc::now(),
         };
         users.push(user.clone());
         Ok(user)
+    }
+
+    #[allow(unused)]
+    async fn enable_mfa(&self, id: uuid::Uuid, mfa: EncryptedMfaSecret) -> Result<(), DomainError> {
+        unimplemented!()
     }
 
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, DomainError> {
@@ -136,6 +143,10 @@ impl CacheService for MockCacheService {
     }
     async fn get(&self, key: &str) -> Result<Option<String>, DomainError> {
         Ok(self.storage.lock().unwrap().get(key).cloned())
+    }
+    #[allow(unused)]
+    async fn increment(&self, key: &str) -> Result<u64, DomainError> {
+        unimplemented!()
     }
     async fn exists(&self, key: &str) -> Result<bool, DomainError> {
         Ok(self.storage.lock().unwrap().contains_key(key))
@@ -264,7 +275,11 @@ async fn test_login_success_with_email() {
     let result = login_uc.execute("john@example.com", "password123").await;
     
     assert!(result.is_ok());
-    let res = result.unwrap();
+    assert!(matches!(result, Ok(LoginResult::Success(_))));
+    let Ok(LoginResult::Success(res)) = result else {
+        unreachable!();
+    };
+
     assert_eq!(res.user.username.to_string(), "johndoe");
 }
 
