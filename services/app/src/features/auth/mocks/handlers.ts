@@ -3,7 +3,7 @@ import { http, HttpResponse, delay } from 'msw';
 import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse } from '../types';
 
 // On utilise une URL absolue ou relative selon ton setup Vite
-const API_URL = 'http://localhost:8081/api/v1';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const authHandlers = [
   // Mock Register
@@ -46,5 +46,11 @@ export const authHandlers = [
         email: body.identifier.includes('@') ? body.identifier : `${body.identifier}@example.com`,
       },
     } as LoginResponse);
+  }),
+
+  // Mock Logout
+  http.post(`${API_URL}/auth/logout`, async () => {
+    await delay(500);
+    return new HttpResponse(null, { status: 200 });
   }),
 ];
