@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package user;
+
+service UserService {
+  rpc GetUser (UserRequest) returns (UserResponse);
+  rpc GetUserByUsername (UsernameRequest) returns (UserResponse);
+  rpc GetUserByEmail (EmailRequest) returns (UserResponse);
+  rpc CreateUser (CreateUserRequest) returns (UserResponse);
+  rpc ListUsers (Empty) returns (UserListResponse);
+  rpc DeleteUser (UserRequest) returns (UserResponse);
+  rpc UpdateUser (UpdateUserRequest) returns (UserResponse);
+  rpc AssignRole (RoleRequest) returns (UserResponse);
+  rpc RemoveRole (RoleRequest) returns (UserResponse);
+  rpc GetProfile (UserRequest) returns (ProfileResponse);
+  rpc CreateTheme (CreateThemeRequest) returns (ThemeResponse);
+  rpc GetTheme (UserRequest) returns (ThemeResponse);
+  rpc UpdateTheme (UpdateThemeRequest) returns (ThemeResponse);
+  rpc DeleteTheme (UserRequest) returns (ThemeResponse);
+}
+
+message Empty {}
+
+message UsernameRequest {
+  string username = 1;
+}
+
+message EmailRequest {
+  string email = 1;
+}
+
+message RoleRequest {
+  string user_id = 1;
+  string role_id = 2;
+}
+
+message UserRequest {
+  string id = 1;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  optional string firstname = 2;
+  optional string lastname = 3;
+  optional string profile_picture = 4;
+  optional string language = 5;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string firstname = 2;
+  string lastname = 3;
+  string email = 4;
+}
+
+message CreateThemeRequest {
+  string user_id = 1;
+  string name = 2;
+  string color_bg = 3;
+  string color_main = 4;
+  string color_caret = 5;
+  string color_text = 6;
+  string color_sub = 7;
+  string color_sub_alt = 8;
+  string color_error = 9;
+  string color_extra_error = 10;
+}
+
+message UpdateThemeRequest {
+  string user_id = 1;
+  optional string name = 2;
+  optional string color_bg = 3;
+  optional string color_main = 4;
+  optional string color_caret = 5;
+  optional string color_text = 6;
+  optional string color_sub = 7;
+  optional string color_sub_alt = 8;
+  optional string color_error = 9;
+  optional string color_extra_error = 10;
+}
+
+message ThemeResponse {
+  string id = 1;
+  string user_id = 2;
+  string name = 3;
+  string color_bg = 4;
+  string color_main = 5;
+  string color_caret = 6;
+  string color_text = 7;
+  string color_sub = 8;
+  string color_sub_alt = 9;
+  string color_error = 10;
+  string color_extra_error = 11;
+}
+
+message ProfileResponse {
+  string id = 1;
+  string profile_picture = 2;
+  string language = 3;
+  ThemeResponse theme = 4;
+}
+
+message UserResponse {
+  string    id = 1;
+  string    username = 2;
+  string    firstname = 3;
+  string    lastname = 4;
+  string    email = 5;
+  ProfileResponse profile = 6;
+  repeated string roles = 7;
+  repeated string permissions = 8;
+}
+
+message UserListResponse {
+  repeated UserResponse users = 1;
+}

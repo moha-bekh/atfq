@@ -13,3 +13,8 @@ user/dist
 wiki/tmp
 wiki/wiki
 wiki/main
+
+# vim swp files
+*.swp
+*.swp
+*.swo
