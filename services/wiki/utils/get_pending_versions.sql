@@ -20,5 +20,6 @@ JOIN nodes n ON v.node_id = n.id
 LEFT JOIN questions q ON v.id = q.node_version_id
 
 WHERE v.status = 'pending'
+-- AND v.node_id = $1
 
 ORDER BY v.created_at ASC; 

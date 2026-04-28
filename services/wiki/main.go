@@ -1,53 +1,86 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"net/http"
+	"log"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq" // PostgreSQL driver
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
+	pb "wiki/proto/wiki/v1"
 )
 
-func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+var (
+	bypass_moderation = flag.Bool("bypass", false, "bypass moderation")
+	port              = flag.Int("port", 50051, "The port to serve gRPC on")
+	// Update these credentials to match your local Postgres setup
+	dbURL = flag.String("db", "postgres://postgres:password@localhost:5432/wiki?sslmode=disable", "PostgreSQL connection string")
+)
 
-	r := chi.NewRouter()
-
-	// 1. Basic Middlewares
-	r.Use(middleware.Logger)    // Log every request to terminal
-	r.Use(middleware.Recoverer) // Panic recovery (prevents service crash)
-	r.Use(middleware.Timeout(60 * time.Second))
-
-	// 2. Routes
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Wiki Service API v1.0 (Powered by Chi)"))
-	})
-
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	r.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
-		// Placeholder for future DB checks
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("READY"))
-	})
-
-	// Example of a grouped route for the wiki content
-	r.Route("/articles", func(r chi.Router) {
-		r.Get("/", listArticles) // GET /articles
-	})
-
-	fmt.Printf("🚀 Wiki Service listening on port %s\n", port)
-	http.ListenAndServe(":"+port, r)
+// wikiServer is defined here so all files in 'package main' can see it.
+// Its methods (the gRPC handlers) will live in handlers.go
+type wikiServer struct {
+	pb.UnimplementedWikiServiceServer
+	db *sqlx.DB
 }
 
-func listArticles(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Article list placeholder"))
+func main() {
+	flag.Parse()
+
+	_ = &pb.Node{}
+
+	db, err := sqlx.Connect("postgres", *dbURL)
+	if err != nil {
+		log.Fatalf("Could not connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// Configure connection pooling (keeps the DB healthy under load)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	log.Println("Database connection established")
+
+	// 2. Setup the Network Listener
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	if err != nil {
+		log.Fatalf("Failed to listen on port %d: %v", *port, err)
+	}
+
+	// 3. Initialize the gRPC Server
+	s := grpc.NewServer()
+
+	// Register the service using our server struct that holds the DB
+	serverInstance := &wikiServer{db: db}
+	pb.RegisterWikiServiceServer(s, serverInstance)
+
+	// Enable reflection so tools like Postman can see your methods
+	reflection.Register(s)
+
+	// 4. Start the server in a goroutine
+	go func() {
+		log.Printf("Wiki Service is live at localhost:%d", *port)
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
+		}
+	}()
+
+	// 5. Graceful Shutdown (The "Clean Exit")
+	// This waits for you to hit Ctrl+C (SIGINT) or for the system to stop the app (SIGTERM)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	log.Println("\nStopping server...")
+	s.GracefulStop()
+	log.Println("Server stopped gracefully.")
 }
