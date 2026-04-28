@@ -1,0 +1,159 @@
+version: "3"
+
+vars:
+  DATABASE_URL: "postgresql://atfq:atfq@localhost:5432/atfq_db"
+  DB_CONTAINER: "db-user"
+  SERVER_URL: "localhost:8083"
+
+env:
+  DATABASE_URL: "{{.DATABASE_URL}}"
+
+tasks:
+  migrate-run:
+    desc: "Run pending database migrations"
+    cmds:
+      - sqlx migrate run --source migrations
+
+  db-profiles:
+    desc: "List all user profiles in the database (SQL)"
+    cmds:
+      - |
+        docker exec -it {{.DB_CONTAINER}} \
+        psql -U atfq -d atfq_db \
+        -c "SELECT id, profile_picture_url, theme, created_at FROM profiles;"
+
+  create-profile:
+    desc: "Create a new profile via gRPC (Usage: task create-profile ID=uuid)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"id": "{{.ID}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/CreateProfile
+
+  get-profile:
+    desc: "Get a profile via gRPC (Usage: task get-profile ID=uuid)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"id": "{{.ID}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/GetProfile
+
+  update-profile:
+    desc: "Update a profile via gRPC (Usage: task update-profile ID=uuid PIC=url)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"id": "{{.ID}}", "profile_picture_url": "{{.PIC}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/UpdateProfile
+
+  upload-pic:
+    desc: "Upload a profile picture via gRPC (Usage: task upload-pic ID=uuid FILE=path/to/img EXT=jpg)"
+    requires:
+      vars: [ID, FILE, EXT]
+    cmds:
+      - |
+        IMAGE_BASE64=$(base64 < {{.FILE}} | tr -d '\n')
+        grpcurl -plaintext -d "{
+          \"id\": \"{{.ID}}\",
+          \"image_data\": \"$IMAGE_BASE64\",
+          \"extension\": \"{{.EXT}}\"
+        }" {{.SERVER_URL}} user.v1.UserService/UploadProfilePicture
+
+  assign-role:
+    desc: "Assign a role to a user (Usage: task assign-role ID=uuid ROLE=name)"
+    requires:
+      vars: [ID, ROLE]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"id": "{{.ID}}", "role_name": "{{.ROLE}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/AssignRole
+
+  list-permissions:
+    desc: "List all available permissions"
+    cmds:
+      - |
+        grpcurl -plaintext {{.SERVER_URL}} user.v1.UserService/ListAvailablePermissions
+
+  create-role-request:
+    desc: "Request a new role (Usage: task create-role-request ID=uuid ROLE=name REASON='...')"
+    requires:
+      vars: [ID, ROLE, REASON]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"id": "{{.ID}}", "requested_role": "{{.ROLE}}", "reason": "{{.REASON}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/CreateRoleRequest
+
+  list-requests:
+    desc: "List all pending role change requests"
+    cmds:
+      - |
+        grpcurl -plaintext {{.SERVER_URL}} user.v1.UserService/ListPendingRoleRequests
+
+  approve-request:
+    desc: "Approve a role change request (Usage: task approve-request REQ_ID=uuid)"
+    requires:
+      vars: [REQ_ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"request_id": "{{.REQ_ID}}", "approve": true}' \
+        {{.SERVER_URL}} user.v1.UserService/ReviewRoleRequest
+
+  reject-request:
+    desc: "Reject a role change request (Usage: task reject-request REQ_ID=uuid REASON='...')"
+    requires:
+      vars: [REQ_ID, REASON]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"request_id": "{{.REQ_ID}}", "approve": false, "rejection_reason": "{{.REASON}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/ReviewRoleRequest
+
+  update-theme-dark:
+    desc: "Quickly update to a dark theme for a user (Usage: task update-theme-dark ID=uuid)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "id": "{{.ID}}",
+          "theme": {
+            "is_preset": false,
+            "name": "dark-mode",
+            "colors": {
+              "color-bg": "#1A1A1A",
+              "color-text": "#FFFFFF",
+              "color-main": "#BB86FC"
+            },
+            "font_main": "Inter"
+          }
+        }' \
+        {{.SERVER_URL}} user.v1.UserService/UpdateTheme
+
+  delete-profile:
+    desc: "Delete a profile via gRPC (Usage: task delete-profile ID=uuid)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"id": "{{.ID}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/DeleteProfile
+
+  db-shell:
+    desc: "Open an interactive Postgres shell inside the container"
+    interactive: true
+    cmds:
+      - |
+        docker exec -it {{.DB_CONTAINER}} \
+        psql -U atfq -d atfq_db
+
+  run:
+    desc: "Run the user service locally"
+    cmds:
+      - cargo run
+
+  build:
+    desc: "Build the user service"
+    cmds:
+      - cargo build

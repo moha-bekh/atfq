@@ -7,8 +7,8 @@ app/dist
 auth/target
 auth/.sqlx
 
-user/node_modules
-user/dist
+user/target
+user/.sqlx
 
 wiki/tmp
 wiki/wiki

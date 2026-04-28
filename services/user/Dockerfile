@@ -1,34 +1,44 @@
-FROM node:22-bookworm-slim AS base
-RUN apt-get update -y && apt-get install -y openssl \
-		postgresql-client
+FROM rust:1.94-bookworm AS planner
 WORKDIR /app
-COPY package.json package-lock.json ./
-COPY prisma ./prisma/
-COPY prisma.config.ts ./
-ENV DATABASE_URL="postgresql://dummy:dummy@localhost/dummy"
-RUN --mount=type=cache,target=/root/.npm \
-			npm ci
-
-FROM base AS dev
+RUN cargo install cargo-chef
 COPY . .
-CMD ["npm", "run", "dev"]
+RUN cargo chef prepare --recipe-path recipe.json
 
-FROM base AS builder
-COPY . .
-RUN npm run build
-RUN npm prune --production
-
-FROM node:22-bookworm-slim AS prod
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+FROM rust:1.94-bookworm AS builder
 WORKDIR /app
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma/
-COPY --from=builder /app/prisma.config.ts ./
-COPY --from=builder /app/src/proto ./src/proto/
-USER node
+
+RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-chef
+
+COPY --from=planner /app/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+  --mount=type=cache,target=/app/target \
+  cargo chef cook --release --recipe-path recipe.json
+
+COPY . .
+
+ENV SQLX_OFFLINE=true
+# -------------------------
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+  --mount=type=cache,target=/app/target \
+  RUSTFLAGS="-C link-arg=-Wl,-z,relro -C link-arg=-Wl,-z,now" \
+  cargo build --release && \
+  cp target/release/user /app/user
+
+FROM rust:1.94-bookworm AS dev
+WORKDIR /app
+RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
+RUN cargo install cargo-watch
+COPY . .
+
+CMD ["cargo-watch", "-x", "run"]
+
+FROM gcr.io/distroless/cc-debian12 AS prod
+WORKDIR /app
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /app/user /app/user
+USER 65532:65532
 ENV PORT=8080
 EXPOSE 8080
-EXPOSE 50051
-CMD ["sh", "-c", "npm run start"]
+ENTRYPOINT ["./user"]

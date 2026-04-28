@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package user.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service UserService {
+    rpc SayHello(HelloRequest) returns (HelloResponse);
+    rpc CreateProfile(CreateProfileRequest) returns (Profile);
+    rpc DeleteProfile(DeleteProfileRequest) returns (google.protobuf.Empty);
+    rpc GetProfile(GetProfileRequest) returns (Profile);
+    rpc UpdateProfile(UpdateProfileRequest) returns (Profile);
+
+    rpc UpdateTheme(UpdateThemeRequest) returns (Profile);
+
+    rpc AssignRole(RoleRequest) returns (Profile);
+    rpc RemoveRole(RoleRequest) returns (Profile);
+
+    rpc ListAvailablePermissions(google.protobuf.Empty) returns (PermissionList);
+    rpc CreateRoleRequest(RoleChangeRequest) returns (RoleRequestStatus);
+    rpc ListPendingRoleRequests(google.protobuf.Empty) returns (RoleRequestsList);
+    rpc ReviewRoleRequest(ReviewRequest) returns (Profile);
+    rpc UploadProfilePicture(UploadProfilePictureRequest) returns (Profile);
+}
+
+message Profile {
+    string id = 1;
+    optional string profile_picture_url = 2;
+    repeated string roles = 3;
+    repeated string permissions = 4;
+    Theme theme = 5;
+    google.protobuf.Timestamp created_at = 6;
+    google.protobuf.Timestamp updated_at = 7;
+}
+
+message Theme {
+    bool is_preset = 1;
+    string name = 2;
+    map<string, string> colors = 3;
+    string font_main = 4;
+}
+
+message CreateProfileRequest {
+    string id = 1;
+}
+
+message DeleteProfileRequest {
+    string id = 1;
+}
+
+message GetProfileRequest {
+    string id = 1;
+}
+
+message UpdateProfileRequest {
+    string id = 1;
+    optional string profile_picture_url = 2;
+}
+
+message UpdateThemeRequest {
+    string id = 1;
+    Theme theme = 2;
+}
+
+message RoleRequest {
+    string id = 1;
+    string role_name = 2;
+}
+
+message PermissionList {
+    repeated string permissions = 1;
+}
+
+message RoleChangeRequest {
+    string id = 1;
+    string requested_role = 2;
+    string reason = 3;
+}
+
+message RoleRequestStatus {
+    string request_id = 1;
+    string status = 2;
+}
+
+message RoleRequestsList {
+    message Entry {
+        string request_id = 1;
+        string id = 2; // user_id
+        string requested_role = 3;
+        string reason = 4;
+        google.protobuf.Timestamp created_at = 5;
+    }
+    repeated Entry requests = 1;
+}
+
+message ReviewRequest {
+    string request_id = 1;
+    bool approve = 2;
+    optional string rejection_reason = 3;
+}
+
+message HelloRequest {
+    string name = 1;
+}
+
+message HelloResponse {
+    string message = 1;
+}
+
+message UploadProfilePictureRequest {
+    string id = 1;
+    bytes image_data = 2;
+    string extension = 3;
+}

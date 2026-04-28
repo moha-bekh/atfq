@@ -1,8 +1,4 @@
-volumes:
-  user-postgres_data:
-
 services:
-  # SERVICE
   user:
     build:
       context: .
@@ -10,39 +6,85 @@ services:
     init: true
     networks:
       - backend
-    env_file:
-      - ./.env
     environment:
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-user:5432/${POSTGRES_DB}"
-    ports:
-      - "8080:8080"
-      - "50051:50051"
+      - DATABASE_URL=postgresql://atfq:atfq@db-user:5432/atfq_db
+      - SERVER_ADDR=0.0.0.0:8080
+      - S3_ENDPOINT=http://minio-user:9000
+      - S3_PUBLIC_URL=http://localhost:9000
+      - S3_BUCKET=profiles
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:
       db-user:
-        condition: service_healthy
+        condition: service_started
+      minio:
+        condition: service_started
+      create-buckets:
+        condition: service_completed_successfully
     restart: unless-stopped
-
-  # DATABASE
+    ports:
+      - "8083:8080"
+  # ------------------------------
   db-user:
     image: postgres:16-alpine
+    container_name: db-user
     networks:
       - backend
+    environment:
+      - POSTGRES_DB=atfq_db
+      - POSTGRES_USER=atfq
+      - POSTGRES_PASSWORD=atfq
     volumes:
       - type: volume
         source: user-postgres_data
         target: /var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
+    command: >
+      sh -c "exec docker-entrypoint.sh postgres"
+
+  # ------------------------------
+  minio:
+    image: minio/minio
+    container_name: minio-user
+    ports:
+      - "9000:9000" # API S3
+      - "9001:9001" # Interface Web (Console)
     environment:
-      - POSTGRES_DB=atfq_db
-      - POSTGRES_USER=atfq
-      - POSTGRES_PASSWORD=atfq
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - type: volume
+        source: user-minio_data
+        target: /data
+    networks:
+      - backend
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  # Service utilitaire pour créer le bucket automatiquement
+  create-buckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    networks:
+      - backend
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO...';
+      sleep 5;
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/profiles || echo 'Bucket already exists';
+      /usr/bin/mc anonymous set public myminio/profiles;
+      echo 'Buckets created successfully';
+      exit 0;
+      "
+
+volumes:
+  user-postgres_data:
+  user-minio_data:
 
 networks:
   backend:
-    driver: bridge
+    name: atfq_backend
+    external: true
