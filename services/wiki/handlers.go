@@ -195,8 +195,16 @@ func (s *wikiServer) ApproveVersion(ctx context.Context, req *pb.ModerateVersion
 	return row.ToProto(), nil
 }
 
-func (s *wikiServer) DenyVersion(ctx context.Context, req *pb.ModerateVersionRequest) (*pb.Node, error) {
-	row, err := s.DenyVersionInternal(ctx, s.db, req.VersionId) //returns VersionRow
+func (s *wikiServer) DenyVersion(ctx context.Context, req *pb.ModerateVersionRequest) (*pb.Version, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "db error: %v", err)
+	}
+	node_id, err := s.ApproveVersionInternal(ctx, tx, req.VersionId)
+	if err != nil {
+		return nil, err
+	}
+	row, err := s.fetchNodeInternal(ctx, node_id)
 	if err != nil {
 		return nil, err
 	}
