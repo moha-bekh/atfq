@@ -105,7 +105,7 @@ func (s *wikiServer) GetRootArticles(ctx context.Context, req *pb.GetRootArticle
 }
 
 func (s *wikiServer) GetArticle(ctx context.Context, req *pb.GetArticleRequest) (*pb.Article, error) {
-	article_node, err := s.fetchNodeInternal(ctx, req.Id)
+	article_node, err := s.fetchNodeInternal(ctx, s.db, req.Id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, status.Error(codes.NotFound, "node not found")
@@ -184,37 +184,86 @@ func (s *wikiServer) ApproveVersion(ctx context.Context, req *pb.ModerateVersion
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
 	}
+	defer tx.Rollback()
+
 	node_id, err := s.ApproveVersionInternal(ctx, tx, req.VersionId)
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.fetchNodeInternal(ctx, node_id)
+
+	row, err := s.fetchNodeInternal(ctx, tx, node_id)
 	if err != nil {
 		return nil, err
 	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to approve version: %v", err)
+	}
+
 	return row.ToProto(), nil
 }
 
-func (s *wikiServer) DenyVersion(ctx context.Context, req *pb.ModerateVersionRequest) (*pb.Version, error) {
+// func (s *wikiServer) DenyVersion(ctx context.Context, req *pb.ModerateVersionRequest) (*pb.Version, error) {
+// 	tx, err := s.db.BeginTxx(ctx, nil)
+// 	if err != nil {
+// 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
+// 	}
+// 	node_id, err := s.ApproveVersionInternal(ctx, tx, req.VersionId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	row, err := s.fetchNodeInternal(ctx, node_id)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return row.ToProto(), nil
+// }
+
+// func (s *wikiServer) GetHistory(ctx context.Context, req *pb.GetHistoryRequest) (*pb.GetHistoryResponse, error) {
+//
+// }
+
+func (s *wikiServer) GetPending(ctx context.Context, req *pb.GetPendingRequest) (*pb.PendingVersionsResponse, error) {
+	rows, err := s.fetchPendingVersionsInternal(ctx, s.db, &req.NodeId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch pending versions: %v", err)
+	}
+
+	res := &pb.PendingVersionsResponse{}
+	for _, r := range rows {
+		res.Versions = append(res.Versions, r.ToProto())
+	}
+	return res, nil
+}
+
+func (s *wikiServer) GetAllPending(ctx context.Context, req *pb.GetAllPendingRequest) (*pb.PendingVersionsResponse, error) {
+	rows, err := s.fetchPendingVersionsInternal(ctx, s.db, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch all pending versions: %v", err)
+	}
+
+	res := &pb.PendingVersionsResponse{}
+	for _, r := range rows {
+		res.Versions = append(res.Versions, r.ToProto())
+	}
+	return res, nil
+}
+
+func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) (*pb.Node, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
 	}
-	node_id, err := s.ApproveVersionInternal(ctx, tx, req.VersionId)
+	defer tx.Rollback()
+
+	row, err := s.DeleteNodeInternal(ctx, tx, req.NodeId)
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.fetchNodeInternal(ctx, node_id)
-	if err != nil {
-		return nil, err
+
+	if err := tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete node: %v", err)
 	}
+
 	return row.ToProto(), nil
 }
-
-func (s *wikiServer) GetHistory(ctx context.Context, req *pb.GetHistoryRequest) (*pb.GetHistoryResponse, error) {
-
-}
-
-// GetPending
-// GetAllPending
-// DeleteNode

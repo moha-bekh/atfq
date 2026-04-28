@@ -1,3 +1,7 @@
+volumes:
+  user-postgres_data:
+  user-minio_data:
+
 services:
   user:
     build:
@@ -79,12 +83,3 @@ services:
       echo 'Buckets created successfully';
       exit 0;
       "
-
-volumes:
-  user-postgres_data:
-  user-minio_data:
-
-networks:
-  backend:
-    name: atfq_backend
-    external: true
