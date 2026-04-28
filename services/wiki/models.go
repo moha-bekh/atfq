@@ -22,6 +22,7 @@ type NodeRow struct {
 	Content     sql.NullString `db:"content"`
 	CreatedAt   time.Time      `db:"created_at"`
 	Author      int32          `db:"created_by"`
+	Status      string         `db:"status"`
 	ActivatedAt sql.NullTime   `db:"activated_at"` // Nullable if not yet approved
 
 	// JSONB Metadata

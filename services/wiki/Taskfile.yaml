@@ -1,0 +1,124 @@
+version: "3"
+
+vars:
+  DATABASE_URL: "postgresql://atfq:atfq@localhost:5432/atfq_db"
+  DB_CONTAINER: "services-db-wiki-1"
+  SERVER_URL: "localhost:8084"
+
+env:
+  DATABASE_URL: "{{.DATABASE_URL}}"
+
+tasks:
+  db-nodes:
+    desc: "List all wiki nodes in the database"
+    cmds:
+      - |
+        docker exec -it {{.DB_CONTAINER}} \
+        psql -U atfq -d atfq_db \
+        -c "SELECT id, parent_id, type, current_version_id, order_index FROM nodes;"
+
+  db-versions:
+    desc: "List all node versions in the database"
+    cmds:
+      - |
+        docker exec -it {{.DB_CONTAINER}} \
+        psql -U atfq -d atfq_db \
+        -c "SELECT id, node_id, title, status, created_at FROM node_versions ORDER BY created_at DESC;"
+
+  get-roots:
+    desc: "Get root articles via gRPC"
+    cmds:
+      - |
+        grpcurl -plaintext {{.SERVER_URL}} wiki.WikiService/GetRootArticles
+
+  get-article:
+    desc: "Get an article by ID via gRPC (Usage: task get-article ID=1)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"id": {{.ID}}}' \
+        {{.SERVER_URL}} wiki.WikiService/GetArticle
+
+  create-node:
+    desc: "Create a new node via gRPC (Usage: task create-node TITLE='...' CONTENT='...' [PARENT_ID=1] [TYPE=TYPE_ARTICLE])"
+    requires:
+      vars: [TITLE, CONTENT]
+    vars:
+      PARENT_ID: '{{.PARENT_ID | default 0}}'
+      TYPE: '{{.TYPE | default "TYPE_ARTICLE"}}'
+    cmds:
+      - |
+        JSON_DATA=$(jq -n \
+          --arg title "{{.TITLE}}" \
+          --arg content "{{.CONTENT}}" \
+          --arg type "{{.TYPE}}" \
+          --arg parent_id "{{.PARENT_ID}}" \
+          '{title: $title, content: $content, type: $type} | if ($parent_id != "0") then . + {parent_id: ($parent_id|tonumber)} else . end')
+        grpcurl -plaintext -d "$JSON_DATA" {{.SERVER_URL}} wiki.WikiService/CreateNode
+
+  update-node:
+    desc: "Update a node (creates a pending version) (Usage: task update-node ID=1 TITLE='...' CONTENT='...')"
+    requires:
+      vars: [ID, TITLE, CONTENT]
+    cmds:
+      - |
+        JSON_DATA=$(jq -n --arg id {{.ID}} --arg title "{{.TITLE}}" --arg content "{{.CONTENT}}" \
+          '{"node_id": ($id|tonumber), "title": $title, "content": $content}')
+        grpcurl -plaintext -d "$JSON_DATA" {{.SERVER_URL}} wiki.WikiService/UpdateNode
+
+  approve-version:
+    desc: "Approve a pending version (Usage: task approve-version ID=1)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"version_id": {{.ID}}}' \
+        {{.SERVER_URL}} wiki.WikiService/ApproveVersion
+
+  get-pending:
+    desc: "Get pending versions for a node (Usage: task get-pending ID=1)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"node_id": {{.ID}}}' \
+        {{.SERVER_URL}} wiki.WikiService/GetPending
+
+  get-all-pending:
+    desc: "Get all pending versions across all nodes"
+    cmds:
+      - |
+        grpcurl -plaintext {{.SERVER_URL}} wiki.WikiService/GetAllPending
+
+  delete-node:
+    desc: "Delete a node via gRPC (Usage: task delete-node ID=1)"
+    requires:
+      vars: [ID]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{"node_id": {{.ID}}}' \
+        {{.SERVER_URL}} wiki.WikiService/DeleteNode
+
+  db-shell:
+    desc: "Open an interactive Postgres shell inside the container"
+    interactive: true
+    cmds:
+      - |
+        docker exec -it {{.DB_CONTAINER}} \
+        psql -U atfq -d atfq_db
+
+  run:
+    desc: "Run the wiki service locally"
+    cmds:
+      - go run .
+
+  build:
+    desc: "Build the wiki service"
+    cmds:
+      - go build -o wiki-service .
+
+  migrate-up:
+    desc: "Run migrations up (requires service to be running or use a CLI tool)"
+    cmds:
+      - echo "Migrations are automatically run on service start."
