@@ -1,0 +1,48 @@
+version: '3'
+
+tasks:
+  up:
+    desc: Start the net-gateway service
+    cmds:
+      - docker compose up -d --build net-gateway
+
+  down:
+    desc: Stop the net-gateway service
+    cmds:
+      - docker compose down net-gateway
+
+  logs:
+    desc: View net-gateway logs (useful to see WAF blocks)
+    cmds:
+      - docker logs -f net-gateway
+
+  test-waf:
+    desc: Run security tests against the WAF (SQLi, XSS, Path Traversal)
+    cmds:
+      - |
+        echo "--- [TEST] Legitimate request (Expected: 200 OK) ---"
+        curl -I -s -o /dev/null -w "HTTP Code: %{http_code}\n" http://localhost/
+      
+      - |
+        echo ""
+        echo "--- [TEST] XSS Attack (Expected: 403 Forbidden) ---"
+        curl -I -s -o /dev/null -w "HTTP Code: %{http_code}\n" "http://localhost/?id=<script>alert(1)</script>"
+      
+      - |
+        echo ""
+        echo "--- [TEST] SQL Injection Attack (Expected: 403 Forbidden) ---"
+        curl -I -s -o /dev/null -w "HTTP Code: %{http_code}\n" "http://localhost/?id=1'%20OR%20'1'='1"
+      
+      - |
+        echo ""
+        echo "--- [TEST] Path Traversal Attack (Expected: 403 Forbidden) ---"
+        curl -I -s -o /dev/null -w "HTTP Code: %{http_code}\n" "http://localhost/?file=../../etc/passwd"
+      
+      - |
+        echo ""
+        echo "--- [TEST] RCE Attack (Expected: 403 Forbidden) ---"
+        curl -I -s -o /dev/null -w "HTTP Code: %{http_code}\n" "http://localhost/?cmd=ls%20-la;%20rm%20-rf%20/"
+      
+      - |
+        echo ""
+        echo "--- [ADVICE] If a test returns an unexpected error, check 'docker logs net-gateway'."

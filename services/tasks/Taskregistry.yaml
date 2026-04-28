@@ -1,0 +1,39 @@
+version: "3"
+
+tasks:
+  login:
+    internal: true
+    cmds:
+      - |
+        if [ -z "{{.TOKEN}}" ]; then
+          echo "TOKEN is required. Pass it with TOKEN=your_pat"
+          exit 1
+        fi
+        echo "{{.TOKEN}}" | docker login {{.REGISTRY}} -u {{.GH_USER}} --password-stdin
+    silent: true
+
+  push-svc:
+    internal: true
+    deps: [login]
+    cmds:
+      - |
+        docker buildx build \
+          --platform linux/amd64 \
+          --target {{.TARGET}} \
+          -t {{.REGISTRY}}/{{.GH_USER}}/atfq-{{.NAME}}:{{.VERSION}} \
+          --push \
+          {{.PATH}}
+
+  push-all:
+    desc: "Build and push all microservices"
+    cmds:
+      - task: push-svc
+        vars: { NAME: "api-gateway", PATH: "./api-gateway" }
+      - task: push-svc
+        vars: { NAME: "auth-service", PATH: "./auth" }
+      - task: push-svc
+        vars: { NAME: "user-service", PATH: "./user" }
+      - task: push-svc
+        vars: { NAME: "wiki-service", PATH: "./wiki" }
+      - task: push-svc
+        vars: { NAME: "app", PATH: "./app" }

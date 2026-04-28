@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Plus+Jakarta+Sans:wght@200..800&family=JetBrains+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* --- 1. FONTS CONFIGURATION --- */
+  /* We link Tailwind's font-main to the CSS variable controlled by SettingsContext */
+  --font-main: var(--font-main, "Plus Jakarta Sans", sans-serif);
+  /* A secondary font for a "display" look (titles) */
+  --font-display: "Bricolage Grotesque", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* --- 2. COLORS CONFIGURATION (Monkeytype Style) --- */
+  /* These are the DEFAULT values (Base theme) */
+  --color-bg: #7766BD;
+  --color-main: #F4EFFA;
+  --color-caret: var(--color-main);
+  --color-text: #F4EFFA;
+  --color-sub: #4B3A91;
+  --color-sub-alt: #4B3A91;
+  --color-error: #00F5FF;
+  --color-extra-error: #20C2CC;
+}
+
+/* --- 3. PRESET THEMES (Overrides) --- */
+
+/* Husqy Theme */
+[data-theme='husqy'] {
+  --color-bg: #000000;
+  --color-main: #972FFF;
+  --color-text: #EBD7FF;
+  --color-sub: #523b6b;
+  --color-sub-alt: #1a0b2e;
+}
+
+/* Light / Paper Theme */
+[data-theme='paper'] {
+  --color-bg: #eeeeee;
+  --color-main: #444444;
+  --color-text: #111111;
+  --color-sub: #999999;
+  --color-sub-alt: #dddddd;
+}
+
+/* --- 4. GLOBAL ELEMENT STYLES --- */
+
+:root {
+  /* Initial font before React loads */
+  --font-main: "Plus Jakarta Sans", sans-serif;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-main);
+  /* Smooth transitions for theme switching */
+  transition: background-color 0.25s ease, color 0.2s ease;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Customizing the selection color to match your theme */
+::selection {
+  background-color: var(--color-main);
+  color: var(--color-bg);
+}
+
+/* Global scrollbar style to match the wiki look */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-sub-alt);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sub);
+}
+
+.btn-primary, .btn-secondary {
+  box-sizing: border-box; 
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  height: 42px;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.btn-primary {
+  background-color: var(--color-sub);
+  color: var(--color-text);
+  border-color: var(--color-sub);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-main); 
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: var(--color-sub);
+  border-color: var(--color-sub);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-main);
+}
+

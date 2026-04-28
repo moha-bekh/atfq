@@ -5,6 +5,7 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # healthcheck:
   api-gateway:
     build:
       target: prod
@@ -14,6 +15,7 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # healthcheck:
   app:
     build:
       target: prod
@@ -24,11 +26,6 @@ services:
     security_opt:
       - no-new-privileges:true
     # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
-    #   interval: 30s
-    #   timeout: 5s
-    #   retries: 3
-    #   start_period: 10s
   auth:
     build:
       target: prod
@@ -38,6 +35,7 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # healthcheck:
   user:
     build:
       target: prod
@@ -47,6 +45,7 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    # healthcheck:
   wiki:
     build:
       target: prod

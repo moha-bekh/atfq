@@ -1,0 +1,26 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: "Provision Vault for Auth service"
+    cmds:
+      # 1. Write Policy
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault policy write auth-service - < ./policy.hcl
+      
+      # 2. Configure AppRole
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault write auth/approle/role/auth-service - < ./role.json
+      
+      # 3. Inject Secrets
+      - |
+        docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault kv put secret/auth \
+          db_url="$AUTH_DB_URL" \
+          db_name="$AUTH_DB_NAME" \
+          db_user="$AUTH_DB_USER" \
+          db_password="$AUTH_DB_PASSWORD" \
+          server_addr="$AUTH_SERVER_ADDR" \
+          jwt_secret="$AUTH_JWT"
+          
+      # 4. Generate IDs for the app
+      - mkdir -p ../../../auth/vault/agent_ids/
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/auth-service/role-id > ../../../auth/vault/agent_ids/role-id
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/auth-service/secret-id > ../../../auth/vault/agent_ids/secret-id

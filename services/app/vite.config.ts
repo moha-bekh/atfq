@@ -1,17 +1,26 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import tailwindcss from '@tailwindcss/vite'
+import svgr from 'vite-plugin-svgr'
+import path from 'path'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+    tailwindcss(),
+    svgr()
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   server: {
     port: 8080,
-    host: true,
     strictPort: true,
-    allowedHosts: [
-      'localhost',
-      'app',
-      'atfq.org',
-    ]
+    host: true,
+    allowedHosts: ['atfq.org']
   }
 })
