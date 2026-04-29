@@ -275,8 +275,7 @@ func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) 
 	}
 	defer tx.Rollback()
 
-	err := s.DeleteNodeInternal(ctx, tx, req.NodeId)
-	if err != nil {
+	if err := s.DeleteNodeInternal(ctx, tx, req.NodeId); err != nil {
 		return nil, err
 	}
 
@@ -284,5 +283,5 @@ func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) 
 		return nil, status.Errorf(codes.Internal, "failed to delete node: %v", err)
 	}
 
-	return row.ToProto(), nil
+	return nil, nil
 }
