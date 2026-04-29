@@ -249,6 +249,25 @@ func (s *wikiServer) GetAllPending(ctx context.Context, req *pb.GetAllPendingReq
 	return res, nil
 }
 
+// func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) (*pb.Node, error) {
+// 	tx, err := s.db.BeginTxx(ctx, nil)
+// 	if err != nil {
+// 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
+// 	}
+// 	defer tx.Rollback()
+
+// 	row, err := s.DeleteNodeInternal(ctx, tx, req.NodeId)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	if err := tx.Commit(); err != nil {
+// 		return nil, status.Errorf(codes.Internal, "failed to delete node: %v", err)
+// 	}
+
+// 	return row.ToProto(), nil
+// }
+
 func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) (*pb.Node, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
@@ -256,7 +275,7 @@ func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) 
 	}
 	defer tx.Rollback()
 
-	row, err := s.DeleteNodeInternal(ctx, tx, req.NodeId)
+	err := s.DeleteNodeInternal(ctx, tx, req.NodeId)
 	if err != nil {
 		return nil, err
 	}

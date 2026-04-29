@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+
 	// "fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -33,7 +34,6 @@ func (s *wikiServer) fetchNodeInternal(ctx context.Context, ext Ext, id int32) (
     	v.id AS version_id,
     	v.title,
 		v.content,
-		v.status,
 		v.created_at,
 		v.created_by,
 		v.activated_at,
@@ -47,6 +47,36 @@ func (s *wikiServer) fetchNodeInternal(ctx context.Context, ext Ext, id int32) (
 	    ON v.id = q.node_version_id
 	WHERE n.id = $1
 		AND n.current_version_id IS NOT NULL;
+`
+	err := ext.GetContext(ctx, &row, query, id)
+
+	return &row, err
+}
+
+func (s *wikiServer) fetchPendingNodeInternal(ctx context.Context, ext Ext, id int32) (*NodeRow, error) {
+	var row NodeRow
+	query := `
+	SELECT
+    	n.id,
+    	n.type,
+		n.parent_id,
+    	n.order_index,
+
+    	v.id AS version_id,
+    	v.title,
+		v.content,
+		v.created_at,
+		v.created_by,
+		v.activated_at,
+
+    	q.metadata
+
+	FROM nodes n
+	JOIN node_versions v
+	    ON n.current_version_id = v.id
+	LEFT JOIN questions q
+	    ON v.id = q.node_version_id
+	WHERE n.id = $1
 `
 	err := ext.GetContext(ctx, &row, query, id)
 
@@ -87,7 +117,7 @@ func (s *wikiServer) createNodeInternal(ctx context.Context, ext Ext, req *pb.Cr
         ),
         new_version AS (
             INSERT INTO node_versions (node_id, title, content, created_by, status)
-            VALUES ((SELECT id FROM new_node), $3, $4, $5, 'approved')
+            VALUES ((SELECT id FROM new_node), $3, $4, $5, 'pending')
             RETURNING id, node_id
         ),
         _ AS (
@@ -104,10 +134,10 @@ func (s *wikiServer) createNodeInternal(ctx context.Context, ext Ext, req *pb.Cr
 	}
 
 	// 4. Activate the node
-	_, err = ext.ExecContext(ctx, `UPDATE nodes SET current_version_id = $1 WHERE id = $2`, versionID, nodeID)
-	if err != nil {
-		return nil, err
-	}
+	// _, err = ext.ExecContext(ctx, `UPDATE nodes SET current_version_id = $1 WHERE id = $2`, versionID, nodeID)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// 5. Build and return the NodeRow
 	// We populate it with the data we already have to avoid a re-fetch
@@ -116,12 +146,13 @@ func (s *wikiServer) createNodeInternal(ctx context.Context, ext Ext, req *pb.Cr
 		Type:       dbType,
 		ParentID:   parentID,
 		OrderIndex: req.OrderIndex,
-		VersionID:  versionID,
-		Title:      req.Title,
-		Content:    sql.NullString{String: req.Content, Valid: true},
-		Author:     uid,
-		Status:     "approved",
-		Metadata:   metadataJSON,
+		VersionID:  0,
+		// VersionID:  versionID,
+		Title:   req.Title,
+		Content: sql.NullString{String: req.Content, Valid: true},
+		Author:  uid,
+		// Status:     "approved",
+		Metadata: metadataJSON,
 		// (Timestamps will be slightly off since we aren't fetching the DB's
 		//  actual 'now()', but for a 'Create' response, that's usually fine)
 	}, nil
@@ -144,7 +175,6 @@ func (s *wikiServer) fetchChildrenInternal(ctx context.Context, ext Ext, id any,
     	v.id AS version_id,
     	v.title,
 		v.content,
-		v.status,
 		v.created_at,
 		v.created_by,
 		v.activated_at,
@@ -277,35 +307,42 @@ func (s *wikiServer) fetchPendingVersionsInternal(ctx context.Context, ext Ext, 
 	return versions, err
 }
 
-func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) (*NodeRow, error) {
+// func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) (*NodeRow, error) {
+func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) error {
 	// 1. Fetch node before deletion to return it
-	row, err := s.fetchNodeInternal(ctx, ext, nodeID)
-	if err != nil {
-		return nil, err
-	}
+
+	// row, err := s.fetchPendingNodeInternal(ctx, ext, nodeID)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// 2. Break circular dependency
-	_, err = ext.ExecContext(ctx, "UPDATE nodes SET current_version_id = NULL WHERE id = $1", nodeID)
+	_, err := ext.ExecContext(ctx, "UPDATE nodes SET current_version_id = NULL WHERE id = $1", nodeID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to break dependency: %v", err)
+		return status.Errorf(codes.Internal, "failed to break dependency: %v", err)
+		// return nil, status.Errorf(codes.Internal, "failed to break dependency: %v", err)
 	}
 
 	// 3. Delete linked data manually since ON DELETE CASCADE is missing
 	_, err = ext.ExecContext(ctx, "DELETE FROM questions WHERE node_version_id IN (SELECT id FROM node_versions WHERE node_id = $1)", nodeID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete questions: %v", err)
+		return status.Errorf(codes.Internal, "failed to delete questions: %v", err)
+		// return nil, status.Errorf(codes.Internal, "failed to delete questions: %v", err)
 	}
 
 	_, err = ext.ExecContext(ctx, "DELETE FROM node_versions WHERE node_id = $1", nodeID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete versions: %v", err)
+		return status.Errorf(codes.Internal, "failed to delete versions: %v", err)
+		// return nil, status.Errorf(codes.Internal, "failed to delete versions: %v", err)
 	}
 
 	// 4. Delete the node itself
 	_, err = ext.ExecContext(ctx, "DELETE FROM nodes WHERE id = $1", nodeID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "delete failed: %v", err)
+		return status.Errorf(codes.Internal, "delete failed: %v", err)
+		// return nil, status.Errorf(codes.Internal, "delete failed: %v", err)
 	}
 
-	return row, nil
+	// return row, nil
+	return nil
 }

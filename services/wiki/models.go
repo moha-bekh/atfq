@@ -17,13 +17,13 @@ type NodeRow struct {
 	OrderIndex int32         `db:"order_index"`
 
 	// Version Specifics
-	VersionID   int32          `db:"version_id"`
-	Title       string         `db:"title"`
-	Content     sql.NullString `db:"content"`
-	CreatedAt   time.Time      `db:"created_at"`
-	Author      int32          `db:"created_by"`
-	Status      string         `db:"status"`
-	ActivatedAt sql.NullTime   `db:"activated_at"` // Nullable if not yet approved
+	VersionID int32          `db:"version_id"`
+	Title     string         `db:"title"`
+	Content   sql.NullString `db:"content"`
+	CreatedAt time.Time      `db:"created_at"`
+	Author    int32          `db:"created_by"`
+	// Status      string         `db:"status"`
+	ActivatedAt sql.NullTime `db:"activated_at"` // Nullable if not yet approved
 
 	// JSONB Metadata
 	Metadata []byte `db:"metadata"`
