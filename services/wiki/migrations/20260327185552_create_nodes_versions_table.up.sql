@@ -10,7 +10,8 @@ CREATE TABLE node_versions (
 
     CONSTRAINT fk_node_versions_to_nodes
         FOREIGN KEY (node_id)
-        REFERENCES nodes(id),
+        REFERENCES nodes(id)
+        ON DELETE CASCADE,
 
     CONSTRAINT chk_node_versions_status
         CHECK (status IN ('pending', 'approved', 'rejected', 'archived'))

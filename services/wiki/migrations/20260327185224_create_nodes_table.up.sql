@@ -7,7 +7,8 @@ CREATE TABLE nodes (
 
     CONSTRAINT fk_nodes_parent
         FOREIGN KEY (parent_id)
-        REFERENCES nodes(id),
+        REFERENCES nodes(id)
+        ON DELETE CASCADE,
 
     CONSTRAINT chk_nodes_type
         CHECK (type IN ('article', 'notion', 'question'))

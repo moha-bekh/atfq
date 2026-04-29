@@ -83,8 +83,3 @@ services:
 volumes:
   user-postgres_data:
   user-minio_data:
-
-networks:
-  backend:
-    name: atfq_backend
-    external: true
