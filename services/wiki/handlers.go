@@ -186,6 +186,30 @@ func (s *wikiServer) ApproveVersion(ctx context.Context, req *pb.ModerateVersion
 	}
 	defer tx.Rollback()
 
+    // We verify if the node's parent has an active version (current_version_id is not null)
+    var hierarchy struct {
+        ParentID         *int32 `db:"parent_id"`
+        ParentApprovedID *int32 `db:"parent_approved_id"`
+    }
+
+    checkQuery := `
+        SELECT n.parent_id, p.current_version_id as parent_approved_id
+        FROM nodes n
+        JOIN node_versions v ON n.id = v.node_id
+        LEFT JOIN nodes p ON n.parent_id = p.id
+        WHERE v.id = $1`
+
+    err = tx.GetContext(ctx, &hierarchy, checkQuery, req.VersionId)
+    if err != nil {
+        return nil, status.Errorf(codes.Internal, "failed to check hierarchy: %v", err)
+    }
+
+    // If the node has a parent, but that parent has no approved version, we block the request.
+    if hierarchy.ParentID != nil && (hierarchy.ParentApprovedID == nil || *hierarchy.ParentApprovedID == 0) {
+        return nil, status.Errorf(codes.FailedPrecondition, 
+            "cannot approve: parent article (ID %d) must be approved first", *hierarchy.ParentID)
+    }
+
 	node_id, err := s.ApproveVersionInternal(ctx, tx, req.VersionId)
 	if err != nil {
 		return nil, err
