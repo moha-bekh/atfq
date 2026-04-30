@@ -130,6 +130,14 @@ message AssignParentRequest {
     int32 child = 2;
 }
 
+message SearchRequest {
+    string query = 1;
+}
+
+message SearchResponse {
+    repeated NodeBreadcrumb results = 1;
+}
+
 // --- SERVICE DEFINITION ---
 
 service WikiService {
@@ -151,4 +159,5 @@ service WikiService {
     // Moderation
     rpc ApproveVersion(ModerateVersionRequest) returns (Node);
     rpc DenyVersion(ModerateVersionRequest) returns (Version);
+    rpc SearchArticles(SearchRequest) returns (SearchResponse);
 }

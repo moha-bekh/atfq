@@ -115,6 +115,16 @@ tasks:
           -d '{"child": {{.CHILD}}, "new_parent": {{.PARENT}}}' \
           {{.SERVER_URL}} wiki.WikiService/AssignParent
 
+  search:
+      desc: "Search articles by title (Usage: task search QUERY='mot-clé')"
+      vars:
+        QUERY: '{{.QUERY | default ""}}'
+      cmds:
+        - |
+          grpcurl -plaintext -d '{"query": "{{.QUERY}}"}' \
+          localhost:8084 wiki.WikiService/SearchArticles
+
+
   db-shell:
     desc: "Open an interactive Postgres shell inside the container"
     interactive: true

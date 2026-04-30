@@ -309,3 +309,20 @@ func (s *wikiServer) AssignParent(ctx context.Context, req *pb.AssignParentReque
 
 	return row.ToProto(), nil
 }
+
+func (s *wikiServer) SearchArticles(ctx context.Context, req *pb.SearchRequest) (*pb.SearchResponse, error) {
+    // 1. Appel au repository pour chercher en DB
+    rows, err := s.SearchArticlesInternal(ctx, s.db, req.Query)
+    if err != nil {
+        return nil, status.Errorf(codes.Internal, "search failed: %v", err)
+    }
+
+    // 2. Préparation de la réponse gRPC
+    res := &pb.SearchResponse{}
+    for _, r := range rows {
+        // ToProtoBreadcrumb est parfait ici car il ne contient que ID et Title
+        res.Results = append(res.Results, r.ToProtoBreadcrumb())
+    }
+
+    return res, nil
+}
