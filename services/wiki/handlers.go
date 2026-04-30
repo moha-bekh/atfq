@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"context"
 	"database/sql"
 	"strconv"
@@ -273,26 +274,7 @@ func (s *wikiServer) GetAllPending(ctx context.Context, req *pb.GetAllPendingReq
 	return res, nil
 }
 
-// func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) (*pb.Node, error) {
-// 	tx, err := s.db.BeginTxx(ctx, nil)
-// 	if err != nil {
-// 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
-// 	}
-// 	defer tx.Rollback()
-
-// 	row, err := s.DeleteNodeInternal(ctx, tx, req.NodeId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if err := tx.Commit(); err != nil {
-// 		return nil, status.Errorf(codes.Internal, "failed to delete node: %v", err)
-// 	}
-
-// 	return row.ToProto(), nil
-// }
-
-func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) (*pb.Node, error) {
+func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) (*pb.DeleteResponse, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
@@ -307,7 +289,11 @@ func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) 
 		return nil, status.Errorf(codes.Internal, "failed to delete node: %v", err)
 	}
 
-	return nil, nil
+	successMessage := fmt.Sprintf("Node %d and all its versions have been successfully deleted.", req.NodeId)
+
+	return &pb.DeleteResponse{
+        Message: successMessage,
+    }, nil
 }
 
 // AssignParent handles the gRPC request to change a node's parent

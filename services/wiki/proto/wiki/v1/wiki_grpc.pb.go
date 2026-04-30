@@ -44,7 +44,7 @@ type WikiServiceClient interface {
 	CreateNode(ctx context.Context, in *CreateNodeRequest, opts ...grpc.CallOption) (*Node, error)
 	GetArticle(ctx context.Context, in *GetArticleRequest, opts ...grpc.CallOption) (*Article, error)
 	UpdateNode(ctx context.Context, in *UpdateNodeRequest, opts ...grpc.CallOption) (*Version, error)
-	DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*Node, error)
+	DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
 	AssignParent(ctx context.Context, in *AssignParentRequest, opts ...grpc.CallOption) (*Node, error)
 	// History & Versioning
 	GetHistory(ctx context.Context, in *GetHistoryRequest, opts ...grpc.CallOption) (*GetHistoryResponse, error)
@@ -114,9 +114,9 @@ func (c *wikiServiceClient) UpdateNode(ctx context.Context, in *UpdateNodeReques
 	return out, nil
 }
 
-func (c *wikiServiceClient) DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*Node, error) {
+func (c *wikiServiceClient) DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Node)
+	out := new(DeleteResponse)
 	err := c.cc.Invoke(ctx, WikiService_DeleteNode_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -204,7 +204,7 @@ type WikiServiceServer interface {
 	CreateNode(context.Context, *CreateNodeRequest) (*Node, error)
 	GetArticle(context.Context, *GetArticleRequest) (*Article, error)
 	UpdateNode(context.Context, *UpdateNodeRequest) (*Version, error)
-	DeleteNode(context.Context, *DeleteNodeRequest) (*Node, error)
+	DeleteNode(context.Context, *DeleteNodeRequest) (*DeleteResponse, error)
 	AssignParent(context.Context, *AssignParentRequest) (*Node, error)
 	// History & Versioning
 	GetHistory(context.Context, *GetHistoryRequest) (*GetHistoryResponse, error)
@@ -239,7 +239,7 @@ func (UnimplementedWikiServiceServer) GetArticle(context.Context, *GetArticleReq
 func (UnimplementedWikiServiceServer) UpdateNode(context.Context, *UpdateNodeRequest) (*Version, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateNode not implemented")
 }
-func (UnimplementedWikiServiceServer) DeleteNode(context.Context, *DeleteNodeRequest) (*Node, error) {
+func (UnimplementedWikiServiceServer) DeleteNode(context.Context, *DeleteNodeRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteNode not implemented")
 }
 func (UnimplementedWikiServiceServer) AssignParent(context.Context, *AssignParentRequest) (*Node, error) {

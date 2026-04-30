@@ -1204,6 +1204,50 @@ func (x *SearchResponse) GetResults() []*NodeBreadcrumb {
 	return nil
 }
 
+type DeleteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteResponse) Reset() {
+	*x = DeleteResponse{}
+	mi := &file_wiki_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteResponse) ProtoMessage() {}
+
+func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_wiki_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteResponse.ProtoReflect.Descriptor instead.
+func (*DeleteResponse) Descriptor() ([]byte, []int) {
+	return file_wiki_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DeleteResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_wiki_proto protoreflect.FileDescriptor
 
 const file_wiki_proto_rawDesc = "" +
@@ -1297,12 +1341,14 @@ const file_wiki_proto_rawDesc = "" +
 	"\rSearchRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\"@\n" +
 	"\x0eSearchResponse\x12.\n" +
-	"\aresults\x18\x01 \x03(\v2\x14.wiki.NodeBreadcrumbR\aresults*V\n" +
+	"\aresults\x18\x01 \x03(\v2\x14.wiki.NodeBreadcrumbR\aresults\"*\n" +
+	"\x0eDeleteResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage*V\n" +
 	"\bNodeType\x12\x14\n" +
 	"\x10TYPE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fTYPE_ARTICLE\x10\x01\x12\x0f\n" +
 	"\vTYPE_NOTION\x10\x02\x12\x11\n" +
-	"\rTYPE_QUESTION\x10\x032\xaa\x06\n" +
+	"\rTYPE_QUESTION\x10\x032\xb4\x06\n" +
 	"\vWikiService\x12N\n" +
 	"\x0fGetRootArticles\x12\x1c.wiki.GetRootArticlesRequest\x1a\x1d.wiki.GetRootArticlesResponse\x12:\n" +
 	"\rCreateArticle\x12\x1a.wiki.CreateArticleRequest\x1a\r.wiki.Article\x121\n" +
@@ -1312,10 +1358,9 @@ const file_wiki_proto_rawDesc = "" +
 	"\n" +
 	"GetArticle\x12\x17.wiki.GetArticleRequest\x1a\r.wiki.Article\x124\n" +
 	"\n" +
-	"UpdateNode\x12\x17.wiki.UpdateNodeRequest\x1a\r.wiki.Version\x121\n" +
+	"UpdateNode\x12\x17.wiki.UpdateNodeRequest\x1a\r.wiki.Version\x12;\n" +
 	"\n" +
-	"DeleteNode\x12\x17.wiki.DeleteNodeRequest\x1a\n" +
-	".wiki.Node\x125\n" +
+	"DeleteNode\x12\x17.wiki.DeleteNodeRequest\x1a\x14.wiki.DeleteResponse\x125\n" +
 	"\fAssignParent\x12\x19.wiki.AssignParentRequest\x1a\n" +
 	".wiki.Node\x12?\n" +
 	"\n" +
@@ -1341,7 +1386,7 @@ func file_wiki_proto_rawDescGZIP() []byte {
 }
 
 var file_wiki_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_wiki_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_wiki_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_wiki_proto_goTypes = []any{
 	(NodeType)(0),                   // 0: wiki.NodeType
 	(*Node)(nil),                    // 1: wiki.Node
@@ -1364,26 +1409,27 @@ var file_wiki_proto_goTypes = []any{
 	(*AssignParentRequest)(nil),     // 18: wiki.AssignParentRequest
 	(*SearchRequest)(nil),           // 19: wiki.SearchRequest
 	(*SearchResponse)(nil),          // 20: wiki.SearchResponse
-	(*timestamppb.Timestamp)(nil),   // 21: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),         // 22: google.protobuf.Struct
+	(*DeleteResponse)(nil),          // 21: wiki.DeleteResponse
+	(*timestamppb.Timestamp)(nil),   // 22: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),         // 23: google.protobuf.Struct
 }
 var file_wiki_proto_depIdxs = []int32{
 	0,  // 0: wiki.Node.type:type_name -> wiki.NodeType
-	21, // 1: wiki.Node.created_at:type_name -> google.protobuf.Timestamp
-	22, // 2: wiki.Node.metadata:type_name -> google.protobuf.Struct
-	21, // 3: wiki.Version.created_at:type_name -> google.protobuf.Timestamp
-	21, // 4: wiki.Version.activated_at:type_name -> google.protobuf.Timestamp
-	22, // 5: wiki.Version.metadata:type_name -> google.protobuf.Struct
+	22, // 1: wiki.Node.created_at:type_name -> google.protobuf.Timestamp
+	23, // 2: wiki.Node.metadata:type_name -> google.protobuf.Struct
+	22, // 3: wiki.Version.created_at:type_name -> google.protobuf.Timestamp
+	22, // 4: wiki.Version.activated_at:type_name -> google.protobuf.Timestamp
+	23, // 5: wiki.Version.metadata:type_name -> google.protobuf.Struct
 	1,  // 6: wiki.Article.article_node:type_name -> wiki.Node
 	3,  // 7: wiki.Article.sub_articles:type_name -> wiki.NodeBreadcrumb
 	1,  // 8: wiki.Article.notions:type_name -> wiki.Node
 	1,  // 9: wiki.Article.questions:type_name -> wiki.Node
 	3,  // 10: wiki.Article.lineage:type_name -> wiki.NodeBreadcrumb
 	0,  // 11: wiki.CreateNodeRequest.type:type_name -> wiki.NodeType
-	22, // 12: wiki.CreateNodeRequest.metadata:type_name -> google.protobuf.Struct
+	23, // 12: wiki.CreateNodeRequest.metadata:type_name -> google.protobuf.Struct
 	5,  // 13: wiki.CreateArticleRequest.article_node:type_name -> wiki.CreateNodeRequest
 	5,  // 14: wiki.CreateArticleRequest.children:type_name -> wiki.CreateNodeRequest
-	22, // 15: wiki.UpdateNodeRequest.metadata:type_name -> google.protobuf.Struct
+	23, // 15: wiki.UpdateNodeRequest.metadata:type_name -> google.protobuf.Struct
 	2,  // 16: wiki.GetHistoryResponse.versions:type_name -> wiki.Version
 	2,  // 17: wiki.PendingVersionsResponse.versions:type_name -> wiki.Version
 	3,  // 18: wiki.GetRootArticlesResponse.articles:type_name -> wiki.NodeBreadcrumb
@@ -1406,7 +1452,7 @@ var file_wiki_proto_depIdxs = []int32{
 	1,  // 35: wiki.WikiService.CreateNode:output_type -> wiki.Node
 	4,  // 36: wiki.WikiService.GetArticle:output_type -> wiki.Article
 	2,  // 37: wiki.WikiService.UpdateNode:output_type -> wiki.Version
-	1,  // 38: wiki.WikiService.DeleteNode:output_type -> wiki.Node
+	21, // 38: wiki.WikiService.DeleteNode:output_type -> wiki.DeleteResponse
 	1,  // 39: wiki.WikiService.AssignParent:output_type -> wiki.Node
 	10, // 40: wiki.WikiService.GetHistory:output_type -> wiki.GetHistoryResponse
 	13, // 41: wiki.WikiService.GetPending:output_type -> wiki.PendingVersionsResponse
@@ -1435,7 +1481,7 @@ func file_wiki_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_wiki_proto_rawDesc), len(file_wiki_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   20,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
