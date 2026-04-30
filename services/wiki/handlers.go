@@ -285,3 +285,27 @@ func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) 
 
 	return nil, nil
 }
+
+// AssignParent handles the gRPC request to change a node's parent
+func (s *wikiServer) AssignParent(ctx context.Context, req *pb.AssignParentRequest) (*pb.Node, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "database error: %v", err)
+	}
+	defer tx.Rollback()
+
+	if err := s.AssignParentInternal(ctx, tx, req.Child, &req.NewParent); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to commit transaction: %v", err)
+	}
+
+	row, err := s.fetchNodeInternal(ctx, s.db, req.Child)
+	if err != nil {
+		return nil, err
+	}
+
+	return row.ToProto(), nil
+}

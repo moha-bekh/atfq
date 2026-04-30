@@ -100,6 +100,21 @@ tasks:
         grpcurl -plaintext -d '{"node_id": {{.ID}}}' \
         {{.SERVER_URL}} wiki.WikiService/DeleteNode
 
+  assign-parent:
+    desc: "Assign a new parent to a node (Usage: task assign-parent CHILD=5 PARENT=2)"
+    vars:
+      CHILD: '{{.CHILD | default ""}}'
+      PARENT: '{{.PARENT | default "0"}}'
+    cmds:
+      - |
+        if [ -z "{{.CHILD}}" ]; then 
+          echo "Error: CHILD argument is required (ex: CHILD=5)"; 
+          exit 1; 
+        fi
+        grpcurl -plaintext \
+          -d '{"child": {{.CHILD}}, "new_parent": {{.PARENT}}}' \
+          {{.SERVER_URL}} wiki.WikiService/AssignParent
+
   db-shell:
     desc: "Open an interactive Postgres shell inside the container"
     interactive: true

@@ -346,3 +346,50 @@ func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int
 	// return row, nil
 	return nil
 }
+
+func (s *wikiServer) AssignParentInternal(ctx context.Context, ext Ext, nodeID int32, newParentID *int32) error {
+	// 1. Basic check: a node cannot be its own parent
+	if newParentID != nil && *newParentID == nodeID {
+		return status.Error(codes.InvalidArgument, "a node cannot be its own parent")
+	}
+
+	var parentID sql.NullInt32
+	if newParentID != nil && *newParentID > 0 {
+		// 2. Anti-cycle check: verify that the new parent is not a descendant of the node
+		// We use a RECURSIVE CTE to find all children, grandchildren, etc.
+		var isDescendant bool
+		cycleCheckQuery := `
+			WITH RECURSIVE subordinates AS (
+				SELECT id FROM nodes WHERE id = $1
+				UNION ALL
+				SELECT n.id FROM nodes n
+				INNER JOIN subordinates s ON s.id = n.parent_id
+			)
+			SELECT EXISTS (SELECT 1 FROM subordinates WHERE id = $2);
+		`
+		err := ext.GetContext(ctx, &isDescendant, cycleCheckQuery, nodeID, *newParentID)
+		if err != nil {
+			return status.Errorf(codes.Internal, "cycle check failed: %v", err)
+		}
+
+		if isDescendant {
+			return status.Error(codes.FailedPrecondition, "circular dependency detected: the new parent is a descendant of the node")
+		}
+
+		parentID = sql.NullInt32{Int32: *newParentID, Valid: true}
+	}
+
+	// 3. Perform the update if all checks passed
+	query := `UPDATE nodes SET parent_id = $1 WHERE id = $2`
+	res, err := ext.ExecContext(ctx, query, parentID, nodeID)
+	if err != nil {
+		return status.Errorf(codes.Internal, "SQL update failed: %v", err)
+	}
+
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		return status.Error(codes.NotFound, "node to move not found")
+	}
+
+	return nil
+}
