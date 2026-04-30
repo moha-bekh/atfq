@@ -396,8 +396,7 @@ func (s *wikiServer) AssignParentInternal(ctx context.Context, ext Ext, nodeID i
 
 func (s *wikiServer) SearchArticlesInternal(ctx context.Context, ext Ext, query string) ([]NodeRow, error) {
     var rows []NodeRow
-    // On récupère l'ID et le Titre de la version actuelle de chaque article
-    // ILIKE permet de chercher "Tuto" même si l'utilisateur écrit "tuto"
+
     sqlQuery := `
         SELECT n.id, v.title
         FROM nodes n
@@ -407,7 +406,6 @@ func (s *wikiServer) SearchArticlesInternal(ctx context.Context, ext Ext, query 
         ORDER BY v.title ASC
         LIMIT 15;`
 
-    // Le "%" autour du query permet de trouver le mot n'importe où dans le titre
     err := ext.SelectContext(ctx, &rows, sqlQuery, "%"+query+"%")
     return rows, err
 }
