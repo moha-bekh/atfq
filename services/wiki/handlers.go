@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
 
 	pb "wiki/proto/wiki/v1"
@@ -38,8 +38,17 @@ func (s *wikiServer) CreateArticle(ctx context.Context, req *pb.CreateArticleReq
 	if err != nil {
 		return nil, err
 	}
-
 	defer tx.Rollback()
+
+	if req.ArticleNode.ParentId != nil {
+		parent_is_valid, err := s.nodeExists(ctx, tx, *req.ArticleNode.ParentId)
+		if err != nil {
+			return nil, err
+		}
+		if !parent_is_valid {
+			return nil, status.Error(codes.NotFound, "parent node not found")
+		}
+	}
 
 	article_row, err := s.createNodeInternal(ctx, tx, req.ArticleNode)
 	if err != nil {
@@ -77,6 +86,28 @@ func (s *wikiServer) CreateNode(ctx context.Context, req *pb.CreateNodeRequest) 
 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
 	}
 	defer tx.Rollback()
+
+	if req.Type != pb.NodeType_TYPE_ARTICLE && req.ParentId == nil {
+		return nil, status.Error(codes.NotFound, req.Type.String()+" type node can not be at the root. please specify a parent")
+	}
+
+	//reject request if specified parent does not exist
+	if req.ParentId != nil {
+		parent_is_valid, err := s.nodeExists(ctx, tx, *req.ParentId)
+		if err != nil {
+			return nil, err
+		}
+		if !parent_is_valid {
+			return nil, status.Error(codes.NotFound, "specified parent does not exist")
+		}
+		parent, err := s.fetchNodeInternal(ctx, tx, *req.ParentId)
+		if err != nil {
+			return nil, err
+		}
+		if parent.ToProto().Type != pb.NodeType_TYPE_ARTICLE {
+			return nil, status.Error(codes.InvalidArgument, "specified parent has to be an article")
+		}
+	}
 
 	row, err := s.createNodeInternal(ctx, tx, req)
 	if err != nil {
@@ -168,7 +199,7 @@ func (s *wikiServer) UpdateNode(ctx context.Context, req *pb.UpdateNodeRequest) 
 	}
 	defer tx.Rollback()
 
-	row, err := s.UpdateNodeInternal(ctx, tx, req)
+	row, err := s.updateNodeInternal(ctx, tx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -187,31 +218,31 @@ func (s *wikiServer) ApproveVersion(ctx context.Context, req *pb.ModerateVersion
 	}
 	defer tx.Rollback()
 
-    // We verify if the node's parent has an active version (current_version_id is not null)
-    var hierarchy struct {
-        ParentID         *int32 `db:"parent_id"`
-        ParentApprovedID *int32 `db:"parent_approved_id"`
-    }
+	// We verify if the node's parent has an active version (current_version_id is not null)
+	var hierarchy struct {
+		ParentID         *int32 `db:"parent_id"`
+		ParentApprovedID *int32 `db:"parent_approved_id"`
+	}
 
-    checkQuery := `
+	checkQuery := `
         SELECT n.parent_id, p.current_version_id as parent_approved_id
         FROM nodes n
         JOIN node_versions v ON n.id = v.node_id
         LEFT JOIN nodes p ON n.parent_id = p.id
         WHERE v.id = $1`
 
-    err = tx.GetContext(ctx, &hierarchy, checkQuery, req.VersionId)
-    if err != nil {
-        return nil, status.Errorf(codes.Internal, "failed to check hierarchy: %v", err)
-    }
+	err = tx.GetContext(ctx, &hierarchy, checkQuery, req.VersionId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to check hierarchy: %v", err)
+	}
 
-    // If the node has a parent, but that parent has no approved version, we block the request.
-    if hierarchy.ParentID != nil && (hierarchy.ParentApprovedID == nil || *hierarchy.ParentApprovedID == 0) {
-        return nil, status.Errorf(codes.FailedPrecondition, 
-            "cannot approve: parent article (ID %d) must be approved first", *hierarchy.ParentID)
-    }
+	// If the node has a parent, but that parent has no approved version, we block the request.
+	if hierarchy.ParentID != nil && (hierarchy.ParentApprovedID == nil || *hierarchy.ParentApprovedID == 0) {
+		return nil, status.Errorf(codes.FailedPrecondition,
+			"cannot approve: parent article (ID %d) must be approved first", *hierarchy.ParentID)
+	}
 
-	node_id, err := s.ApproveVersionInternal(ctx, tx, req.VersionId)
+	node_id, err := s.approveVersionInternal(ctx, tx, req.VersionId)
 	if err != nil {
 		return nil, err
 	}
@@ -228,25 +259,44 @@ func (s *wikiServer) ApproveVersion(ctx context.Context, req *pb.ModerateVersion
 	return row.ToProto(), nil
 }
 
-// func (s *wikiServer) DenyVersion(ctx context.Context, req *pb.ModerateVersionRequest) (*pb.Version, error) {
-// 	tx, err := s.db.BeginTxx(ctx, nil)
-// 	if err != nil {
-// 		return nil, status.Errorf(codes.Internal, "db error: %v", err)
-// 	}
-// 	node_id, err := s.ApproveVersionInternal(ctx, tx, req.VersionId)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	row, err := s.fetchNodeInternal(ctx, node_id)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return row.ToProto(), nil
-// }
+func (s *wikiServer) RejectVersion(ctx context.Context, req *pb.ModerateVersionRequest) (*pb.Node, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "db error: %v", err)
+	}
+	defer tx.Rollback()
 
-// func (s *wikiServer) GetHistory(ctx context.Context, req *pb.GetHistoryRequest) (*pb.GetHistoryResponse, error) {
-//
-// }
+	node_id, err := s.rejectVersionInternal(ctx, tx, req.VersionId)
+	if err != nil {
+		return nil, err
+	}
+
+	row, err := s.fetchNodeInternal(ctx, tx, node_id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to approve version: %v", err)
+	}
+
+	return row.ToProto(), nil
+}
+
+func (s *wikiServer) GetHistory(ctx context.Context, req *pb.GetHistoryRequest) (*pb.GetHistoryResponse, error) {
+	rows, err := s.fetchVersionHistoryInternal(ctx, s.db, req.NodeId)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &pb.GetHistoryResponse{}
+
+	for _, r := range rows {
+		res.Versions = append(res.Versions, r.ToProto())
+	}
+
+	return res, nil
+}
 
 func (s *wikiServer) GetPending(ctx context.Context, req *pb.GetPendingRequest) (*pb.PendingVersionsResponse, error) {
 	rows, err := s.fetchPendingVersionsInternal(ctx, s.db, &req.NodeId)
@@ -281,7 +331,7 @@ func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) 
 	}
 	defer tx.Rollback()
 
-	if err := s.DeleteNodeInternal(ctx, tx, req.NodeId); err != nil {
+	if err := s.deleteNodeInternal(ctx, tx, req.NodeId); err != nil {
 		return nil, err
 	}
 
@@ -292,8 +342,8 @@ func (s *wikiServer) DeleteNode(ctx context.Context, req *pb.DeleteNodeRequest) 
 	successMessage := fmt.Sprintf("Node %d and all its versions have been successfully deleted.", req.NodeId)
 
 	return &pb.DeleteResponse{
-        Message: successMessage,
-    }, nil
+		Message: successMessage,
+	}, nil
 }
 
 // AssignParent handles the gRPC request to change a node's parent
@@ -304,7 +354,7 @@ func (s *wikiServer) AssignParent(ctx context.Context, req *pb.AssignParentReque
 	}
 	defer tx.Rollback()
 
-	if err := s.AssignParentInternal(ctx, tx, req.Child, &req.NewParent); err != nil {
+	if err := s.assignParentInternal(ctx, tx, req.Child, &req.NewParent); err != nil {
 		return nil, err
 	}
 
@@ -321,15 +371,15 @@ func (s *wikiServer) AssignParent(ctx context.Context, req *pb.AssignParentReque
 }
 
 func (s *wikiServer) SearchArticles(ctx context.Context, req *pb.SearchRequest) (*pb.SearchResponse, error) {
-    rows, err := s.SearchArticlesInternal(ctx, s.db, req.Query)
-    if err != nil {
-        return nil, status.Errorf(codes.Internal, "search failed: %v", err)
-    }
+	rows, err := s.searchArticlesInternal(ctx, s.db, req.Query)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "search failed: %v", err)
+	}
 
-    res := &pb.SearchResponse{}
-    for _, r := range rows {
-        res.Results = append(res.Results, r.ToProtoBreadcrumb())
-    }
+	res := &pb.SearchResponse{}
+	for _, r := range rows {
+		res.Results = append(res.Results, r.ToProtoBreadcrumb())
+	}
 
-    return res, nil
+	return res, nil
 }

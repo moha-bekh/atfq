@@ -162,6 +162,6 @@ service WikiService {
 
     // Moderation
     rpc ApproveVersion(ModerateVersionRequest) returns (Node);
-    rpc DenyVersion(ModerateVersionRequest) returns (Version);
+    rpc RejectVersion(ModerateVersionRequest) returns (Node);
     rpc SearchArticles(SearchRequest) returns (SearchResponse);
 }

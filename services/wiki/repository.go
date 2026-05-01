@@ -22,6 +22,20 @@ type Ext interface {
 	QueryRowxContext(ctx context.Context, query string, args ...interface{}) *sqlx.Row
 }
 
+func (s *wikiServer) nodeExists(ctx context.Context, ext Ext, id int32) (bool, error) {
+	var exists bool
+	// Postgres returns a boolean directly from EXISTS
+	query := `SELECT EXISTS(SELECT 1 FROM nodes WHERE id = $1)`
+
+	err := ext.GetContext(ctx, &exists, query, id)
+	if err != nil {
+		// We only get an error here if the DB is down or the query is broken
+		return false, status.Errorf(codes.Internal, "database error: %v", err)
+	}
+
+	return exists, nil
+}
+
 func (s *wikiServer) fetchNodeInternal(ctx context.Context, ext Ext, id int32) (*NodeRow, error) {
 	var row NodeRow
 	query := `
@@ -203,7 +217,7 @@ func (s *wikiServer) fetchChildrenInternal(ctx context.Context, ext Ext, id any,
 	return children, nil
 }
 
-func (s *wikiServer) UpdateNodeInternal(ctx context.Context, ext Ext, req *pb.UpdateNodeRequest) (*VersionRow, error) {
+func (s *wikiServer) updateNodeInternal(ctx context.Context, ext Ext, req *pb.UpdateNodeRequest) (*VersionRow, error) {
 	var title, content *string
 	if req.Title != "" {
 		title = &req.Title
@@ -258,7 +272,7 @@ func (s *wikiServer) UpdateNodeInternal(ctx context.Context, ext Ext, req *pb.Up
 	return &res, nil
 }
 
-func (s *wikiServer) ApproveVersionInternal(ctx context.Context, ext Ext, versionID int32) (int32, error) {
+func (s *wikiServer) approveVersionInternal(ctx context.Context, ext Ext, versionID int32) (int32, error) {
 	query := `
 	WITH approved_v AS (
 		UPDATE node_versions
@@ -286,9 +300,32 @@ func (s *wikiServer) ApproveVersionInternal(ctx context.Context, ext Ext, versio
 	return nodeID, nil
 }
 
+// denyVersionInternal
+func (s *wikiServer) rejectVersionInternal(ctx context.Context, ext Ext, versionID int32) (int32, error) {
+	query := `
+	UPDATE node_versions
+	SET status = 'rejected',
+		activated_at = NOW()
+	WHERE id = $1
+	RETURNING node_id
+	`
+
+	var nodeID int32
+
+	err := ext.QueryRowxContext(ctx, query, versionID).Scan(&nodeID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, status.Error(codes.NotFound, "node not found")
+		}
+		return 0, status.Errorf(codes.Internal, "update failed: %v", err)
+	}
+
+	return nodeID, nil
+}
+
 func (s *wikiServer) fetchPendingVersionsInternal(ctx context.Context, ext Ext, nodeID *int32) ([]VersionRow, error) {
 	query := `
-	SELECT 
+	SELECT
 		v.id, v.node_id, v.title, v.content, v.created_at, v.created_by, v.status, v.activated_at,
 		q.metadata
 	FROM node_versions v
@@ -307,8 +344,8 @@ func (s *wikiServer) fetchPendingVersionsInternal(ctx context.Context, ext Ext, 
 	return versions, err
 }
 
-// func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) (*NodeRow, error) {
-func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) error {
+// func (s *wikiServer) deleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) (*NodeRow, error) {
+func (s *wikiServer) deleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) error {
 	// 1. Fetch node before deletion to return it
 
 	// row, err := s.fetchPendingNodeInternal(ctx, ext, nodeID)
@@ -347,7 +384,7 @@ func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int
 	return nil
 }
 
-func (s *wikiServer) AssignParentInternal(ctx context.Context, ext Ext, nodeID int32, newParentID *int32) error {
+func (s *wikiServer) assignParentInternal(ctx context.Context, ext Ext, nodeID int32, newParentID *int32) error {
 	// 1. Basic check: a node cannot be its own parent
 	if newParentID != nil && *newParentID == nodeID {
 		return status.Error(codes.InvalidArgument, "a node cannot be its own parent")
@@ -394,10 +431,10 @@ func (s *wikiServer) AssignParentInternal(ctx context.Context, ext Ext, nodeID i
 	return nil
 }
 
-func (s *wikiServer) SearchArticlesInternal(ctx context.Context, ext Ext, query string) ([]NodeRow, error) {
-    var rows []NodeRow
+func (s *wikiServer) searchArticlesInternal(ctx context.Context, ext Ext, query string) ([]NodeRow, error) {
+	var rows []NodeRow
 
-    sqlQuery := `
+	sqlQuery := `
         SELECT n.id, v.title
         FROM nodes n
         JOIN node_versions v ON n.current_version_id = v.id
@@ -406,6 +443,24 @@ func (s *wikiServer) SearchArticlesInternal(ctx context.Context, ext Ext, query 
         ORDER BY v.title ASC
         LIMIT 15;`
 
-    err := ext.SelectContext(ctx, &rows, sqlQuery, "%"+query+"%")
-    return rows, err
+	err := ext.SelectContext(ctx, &rows, sqlQuery, "%"+query+"%")
+	return rows, err
+}
+
+func (s *wikiServer) fetchVersionHistoryInternal(ctx context.Context, ext Ext, nodeID int32) ([]VersionRow, error) {
+	query := `
+	SELECT
+		v.id, v.node_id, v.title, v.content, v.created_at, v.created_by, v.status, v.activated_at,
+		q.metadata
+	FROM node_versions v
+	LEFT JOIN questions q ON v.id = q.node_version_id
+	WHERE v.status = 'approved'
+	AND v.node_id = $1
+	ORDER BY v.created_at DESC
+	`
+
+	var rows []VersionRow
+
+	ext.SelectContext(ctx, &rows, query, nodeID)
+	return rows, nil
 }
