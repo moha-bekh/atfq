@@ -104,7 +104,7 @@ func (s *wikiServer) CreateNode(ctx context.Context, req *pb.CreateNodeRequest) 
 		if err != nil {
 			return nil, err
 		}
-		if parent.ToProto().Type != pb.NodeType_TYPE_ARTICLE {
+		if parent.Type != "article" {
 			return nil, status.Error(codes.InvalidArgument, "specified parent has to be an article")
 		}
 	}
