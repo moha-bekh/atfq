@@ -39,6 +39,7 @@ pub struct TokenClaims {
     pub typ: String,
 }
 
+#[derive(Clone)]
 pub struct AuthLayer {
     secret: String,
 }

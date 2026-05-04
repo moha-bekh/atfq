@@ -11,9 +11,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = std::env::var("SERVER_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into());
 
     let auth_client = crate::grpc::auth::connect().await?;
+    let user_client = crate::grpc::user::connect().await?;
 
     let state = Arc::new(AppState {
         auth_client,
+        user_client,
     });
 
     let app = api::create_router(state);

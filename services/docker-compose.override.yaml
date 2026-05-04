@@ -19,6 +19,9 @@ services:
       - type: bind
         source: ./auth/proto/auth
         target: /app/proto/auth
+      - type: bind
+        source: ./user/proto/user
+        target: /app/proto/user
       # Cargo cache
       - type: volume
         source: cargo-cache
