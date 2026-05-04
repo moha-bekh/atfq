@@ -262,13 +262,13 @@ func (s *wikiServer) ApproveVersion(ctx context.Context, req *pb.ModerateVersion
 func (s *wikiServer) RejectVersion(ctx context.Context, req *pb.ModerateVersionRequest) (*pb.Node, error) {
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "db error: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to fetch pending versions: %v", err)
 	}
 	defer tx.Rollback()
 
 	node_id, err := s.rejectVersionInternal(ctx, tx, req.VersionId)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to fetch all pending versions: %v", err)
 	}
 
 	row, err := s.fetchNodeInternal(ctx, tx, node_id)

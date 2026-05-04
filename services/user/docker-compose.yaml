@@ -1,3 +1,7 @@
+volumes:
+  user-postgres_data:
+  user-minio_data:
+
 services:
   user:
     build:
