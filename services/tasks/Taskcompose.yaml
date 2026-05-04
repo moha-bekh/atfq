@@ -2,7 +2,7 @@ version: "3"
 
 tasks:
   up:
-    desc: "Run a service in development mode"
+    desc: "Run a service in development mode (Usage: task up | task up -- service_name)"
     cmds:
       - docker compose up {{.CLI_ARGS}}
 

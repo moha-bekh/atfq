@@ -6,5 +6,6 @@ CREATE TABLE questions (
   CONSTRAINT fk_questions_to_nodes
         FOREIGN KEY (node_version_id)
         REFERENCES node_versions(id)
+        ON DELETE CASCADE
 
 );

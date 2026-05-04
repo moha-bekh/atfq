@@ -30,7 +30,8 @@ const (
 	WikiService_GetPending_FullMethodName      = "/wiki.WikiService/GetPending"
 	WikiService_GetAllPending_FullMethodName   = "/wiki.WikiService/GetAllPending"
 	WikiService_ApproveVersion_FullMethodName  = "/wiki.WikiService/ApproveVersion"
-	WikiService_DenyVersion_FullMethodName     = "/wiki.WikiService/DenyVersion"
+	WikiService_RejectVersion_FullMethodName   = "/wiki.WikiService/RejectVersion"
+	WikiService_SearchArticles_FullMethodName  = "/wiki.WikiService/SearchArticles"
 )
 
 // WikiServiceClient is the client API for WikiService service.
@@ -43,7 +44,7 @@ type WikiServiceClient interface {
 	CreateNode(ctx context.Context, in *CreateNodeRequest, opts ...grpc.CallOption) (*Node, error)
 	GetArticle(ctx context.Context, in *GetArticleRequest, opts ...grpc.CallOption) (*Article, error)
 	UpdateNode(ctx context.Context, in *UpdateNodeRequest, opts ...grpc.CallOption) (*Version, error)
-	DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*Node, error)
+	DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
 	AssignParent(ctx context.Context, in *AssignParentRequest, opts ...grpc.CallOption) (*Node, error)
 	// History & Versioning
 	GetHistory(ctx context.Context, in *GetHistoryRequest, opts ...grpc.CallOption) (*GetHistoryResponse, error)
@@ -51,7 +52,8 @@ type WikiServiceClient interface {
 	GetAllPending(ctx context.Context, in *GetAllPendingRequest, opts ...grpc.CallOption) (*PendingVersionsResponse, error)
 	// Moderation
 	ApproveVersion(ctx context.Context, in *ModerateVersionRequest, opts ...grpc.CallOption) (*Node, error)
-	DenyVersion(ctx context.Context, in *ModerateVersionRequest, opts ...grpc.CallOption) (*Version, error)
+	RejectVersion(ctx context.Context, in *ModerateVersionRequest, opts ...grpc.CallOption) (*Node, error)
+	SearchArticles(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
 }
 
 type wikiServiceClient struct {
@@ -112,9 +114,9 @@ func (c *wikiServiceClient) UpdateNode(ctx context.Context, in *UpdateNodeReques
 	return out, nil
 }
 
-func (c *wikiServiceClient) DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*Node, error) {
+func (c *wikiServiceClient) DeleteNode(ctx context.Context, in *DeleteNodeRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Node)
+	out := new(DeleteResponse)
 	err := c.cc.Invoke(ctx, WikiService_DeleteNode_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -172,10 +174,20 @@ func (c *wikiServiceClient) ApproveVersion(ctx context.Context, in *ModerateVers
 	return out, nil
 }
 
-func (c *wikiServiceClient) DenyVersion(ctx context.Context, in *ModerateVersionRequest, opts ...grpc.CallOption) (*Version, error) {
+func (c *wikiServiceClient) RejectVersion(ctx context.Context, in *ModerateVersionRequest, opts ...grpc.CallOption) (*Node, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Version)
-	err := c.cc.Invoke(ctx, WikiService_DenyVersion_FullMethodName, in, out, cOpts...)
+	out := new(Node)
+	err := c.cc.Invoke(ctx, WikiService_RejectVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *wikiServiceClient) SearchArticles(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchResponse)
+	err := c.cc.Invoke(ctx, WikiService_SearchArticles_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +204,7 @@ type WikiServiceServer interface {
 	CreateNode(context.Context, *CreateNodeRequest) (*Node, error)
 	GetArticle(context.Context, *GetArticleRequest) (*Article, error)
 	UpdateNode(context.Context, *UpdateNodeRequest) (*Version, error)
-	DeleteNode(context.Context, *DeleteNodeRequest) (*Node, error)
+	DeleteNode(context.Context, *DeleteNodeRequest) (*DeleteResponse, error)
 	AssignParent(context.Context, *AssignParentRequest) (*Node, error)
 	// History & Versioning
 	GetHistory(context.Context, *GetHistoryRequest) (*GetHistoryResponse, error)
@@ -200,7 +212,8 @@ type WikiServiceServer interface {
 	GetAllPending(context.Context, *GetAllPendingRequest) (*PendingVersionsResponse, error)
 	// Moderation
 	ApproveVersion(context.Context, *ModerateVersionRequest) (*Node, error)
-	DenyVersion(context.Context, *ModerateVersionRequest) (*Version, error)
+	RejectVersion(context.Context, *ModerateVersionRequest) (*Node, error)
+	SearchArticles(context.Context, *SearchRequest) (*SearchResponse, error)
 	mustEmbedUnimplementedWikiServiceServer()
 }
 
@@ -226,7 +239,7 @@ func (UnimplementedWikiServiceServer) GetArticle(context.Context, *GetArticleReq
 func (UnimplementedWikiServiceServer) UpdateNode(context.Context, *UpdateNodeRequest) (*Version, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateNode not implemented")
 }
-func (UnimplementedWikiServiceServer) DeleteNode(context.Context, *DeleteNodeRequest) (*Node, error) {
+func (UnimplementedWikiServiceServer) DeleteNode(context.Context, *DeleteNodeRequest) (*DeleteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteNode not implemented")
 }
 func (UnimplementedWikiServiceServer) AssignParent(context.Context, *AssignParentRequest) (*Node, error) {
@@ -244,8 +257,11 @@ func (UnimplementedWikiServiceServer) GetAllPending(context.Context, *GetAllPend
 func (UnimplementedWikiServiceServer) ApproveVersion(context.Context, *ModerateVersionRequest) (*Node, error) {
 	return nil, status.Error(codes.Unimplemented, "method ApproveVersion not implemented")
 }
-func (UnimplementedWikiServiceServer) DenyVersion(context.Context, *ModerateVersionRequest) (*Version, error) {
-	return nil, status.Error(codes.Unimplemented, "method DenyVersion not implemented")
+func (UnimplementedWikiServiceServer) RejectVersion(context.Context, *ModerateVersionRequest) (*Node, error) {
+	return nil, status.Error(codes.Unimplemented, "method RejectVersion not implemented")
+}
+func (UnimplementedWikiServiceServer) SearchArticles(context.Context, *SearchRequest) (*SearchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchArticles not implemented")
 }
 func (UnimplementedWikiServiceServer) mustEmbedUnimplementedWikiServiceServer() {}
 func (UnimplementedWikiServiceServer) testEmbeddedByValue()                     {}
@@ -466,20 +482,38 @@ func _WikiService_ApproveVersion_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _WikiService_DenyVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _WikiService_RejectVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ModerateVersionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WikiServiceServer).DenyVersion(ctx, in)
+		return srv.(WikiServiceServer).RejectVersion(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: WikiService_DenyVersion_FullMethodName,
+		FullMethod: WikiService_RejectVersion_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WikiServiceServer).DenyVersion(ctx, req.(*ModerateVersionRequest))
+		return srv.(WikiServiceServer).RejectVersion(ctx, req.(*ModerateVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _WikiService_SearchArticles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WikiServiceServer).SearchArticles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WikiService_SearchArticles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WikiServiceServer).SearchArticles(ctx, req.(*SearchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -536,8 +570,12 @@ var WikiService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _WikiService_ApproveVersion_Handler,
 		},
 		{
-			MethodName: "DenyVersion",
-			Handler:    _WikiService_DenyVersion_Handler,
+			MethodName: "RejectVersion",
+			Handler:    _WikiService_RejectVersion_Handler,
+		},
+		{
+			MethodName: "SearchArticles",
+			Handler:    _WikiService_SearchArticles_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

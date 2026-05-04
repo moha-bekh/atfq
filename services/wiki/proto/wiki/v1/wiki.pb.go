@@ -1116,6 +1116,138 @@ func (x *AssignParentRequest) GetChild() int32 {
 	return 0
 }
 
+type SearchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchRequest) Reset() {
+	*x = SearchRequest{}
+	mi := &file_proto_wiki_v1_wiki_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchRequest) ProtoMessage() {}
+
+func (x *SearchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_wiki_v1_wiki_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
+func (*SearchRequest) Descriptor() ([]byte, []int) {
+	return file_proto_wiki_v1_wiki_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SearchRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+type SearchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Results       []*NodeBreadcrumb      `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchResponse) Reset() {
+	*x = SearchResponse{}
+	mi := &file_proto_wiki_v1_wiki_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchResponse) ProtoMessage() {}
+
+func (x *SearchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_wiki_v1_wiki_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
+func (*SearchResponse) Descriptor() ([]byte, []int) {
+	return file_proto_wiki_v1_wiki_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SearchResponse) GetResults() []*NodeBreadcrumb {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+type DeleteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteResponse) Reset() {
+	*x = DeleteResponse{}
+	mi := &file_proto_wiki_v1_wiki_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteResponse) ProtoMessage() {}
+
+func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_wiki_v1_wiki_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteResponse.ProtoReflect.Descriptor instead.
+func (*DeleteResponse) Descriptor() ([]byte, []int) {
+	return file_proto_wiki_v1_wiki_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DeleteResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_proto_wiki_v1_wiki_proto protoreflect.FileDescriptor
 
 const file_proto_wiki_v1_wiki_proto_rawDesc = "" +
@@ -1204,12 +1336,18 @@ const file_proto_wiki_v1_wiki_proto_rawDesc = "" +
 	"\x13AssignParentRequest\x12\x1d\n" +
 	"\n" +
 	"new_parent\x18\x01 \x01(\x05R\tnewParent\x12\x14\n" +
-	"\x05child\x18\x02 \x01(\x05R\x05child*V\n" +
+	"\x05child\x18\x02 \x01(\x05R\x05child\"%\n" +
+	"\rSearchRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\"@\n" +
+	"\x0eSearchResponse\x12.\n" +
+	"\aresults\x18\x01 \x03(\v2\x14.wiki.NodeBreadcrumbR\aresults\"*\n" +
+	"\x0eDeleteResponse\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage*V\n" +
 	"\bNodeType\x12\x14\n" +
 	"\x10TYPE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fTYPE_ARTICLE\x10\x01\x12\x0f\n" +
 	"\vTYPE_NOTION\x10\x02\x12\x11\n" +
-	"\rTYPE_QUESTION\x10\x032\xed\x05\n" +
+	"\rTYPE_QUESTION\x10\x032\xb3\x06\n" +
 	"\vWikiService\x12N\n" +
 	"\x0fGetRootArticles\x12\x1c.wiki.GetRootArticlesRequest\x1a\x1d.wiki.GetRootArticlesResponse\x12:\n" +
 	"\rCreateArticle\x12\x1a.wiki.CreateArticleRequest\x1a\r.wiki.Article\x121\n" +
@@ -1219,10 +1357,9 @@ const file_proto_wiki_v1_wiki_proto_rawDesc = "" +
 	"\n" +
 	"GetArticle\x12\x17.wiki.GetArticleRequest\x1a\r.wiki.Article\x124\n" +
 	"\n" +
-	"UpdateNode\x12\x17.wiki.UpdateNodeRequest\x1a\r.wiki.Version\x121\n" +
+	"UpdateNode\x12\x17.wiki.UpdateNodeRequest\x1a\r.wiki.Version\x12;\n" +
 	"\n" +
-	"DeleteNode\x12\x17.wiki.DeleteNodeRequest\x1a\n" +
-	".wiki.Node\x125\n" +
+	"DeleteNode\x12\x17.wiki.DeleteNodeRequest\x1a\x14.wiki.DeleteResponse\x125\n" +
 	"\fAssignParent\x12\x19.wiki.AssignParentRequest\x1a\n" +
 	".wiki.Node\x12?\n" +
 	"\n" +
@@ -1231,8 +1368,10 @@ const file_proto_wiki_v1_wiki_proto_rawDesc = "" +
 	"GetPending\x12\x17.wiki.GetPendingRequest\x1a\x1d.wiki.PendingVersionsResponse\x12J\n" +
 	"\rGetAllPending\x12\x1a.wiki.GetAllPendingRequest\x1a\x1d.wiki.PendingVersionsResponse\x12:\n" +
 	"\x0eApproveVersion\x12\x1c.wiki.ModerateVersionRequest\x1a\n" +
-	".wiki.Node\x12:\n" +
-	"\vDenyVersion\x12\x1c.wiki.ModerateVersionRequest\x1a\r.wiki.VersionB\x14Z\x12wiki/proto/wiki/v1b\x06proto3"
+	".wiki.Node\x129\n" +
+	"\rRejectVersion\x12\x1c.wiki.ModerateVersionRequest\x1a\n" +
+	".wiki.Node\x12;\n" +
+	"\x0eSearchArticles\x12\x13.wiki.SearchRequest\x1a\x14.wiki.SearchResponseB\x14Z\x12wiki/proto/wiki/v1b\x06proto3"
 
 var (
 	file_proto_wiki_v1_wiki_proto_rawDescOnce sync.Once
@@ -1247,7 +1386,7 @@ func file_proto_wiki_v1_wiki_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_wiki_v1_wiki_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_wiki_v1_wiki_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_proto_wiki_v1_wiki_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_proto_wiki_v1_wiki_proto_goTypes = []any{
 	(NodeType)(0),                   // 0: wiki.NodeType
 	(*Node)(nil),                    // 1: wiki.Node
@@ -1268,58 +1407,64 @@ var file_proto_wiki_v1_wiki_proto_goTypes = []any{
 	(*GetRootArticlesRequest)(nil),  // 16: wiki.GetRootArticlesRequest
 	(*GetRootArticlesResponse)(nil), // 17: wiki.GetRootArticlesResponse
 	(*AssignParentRequest)(nil),     // 18: wiki.AssignParentRequest
-	(*timestamppb.Timestamp)(nil),   // 19: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),         // 20: google.protobuf.Struct
+	(*SearchRequest)(nil),           // 19: wiki.SearchRequest
+	(*SearchResponse)(nil),          // 20: wiki.SearchResponse
+	(*DeleteResponse)(nil),          // 21: wiki.DeleteResponse
+	(*timestamppb.Timestamp)(nil),   // 22: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),         // 23: google.protobuf.Struct
 }
 var file_proto_wiki_v1_wiki_proto_depIdxs = []int32{
 	0,  // 0: wiki.Node.type:type_name -> wiki.NodeType
-	19, // 1: wiki.Node.created_at:type_name -> google.protobuf.Timestamp
-	20, // 2: wiki.Node.metadata:type_name -> google.protobuf.Struct
-	19, // 3: wiki.Version.created_at:type_name -> google.protobuf.Timestamp
-	19, // 4: wiki.Version.activated_at:type_name -> google.protobuf.Timestamp
-	20, // 5: wiki.Version.metadata:type_name -> google.protobuf.Struct
+	22, // 1: wiki.Node.created_at:type_name -> google.protobuf.Timestamp
+	23, // 2: wiki.Node.metadata:type_name -> google.protobuf.Struct
+	22, // 3: wiki.Version.created_at:type_name -> google.protobuf.Timestamp
+	22, // 4: wiki.Version.activated_at:type_name -> google.protobuf.Timestamp
+	23, // 5: wiki.Version.metadata:type_name -> google.protobuf.Struct
 	1,  // 6: wiki.Article.article_node:type_name -> wiki.Node
 	3,  // 7: wiki.Article.sub_articles:type_name -> wiki.NodeBreadcrumb
 	1,  // 8: wiki.Article.notions:type_name -> wiki.Node
 	1,  // 9: wiki.Article.questions:type_name -> wiki.Node
 	3,  // 10: wiki.Article.lineage:type_name -> wiki.NodeBreadcrumb
 	0,  // 11: wiki.CreateNodeRequest.type:type_name -> wiki.NodeType
-	20, // 12: wiki.CreateNodeRequest.metadata:type_name -> google.protobuf.Struct
+	23, // 12: wiki.CreateNodeRequest.metadata:type_name -> google.protobuf.Struct
 	5,  // 13: wiki.CreateArticleRequest.article_node:type_name -> wiki.CreateNodeRequest
 	5,  // 14: wiki.CreateArticleRequest.children:type_name -> wiki.CreateNodeRequest
-	20, // 15: wiki.UpdateNodeRequest.metadata:type_name -> google.protobuf.Struct
+	23, // 15: wiki.UpdateNodeRequest.metadata:type_name -> google.protobuf.Struct
 	2,  // 16: wiki.GetHistoryResponse.versions:type_name -> wiki.Version
 	2,  // 17: wiki.PendingVersionsResponse.versions:type_name -> wiki.Version
 	3,  // 18: wiki.GetRootArticlesResponse.articles:type_name -> wiki.NodeBreadcrumb
-	16, // 19: wiki.WikiService.GetRootArticles:input_type -> wiki.GetRootArticlesRequest
-	6,  // 20: wiki.WikiService.CreateArticle:input_type -> wiki.CreateArticleRequest
-	5,  // 21: wiki.WikiService.CreateNode:input_type -> wiki.CreateNodeRequest
-	8,  // 22: wiki.WikiService.GetArticle:input_type -> wiki.GetArticleRequest
-	7,  // 23: wiki.WikiService.UpdateNode:input_type -> wiki.UpdateNodeRequest
-	15, // 24: wiki.WikiService.DeleteNode:input_type -> wiki.DeleteNodeRequest
-	18, // 25: wiki.WikiService.AssignParent:input_type -> wiki.AssignParentRequest
-	9,  // 26: wiki.WikiService.GetHistory:input_type -> wiki.GetHistoryRequest
-	11, // 27: wiki.WikiService.GetPending:input_type -> wiki.GetPendingRequest
-	12, // 28: wiki.WikiService.GetAllPending:input_type -> wiki.GetAllPendingRequest
-	14, // 29: wiki.WikiService.ApproveVersion:input_type -> wiki.ModerateVersionRequest
-	14, // 30: wiki.WikiService.DenyVersion:input_type -> wiki.ModerateVersionRequest
-	17, // 31: wiki.WikiService.GetRootArticles:output_type -> wiki.GetRootArticlesResponse
-	4,  // 32: wiki.WikiService.CreateArticle:output_type -> wiki.Article
-	1,  // 33: wiki.WikiService.CreateNode:output_type -> wiki.Node
-	4,  // 34: wiki.WikiService.GetArticle:output_type -> wiki.Article
-	2,  // 35: wiki.WikiService.UpdateNode:output_type -> wiki.Version
-	1,  // 36: wiki.WikiService.DeleteNode:output_type -> wiki.Node
-	1,  // 37: wiki.WikiService.AssignParent:output_type -> wiki.Node
-	10, // 38: wiki.WikiService.GetHistory:output_type -> wiki.GetHistoryResponse
-	13, // 39: wiki.WikiService.GetPending:output_type -> wiki.PendingVersionsResponse
-	13, // 40: wiki.WikiService.GetAllPending:output_type -> wiki.PendingVersionsResponse
-	1,  // 41: wiki.WikiService.ApproveVersion:output_type -> wiki.Node
-	2,  // 42: wiki.WikiService.DenyVersion:output_type -> wiki.Version
-	31, // [31:43] is the sub-list for method output_type
-	19, // [19:31] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	3,  // 19: wiki.SearchResponse.results:type_name -> wiki.NodeBreadcrumb
+	16, // 20: wiki.WikiService.GetRootArticles:input_type -> wiki.GetRootArticlesRequest
+	6,  // 21: wiki.WikiService.CreateArticle:input_type -> wiki.CreateArticleRequest
+	5,  // 22: wiki.WikiService.CreateNode:input_type -> wiki.CreateNodeRequest
+	8,  // 23: wiki.WikiService.GetArticle:input_type -> wiki.GetArticleRequest
+	7,  // 24: wiki.WikiService.UpdateNode:input_type -> wiki.UpdateNodeRequest
+	15, // 25: wiki.WikiService.DeleteNode:input_type -> wiki.DeleteNodeRequest
+	18, // 26: wiki.WikiService.AssignParent:input_type -> wiki.AssignParentRequest
+	9,  // 27: wiki.WikiService.GetHistory:input_type -> wiki.GetHistoryRequest
+	11, // 28: wiki.WikiService.GetPending:input_type -> wiki.GetPendingRequest
+	12, // 29: wiki.WikiService.GetAllPending:input_type -> wiki.GetAllPendingRequest
+	14, // 30: wiki.WikiService.ApproveVersion:input_type -> wiki.ModerateVersionRequest
+	14, // 31: wiki.WikiService.RejectVersion:input_type -> wiki.ModerateVersionRequest
+	19, // 32: wiki.WikiService.SearchArticles:input_type -> wiki.SearchRequest
+	17, // 33: wiki.WikiService.GetRootArticles:output_type -> wiki.GetRootArticlesResponse
+	4,  // 34: wiki.WikiService.CreateArticle:output_type -> wiki.Article
+	1,  // 35: wiki.WikiService.CreateNode:output_type -> wiki.Node
+	4,  // 36: wiki.WikiService.GetArticle:output_type -> wiki.Article
+	2,  // 37: wiki.WikiService.UpdateNode:output_type -> wiki.Version
+	21, // 38: wiki.WikiService.DeleteNode:output_type -> wiki.DeleteResponse
+	1,  // 39: wiki.WikiService.AssignParent:output_type -> wiki.Node
+	10, // 40: wiki.WikiService.GetHistory:output_type -> wiki.GetHistoryResponse
+	13, // 41: wiki.WikiService.GetPending:output_type -> wiki.PendingVersionsResponse
+	13, // 42: wiki.WikiService.GetAllPending:output_type -> wiki.PendingVersionsResponse
+	1,  // 43: wiki.WikiService.ApproveVersion:output_type -> wiki.Node
+	1,  // 44: wiki.WikiService.RejectVersion:output_type -> wiki.Node
+	20, // 45: wiki.WikiService.SearchArticles:output_type -> wiki.SearchResponse
+	33, // [33:46] is the sub-list for method output_type
+	20, // [20:33] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_proto_wiki_v1_wiki_proto_init() }
@@ -1336,7 +1481,7 @@ func file_proto_wiki_v1_wiki_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_wiki_v1_wiki_proto_rawDesc), len(file_proto_wiki_v1_wiki_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   18,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
