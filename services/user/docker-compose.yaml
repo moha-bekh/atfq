@@ -13,6 +13,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://atfq:atfq@db-user:5432/atfq_db
       - SERVER_ADDR=0.0.0.0:8080
+      - JWT_SECRET=jwt_secret
       - S3_ENDPOINT=http://minio-user:9000
       - S3_PUBLIC_URL=http://localhost:9000
       - S3_BUCKET=profiles
@@ -43,7 +44,7 @@ services:
         source: user-postgres_data
         target: /var/lib/postgresql/data
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     command: >
       sh -c "exec docker-entrypoint.sh postgres"
 
@@ -83,7 +84,3 @@ services:
       echo 'Buckets created successfully';
       exit 0;
       "
-
-volumes:
-  user-postgres_data:
-  user-minio_data:

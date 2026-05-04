@@ -7,6 +7,7 @@ import "google/protobuf/timestamp.proto";
 
 service UserService {
     rpc SayHello(HelloRequest) returns (HelloResponse);
+
     rpc CreateProfile(CreateProfileRequest) returns (Profile);
     rpc DeleteProfile(DeleteProfileRequest) returns (google.protobuf.Empty);
     rpc GetProfile(GetProfileRequest) returns (Profile);
