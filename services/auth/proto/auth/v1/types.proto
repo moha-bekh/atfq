@@ -74,6 +74,15 @@ message RefreshRequest {
   string refresh_token = 1;
 }
 
+message GetUserRequest {
+  string access_token = 1;
+}
+
+message DeleteUserRequest {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
 message UserIdMessage {
   string id = 1;
 }

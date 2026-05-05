@@ -1,15 +1,19 @@
 use tonic::{Request, Response, Status};
 use crate::api::grpc::handler::{AuthHandler, map_domain_error};
-use crate::auth_proto::{UserIdMessage, User as ProtoUser};
-use std::str::FromStr;
-use uuid::Uuid;
+use crate::auth_proto::{GetUserRequest, User as ProtoUser};
 
 impl AuthHandler {
-    pub async fn get_user_by_id_handler(&self, request: Request<UserIdMessage>) -> Result<Response<ProtoUser>, Status> {
+    pub async fn get_user_handler(&self, request: Request<GetUserRequest>) -> Result<Response<ProtoUser>, Status> {
         let req = request.into_inner();
         
-        let id = Uuid::from_str(&req.id)
-            .map_err(|_| Status::invalid_argument("Invalid user ID format"))?;
+        let claims = self.token_service.decode_token(&req.access_token)
+            .map_err(|_| Status::unauthenticated("Invalid or expired token"))?;
+
+        if claims.typ != "access" {
+            return Err(Status::unauthenticated("Invalid token type"));
+        }
+
+        let id = claims.user_id;
 
         let user = self.get_user_uc
             .execute(id)

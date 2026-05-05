@@ -14,8 +14,8 @@ service AuthService {
   rpc VerifyMFA(VerifyMFARequest) returns (AuthSuccess);
   rpc RefreshToken(RefreshRequest) returns (AuthResponse);
 
-  rpc GetUserById(UserIdMessage) returns (User);
-  rpc DeleteUserById(UserIdMessage) returns (google.protobuf.Empty);
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
 
   rpc GetOAuthUrl(OAuthUrlRequest) returns (OAuthUrlResponse);
   rpc OAuthCallback(OAuthCallbackRequest) returns (AuthResponse);

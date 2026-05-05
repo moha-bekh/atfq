@@ -71,9 +71,18 @@ tasks:
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/RefreshToken
 
   get-user:
-    desc: "Get user by ID (Usage: task api:get-user ID=...)"
+    desc: "Get user by access token (Usage: task api:get-user ACCESS_TOKEN=...)"
     cmds:
       - |
         grpcurl -plaintext -d '{
-          "id": "{{.ID}}"
-        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/GetUserById
+          "access_token": "{{.ACCESS_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/GetUser
+
+  delete-user:
+    desc: "Delete user account (Usage: task api:delete-user ACCESS_TOKEN=... REFRESH_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "refresh_token": "{{.REFRESH_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/DeleteUser

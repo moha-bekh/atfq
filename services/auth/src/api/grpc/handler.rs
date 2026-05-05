@@ -26,7 +26,7 @@ use crate::domain::error::DomainError;
 use crate::domain::ports::cache_service::CacheService;
 use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
-use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, UserIdMessage, User};
+use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, User};
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
@@ -104,12 +104,12 @@ impl AuthService for AuthHandler {
         self.verify_mfa_handler(request).await
     }
 
-    async fn get_user_by_id(&self, request: Request<UserIdMessage>) -> Result<Response<User>, Status> {
-        self.get_user_by_id_handler(request).await
+    async fn get_user(&self, request: Request<GetUserRequest>) -> Result<Response<User>, Status> {
+        self.get_user_handler(request).await
     }
 
-    async fn delete_user_by_id(&self, request: Request<UserIdMessage>) -> Result<Response<()>, Status> {
-        self.delete_user_by_id_handler(request).await
+    async fn delete_user(&self, request: Request<DeleteUserRequest>) -> Result<Response<()>, Status> {
+        self.delete_user_handler(request).await
     }
 
     async fn get_o_auth_url(&self, request: Request<OAuthUrlRequest>) -> Result<Response<OAuthUrlResponse>, Status> {

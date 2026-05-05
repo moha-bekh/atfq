@@ -116,6 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let delete_user_uc = Arc::new(DeleteUserUseCase::new(
         user_repo.clone(),
+        cache_service.clone(),
     ));
 
     let google_provider = if let (Some(id), Some(secret), Some(url)) = (google_client_id, google_client_secret, google_redirect_url) {
