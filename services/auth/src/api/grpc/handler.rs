@@ -20,6 +20,7 @@ use crate::app::auth::logout::LogoutUseCase;
 use crate::app::auth::refresh::RefreshTokenUseCase;
 use crate::app::auth::oauth::OAuthUseCase;
 use crate::app::auth::get_user::GetUserUseCase;
+use crate::app::auth::delete_user::DeleteUserUseCase;
 use crate::domain::error::DomainError;
 
 use crate::domain::ports::cache_service::CacheService;
@@ -36,6 +37,7 @@ pub struct AuthHandler {
     pub refresh_uc: Arc<RefreshTokenUseCase>,
     pub oauth_uc: Arc<OAuthUseCase>,
     pub get_user_uc: Arc<GetUserUseCase>,
+    pub delete_user_uc: Arc<DeleteUserUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
     pub google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -52,6 +54,7 @@ impl AuthHandler {
         refresh_uc: Arc<RefreshTokenUseCase>,
         oauth_uc: Arc<OAuthUseCase>,
         get_user_uc: Arc<GetUserUseCase>,
+        delete_user_uc: Arc<DeleteUserUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
         google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -66,6 +69,7 @@ impl AuthHandler {
             refresh_uc,
             oauth_uc,
             get_user_uc,
+            delete_user_uc,
             cache_service,
             token_service,
             google_provider,
@@ -102,6 +106,10 @@ impl AuthService for AuthHandler {
 
     async fn get_user_by_id(&self, request: Request<UserIdMessage>) -> Result<Response<User>, Status> {
         self.get_user_by_id_handler(request).await
+    }
+
+    async fn delete_user_by_id(&self, request: Request<UserIdMessage>) -> Result<Response<()>, Status> {
+        self.delete_user_by_id_handler(request).await
     }
 
     async fn get_o_auth_url(&self, request: Request<OAuthUrlRequest>) -> Result<Response<OAuthUrlResponse>, Status> {

@@ -18,6 +18,7 @@ use auth::app::auth::refresh::RefreshTokenUseCase;
 use auth::app::auth::verify_mfa::VerifyMfaUseCase;
 use auth::app::auth::oauth::OAuthUseCase;
 use auth::app::auth::get_user::GetUserUseCase;
+use auth::app::auth::delete_user::DeleteUserUseCase;
 use auth::infra::oauth::google_adapter::GoogleAdapter;
 use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
@@ -113,6 +114,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_repo.clone(),
     ));
 
+    let delete_user_uc = Arc::new(DeleteUserUseCase::new(
+        user_repo.clone(),
+    ));
+
     let google_provider = if let (Some(id), Some(secret), Some(url)) = (google_client_id, google_client_secret, google_redirect_url) {
         Some(Arc::new(GoogleAdapter::new(id, secret, url)) as Arc<dyn auth::domain::ports::oauth_service::OAuthProvider>)
     } else {
@@ -135,6 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         refresh_uc,
         oauth_uc,
         get_user_uc,
+        delete_user_uc,
         cache_service.clone(),
         jwt_service.clone(),
         google_provider,

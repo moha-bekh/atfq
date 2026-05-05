@@ -44,4 +44,8 @@ impl UserRepository for PostgresUserRepository {
     async fn link_oauth_account(&self, user_id: uuid::Uuid, provider: &str, provider_id: &str) -> Result<(), DomainError> {
         self.link_oauth_account_handler(user_id, provider, provider_id).await
     }
+
+    async fn delete_by_id(&self, id: uuid::Uuid) -> Result<(), DomainError> {
+        self.delete_by_id_handler(id).await
+    }
 }
