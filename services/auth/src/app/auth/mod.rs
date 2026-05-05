@@ -8,6 +8,7 @@ pub mod verify_mfa;
 pub mod oauth;
 pub mod get_user;
 pub mod delete_user;
+pub mod update_email;
 
 #[cfg(test)]
 mod tests;

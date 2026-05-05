@@ -78,6 +78,15 @@ tasks:
           "access_token": "{{.ACCESS_TOKEN}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/GetUser
 
+  update-email:
+    desc: "Update user email (Usage: task api:update-email ACCESS_TOKEN=... NEW_EMAIL=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "new_email": "{{.NEW_EMAIL}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdateEmail
+
   delete-user:
     desc: "Delete user account (Usage: task api:delete-user ACCESS_TOKEN=... REFRESH_TOKEN=...)"
     cmds:

@@ -104,6 +104,10 @@ impl UserRepository for MockUserRepo {
     async fn delete_by_id(&self, _id: uuid::Uuid) -> Result<(), DomainError> {
         unimplemented!()
     }
+
+    async fn update_email(&self, _id: uuid::Uuid, _new_email: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
 }
 
 struct MockTokenService {

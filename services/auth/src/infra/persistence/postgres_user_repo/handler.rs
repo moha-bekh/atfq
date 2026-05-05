@@ -48,4 +48,8 @@ impl UserRepository for PostgresUserRepository {
     async fn delete_by_id(&self, id: uuid::Uuid) -> Result<(), DomainError> {
         self.delete_by_id_handler(id).await
     }
+
+    async fn update_email(&self, id: uuid::Uuid, new_email: &str) -> Result<(), DomainError> {
+        self.update_email_handler(id, new_email).await
+    }
 }

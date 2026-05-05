@@ -20,4 +20,5 @@ pub trait UserRepository: Send + Sync {
     async fn find_by_oauth_id(&self, provider: &str, provider_id: &str) -> Result<Option<User>, DomainError>;
     async fn link_oauth_account(&self, user_id: uuid::Uuid, provider: &str, provider_id: &str) -> Result<(), DomainError>;
     async fn delete_by_id(&self, id: uuid::Uuid) -> Result<(), DomainError>;
+    async fn update_email(&self, id: uuid::Uuid, new_email: &str) -> Result<(), DomainError>;
 }

@@ -78,6 +78,11 @@ message GetUserRequest {
   string access_token = 1;
 }
 
+message UpdateEmailRequest {
+  string access_token = 1;
+  string new_email = 2;
+}
+
 message DeleteUserRequest {
   string access_token = 1;
   string refresh_token = 2;

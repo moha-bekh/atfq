@@ -15,6 +15,7 @@ service AuthService {
   rpc RefreshToken(RefreshRequest) returns (AuthResponse);
 
   rpc GetUser(GetUserRequest) returns (User);
+  rpc UpdateEmail(UpdateEmailRequest) returns (google.protobuf.Empty);
   rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
 
   rpc GetOAuthUrl(OAuthUrlRequest) returns (OAuthUrlResponse);
