@@ -14,6 +14,8 @@ service AuthService {
   rpc VerifyMFA(VerifyMFARequest) returns (AuthSuccess);
   rpc RefreshToken(RefreshRequest) returns (AuthResponse);
 
+  rpc GetUserById(UserIdMessage) returns (User);
+
   rpc GetOAuthUrl(OAuthUrlRequest) returns (OAuthUrlResponse);
   rpc OAuthCallback(OAuthCallbackRequest) returns (AuthResponse);
 }

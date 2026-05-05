@@ -69,3 +69,11 @@ tasks:
         grpcurl -plaintext -d '{
           "refresh_token": "{{.REFRESH_TOKEN}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/RefreshToken
+
+  get-user:
+    desc: "Get user by ID (Usage: task api:get-user ID=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "id": "{{.ID}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/GetUserById

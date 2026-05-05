@@ -19,12 +19,13 @@ use crate::app::auth::verify_mfa::VerifyMfaUseCase;
 use crate::app::auth::logout::LogoutUseCase;
 use crate::app::auth::refresh::RefreshTokenUseCase;
 use crate::app::auth::oauth::OAuthUseCase;
+use crate::app::auth::get_user::GetUserUseCase;
 use crate::domain::error::DomainError;
 
 use crate::domain::ports::cache_service::CacheService;
 use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
-use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest};
+use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, UserIdMessage, User};
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
@@ -34,6 +35,7 @@ pub struct AuthHandler {
     pub logout_uc: Arc<LogoutUseCase>,
     pub refresh_uc: Arc<RefreshTokenUseCase>,
     pub oauth_uc: Arc<OAuthUseCase>,
+    pub get_user_uc: Arc<GetUserUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
     pub google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -49,6 +51,7 @@ impl AuthHandler {
         logout_uc: Arc<LogoutUseCase>,
         refresh_uc: Arc<RefreshTokenUseCase>,
         oauth_uc: Arc<OAuthUseCase>,
+        get_user_uc: Arc<GetUserUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
         google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -62,6 +65,7 @@ impl AuthHandler {
             logout_uc,
             refresh_uc,
             oauth_uc,
+            get_user_uc,
             cache_service,
             token_service,
             google_provider,
@@ -94,6 +98,10 @@ impl AuthService for AuthHandler {
 
     async fn verify_mfa(&self, request: Request<VerifyMfaRequest>) -> Result<Response<AuthSuccess>, Status> {
         self.verify_mfa_handler(request).await
+    }
+
+    async fn get_user_by_id(&self, request: Request<UserIdMessage>) -> Result<Response<User>, Status> {
+        self.get_user_by_id_handler(request).await
     }
 
     async fn get_o_auth_url(&self, request: Request<OAuthUrlRequest>) -> Result<Response<OAuthUrlResponse>, Status> {

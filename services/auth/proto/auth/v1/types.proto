@@ -73,3 +73,7 @@ message VerifyMFARequest {
 message RefreshRequest {
   string refresh_token = 1;
 }
+
+message UserIdMessage {
+  string id = 1;
+}

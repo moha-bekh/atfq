@@ -7,3 +7,4 @@ pub mod oauth;
 pub mod auth_interceptor;
 pub mod enable_mfa;
 pub mod verify_mfa;
+pub mod get_user;
