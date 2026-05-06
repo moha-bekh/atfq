@@ -47,7 +47,7 @@ tasks:
     interactive: true
     cmds:
       - |
-        docker exec -it services-db-auth-1 \
+        docker exec -it db-auth \
         psql -U {{.POSTGRES_USER | default "atfq"}} -d {{.POSTGRES_DB | default "atfq_db"}}
 
   redis-cache:
