@@ -100,6 +100,22 @@ impl UserRepository for MockUserRepo {
         oauth_accounts.insert((provider.to_string(), provider_id.to_string()), user_id);
         Ok(())
     }
+
+    async fn delete_by_id(&self, _id: uuid::Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+
+    async fn update_email(&self, _id: uuid::Uuid, _new_email: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+
+    async fn update_username(&self, _id: uuid::Uuid, _new_username: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+
+    async fn update_password(&self, _id: uuid::Uuid, _old_password_hash: &str, _new_password_hash: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
 }
 
 struct MockTokenService {

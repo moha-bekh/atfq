@@ -73,3 +73,32 @@ message VerifyMFARequest {
 message RefreshRequest {
   string refresh_token = 1;
 }
+
+message GetUserRequest {
+  string access_token = 1;
+}
+
+message UpdateEmailRequest {
+  string access_token = 1;
+  string new_email = 2;
+}
+
+message UpdateUsernameRequest {
+  string access_token = 1;
+  string new_username = 2;
+}
+
+message UpdatePasswordRequest {
+  string access_token = 1;
+  string old_password = 2;
+  string new_password = 3;
+}
+
+message DeleteUserRequest {
+  string access_token = 1;
+  string refresh_token = 2;
+}
+
+message UserIdMessage {
+  string id = 1;
+}

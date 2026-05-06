@@ -69,3 +69,48 @@ tasks:
         grpcurl -plaintext -d '{
           "refresh_token": "{{.REFRESH_TOKEN}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/RefreshToken
+
+  get-user:
+    desc: "Get user by access token (Usage: task api:get-user ACCESS_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/GetUser
+
+  update-email:
+    desc: "Update user email (Usage: task api:update-email ACCESS_TOKEN=... NEW_EMAIL=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "new_email": "{{.NEW_EMAIL}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdateEmail
+
+  update-username:
+    desc: "Update user username (Usage: task api:update-username ACCESS_TOKEN=... NEW_USERNAME=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "new_username": "{{.NEW_USERNAME}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdateUsername
+
+  update-password:
+    desc: "Update user password (Usage: task api:update-password ACCESS_TOKEN=... OLD_PASSWORD=... NEW_PASSWORD=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "old_password": "{{.OLD_PASSWORD}}",
+          "new_password": "{{.NEW_PASSWORD}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdatePassword
+
+  delete-user:
+    desc: "Delete user account (Usage: task api:delete-user ACCESS_TOKEN=... REFRESH_TOKEN=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "refresh_token": "{{.REFRESH_TOKEN}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/DeleteUser

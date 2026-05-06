@@ -17,6 +17,11 @@ use auth::app::auth::logout::LogoutUseCase;
 use auth::app::auth::refresh::RefreshTokenUseCase;
 use auth::app::auth::verify_mfa::VerifyMfaUseCase;
 use auth::app::auth::oauth::OAuthUseCase;
+use auth::app::auth::get_user::GetUserUseCase;
+use auth::app::auth::delete_user::DeleteUserUseCase;
+use auth::app::auth::update_email::UpdateEmailUseCase;
+use auth::app::auth::update_username::UpdateUsernameUseCase;
+use auth::app::auth::update_password::UpdatePasswordUseCase;
 use auth::infra::oauth::google_adapter::GoogleAdapter;
 use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
@@ -108,6 +113,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cache_service.clone(),
     ));
 
+    let get_user_uc = Arc::new(GetUserUseCase::new(
+        user_repo.clone(),
+    ));
+
+    let delete_user_uc = Arc::new(DeleteUserUseCase::new(
+        user_repo.clone(),
+        cache_service.clone(),
+    ));
+
+    let update_email_uc = Arc::new(UpdateEmailUseCase::new(
+        user_repo.clone(),
+    ));
+
+    let update_username_uc = Arc::new(UpdateUsernameUseCase::new(
+        user_repo.clone(),
+    ));
+
+    let update_password_uc = Arc::new(UpdatePasswordUseCase::new(
+        user_repo.clone(),
+        crypto_service.clone(),
+    ));
+
     let google_provider = if let (Some(id), Some(secret), Some(url)) = (google_client_id, google_client_secret, google_redirect_url) {
         Some(Arc::new(GoogleAdapter::new(id, secret, url)) as Arc<dyn auth::domain::ports::oauth_service::OAuthProvider>)
     } else {
@@ -129,6 +156,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         logout_uc,
         refresh_uc,
         oauth_uc,
+        get_user_uc,
+        delete_user_uc,
+        update_email_uc,
+        update_username_uc,
+        update_password_uc,
         cache_service.clone(),
         jwt_service.clone(),
         google_provider,

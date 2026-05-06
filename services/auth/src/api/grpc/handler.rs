@@ -19,12 +19,17 @@ use crate::app::auth::verify_mfa::VerifyMfaUseCase;
 use crate::app::auth::logout::LogoutUseCase;
 use crate::app::auth::refresh::RefreshTokenUseCase;
 use crate::app::auth::oauth::OAuthUseCase;
+use crate::app::auth::get_user::GetUserUseCase;
+use crate::app::auth::delete_user::DeleteUserUseCase;
+use crate::app::auth::update_email::UpdateEmailUseCase;
+use crate::app::auth::update_username::UpdateUsernameUseCase;
+use crate::app::auth::update_password::UpdatePasswordUseCase;
 use crate::domain::error::DomainError;
 
 use crate::domain::ports::cache_service::CacheService;
 use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
-use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest};
+use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdateUsernameRequest, UpdatePasswordRequest, User};
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
@@ -34,6 +39,11 @@ pub struct AuthHandler {
     pub logout_uc: Arc<LogoutUseCase>,
     pub refresh_uc: Arc<RefreshTokenUseCase>,
     pub oauth_uc: Arc<OAuthUseCase>,
+    pub get_user_uc: Arc<GetUserUseCase>,
+    pub delete_user_uc: Arc<DeleteUserUseCase>,
+    pub update_email_uc: Arc<UpdateEmailUseCase>,
+    pub update_username_uc: Arc<UpdateUsernameUseCase>,
+    pub update_password_uc: Arc<UpdatePasswordUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
     pub google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -49,6 +59,11 @@ impl AuthHandler {
         logout_uc: Arc<LogoutUseCase>,
         refresh_uc: Arc<RefreshTokenUseCase>,
         oauth_uc: Arc<OAuthUseCase>,
+        get_user_uc: Arc<GetUserUseCase>,
+        delete_user_uc: Arc<DeleteUserUseCase>,
+        update_email_uc: Arc<UpdateEmailUseCase>,
+        update_username_uc: Arc<UpdateUsernameUseCase>,
+        update_password_uc: Arc<UpdatePasswordUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
         google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -62,6 +77,11 @@ impl AuthHandler {
             logout_uc,
             refresh_uc,
             oauth_uc,
+            get_user_uc,
+            delete_user_uc,
+            update_email_uc,
+            update_username_uc,
+            update_password_uc,
             cache_service,
             token_service,
             google_provider,
@@ -94,6 +114,26 @@ impl AuthService for AuthHandler {
 
     async fn verify_mfa(&self, request: Request<VerifyMfaRequest>) -> Result<Response<AuthSuccess>, Status> {
         self.verify_mfa_handler(request).await
+    }
+
+    async fn get_user(&self, request: Request<GetUserRequest>) -> Result<Response<User>, Status> {
+        self.get_user_handler(request).await
+    }
+
+    async fn update_email(&self, request: Request<UpdateEmailRequest>) -> Result<Response<()>, Status> {
+        self.update_email_handler(request).await
+    }
+
+    async fn update_username(&self, request: Request<UpdateUsernameRequest>) -> Result<Response<()>, Status> {
+        self.update_username_handler(request).await
+    }
+
+    async fn update_password(&self, request: Request<UpdatePasswordRequest>) -> Result<Response<()>, Status> {
+        self.update_password_handler(request).await
+    }
+
+    async fn delete_user(&self, request: Request<DeleteUserRequest>) -> Result<Response<()>, Status> {
+        self.delete_user_handler(request).await
     }
 
     async fn get_o_auth_url(&self, request: Request<OAuthUrlRequest>) -> Result<Response<OAuthUrlResponse>, Status> {

@@ -44,4 +44,20 @@ impl UserRepository for PostgresUserRepository {
     async fn link_oauth_account(&self, user_id: uuid::Uuid, provider: &str, provider_id: &str) -> Result<(), DomainError> {
         self.link_oauth_account_handler(user_id, provider, provider_id).await
     }
+
+    async fn delete_by_id(&self, id: uuid::Uuid) -> Result<(), DomainError> {
+        self.delete_by_id_handler(id).await
+    }
+
+    async fn update_email(&self, id: uuid::Uuid, new_email: &str) -> Result<(), DomainError> {
+        self.update_email_handler(id, new_email).await
+    }
+
+    async fn update_username(&self, id: uuid::Uuid, new_username: &str) -> Result<(), DomainError> {
+        self.update_username_handler(id, new_username).await
+    }
+
+    async fn update_password(&self, id: uuid::Uuid, old_password_hash: &str, new_password_hash: &str) -> Result<(), DomainError> {
+        self.update_password_handler(id, old_password_hash, new_password_hash).await
+    }
 }
