@@ -5,3 +5,4 @@ pub mod cache_service;
 pub mod encryption_service;
 pub mod mfa_service;
 pub mod oauth_service;
+pub mod user_profile_service;

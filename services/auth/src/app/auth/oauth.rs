@@ -4,6 +4,7 @@ use crate::domain::ports::{
     token_service::TokenService,
     cache_service::CacheService,
     oauth_service::OAuthProvider,
+    user_profile_service::UserProfileService,
 };
 use crate::domain::error::DomainError;
 use crate::app::auth::types::AuthResult;
@@ -13,6 +14,7 @@ pub struct OAuthUseCase {
     repo: Arc<dyn UserRepository>,
     tokens: Arc<dyn TokenService>,
     cache: Arc<dyn CacheService>,
+    profiles: Arc<dyn UserProfileService>,
 }
 
 impl OAuthUseCase {
@@ -20,8 +22,9 @@ impl OAuthUseCase {
         repo: Arc<dyn UserRepository>,
         tokens: Arc<dyn TokenService>,
         cache: Arc<dyn CacheService>,
+        profiles: Arc<dyn UserProfileService>,
     ) -> Self {
-        Self { repo, tokens, cache }
+        Self { repo, tokens, cache, profiles }
     }
 
     pub async fn get_auth_url(&self, provider: Arc<dyn OAuthProvider>) -> Result<String, DomainError> {
@@ -73,6 +76,12 @@ impl OAuthUseCase {
                         };
                         let new_user = self.repo.save_user(dto).await?;
                         self.repo.link_oauth_account(new_user.id, provider_name, &oauth_user.provider_id).await?;
+
+                        // Create profile in User service
+                        if let Err(e) = self.profiles.create_profile(new_user.id).await {
+                             eprintln!("Failed to create user profile for {}: {}", new_user.id, e);
+                        }
+
                         new_user
                     }
                 }

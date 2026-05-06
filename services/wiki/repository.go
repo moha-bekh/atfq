@@ -309,60 +309,49 @@ func (s *wikiServer) rejectVersionInternal(ctx context.Context, ext Ext, version
 	WHERE id = $1
 	RETURNING node_id
 	`
-	var args []interface{}
-	if nodeID != nil {
-		query += " AND v.node_id = $1"
-		args = append(args, *nodeID)
-	}
-	query += " ORDER BY v.created_at DESC"
-
-	var versions []VersionRow
-	err := ext.SelectContext(ctx, &versions, query, args...)
-	return versions, err
-}
-
-func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) (*NodeRow, error) {
-	// 1. Fetch node before deletion to return it
-	row, err := s.fetchNodeInternal(ctx, ext, nodeID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 2. Break circular dependency
-	_, err = ext.ExecContext(ctx, "UPDATE nodes SET current_version_id = NULL WHERE id = $1", nodeID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to break dependency: %v", err)
-	}
-
-	// 3. Delete linked data manually since ON DELETE CASCADE is missing
-	_, err = ext.ExecContext(ctx, "DELETE FROM questions WHERE node_version_id IN (SELECT id FROM node_versions WHERE node_id = $1)", nodeID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete questions: %v", err)
-	}
-
-	_, err = ext.ExecContext(ctx, "DELETE FROM node_versions WHERE node_id = $1", nodeID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete versions: %v", err)
-	}
-
-	// 4. Delete the node itself
-	_, err = ext.ExecContext(ctx, "DELETE FROM nodes WHERE id = $1", nodeID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "delete failed: %v", err)
-	}
-
 	var nodeID int32
-
 	err := ext.QueryRowxContext(ctx, query, versionID).Scan(&nodeID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return 0, status.Error(codes.NotFound, "node not found")
+			return 0, status.Error(codes.NotFound, "version not found")
 		}
 		return 0, status.Errorf(codes.Internal, "update failed: %v", err)
 	}
-
 	return nodeID, nil
 }
+
+// func (s *wikiServer) DeleteNodeInternal(ctx context.Context, ext Ext, nodeID int32) (*NodeRow, error) {
+// 	// 1. Fetch node before deletion to return it
+// 	row, err := s.fetchNodeInternal(ctx, ext, nodeID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+//
+// 	// 2. Break circular dependency
+// 	_, err = ext.ExecContext(ctx, "UPDATE nodes SET current_version_id = NULL WHERE id = $1", nodeID)
+// 	if err != nil {
+// 		return nil, status.Errorf(codes.Internal, "failed to break dependency: %v", err)
+// 	}
+//
+// 	// 3. Delete linked data manually since ON DELETE CASCADE is missing
+// 	_, err = ext.ExecContext(ctx, "DELETE FROM questions WHERE node_version_id IN (SELECT id FROM node_versions WHERE node_id = $1)", nodeID)
+// 	if err != nil {
+// 		return nil, status.Errorf(codes.Internal, "failed to delete questions: %v", err)
+// 	}
+//
+// 	_, err = ext.ExecContext(ctx, "DELETE FROM node_versions WHERE node_id = $1", nodeID)
+// 	if err != nil {
+// 		return nil, status.Errorf(codes.Internal, "failed to delete versions: %v", err)
+// 	}
+//
+// 	// 4. Delete the node itself
+// 	_, err = ext.ExecContext(ctx, "DELETE FROM nodes WHERE id = $1", nodeID)
+// 	if err != nil {
+// 		return nil, status.Errorf(codes.Internal, "delete failed: %v", err)
+// 	}
+//
+// 	return row, nil
+// }
 
 func (s *wikiServer) fetchPendingVersionsInternal(ctx context.Context, ext Ext, nodeID *int32) ([]VersionRow, error) {
 	query := `

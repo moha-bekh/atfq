@@ -1,0 +1,3 @@
+en t'inspirant de ma strucutre de project app, et de mes pages login et register, ajoute moi la page profile dans mon service app en tappant sur mes api auth et
+   user en t'inspirant de ma page profile tmp/profile.tsx
+

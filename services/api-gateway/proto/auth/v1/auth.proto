@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package auth.v1;
+
+import "auth/v1/types.proto";
+import "auth/v1/oauth.proto";
+import "google/protobuf/empty.proto";
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (AuthResponse);
+  rpc Login(LoginRequest) returns (AuthResponse);
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
+  rpc EnableMFA(EnableMFARequest) returns (EnableMFAResponse);
+  rpc VerifyMFA(VerifyMFARequest) returns (AuthSuccess);
+  rpc RefreshToken(RefreshRequest) returns (AuthResponse);
+
+  rpc GetOAuthUrl(OAuthUrlRequest) returns (OAuthUrlResponse);
+  rpc OAuthCallback(OAuthCallbackRequest) returns (AuthResponse);
+}

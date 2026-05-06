@@ -75,14 +75,17 @@ pub async fn create_profile_handler(
         (status = 200, description = "Profile found", body = ProfileResponse),
         (status = 404, description = "Profile not found"),
         (status = 502, description = "Downstream service error")
-    )
+    ),
+    security(("bearer_auth" = []))
 )]
 pub async fn get_profile_handler(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<ProfileResponse>, AppError> {
     let mut client = state.user_client.clone();
-    let request = tonic::Request::new(crate::grpc::user::GetProfileRequest { id });
+    let mut request = tonic::Request::new(crate::grpc::user::GetProfileRequest { id });
+    add_auth_header(&mut request, &headers);
 
     let response = client.get_profile(request).await?.into_inner();
     Ok(Json(map_grpc_profile(response)))
@@ -213,13 +216,16 @@ pub async fn remove_role_handler(
     responses(
         (status = 200, description = "List of permissions", body = PermissionListResponse),
         (status = 502, description = "Downstream service error")
-    )
+    ),
+    security(("bearer_auth" = []))
 )]
 pub async fn list_permissions_handler(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
 ) -> Result<Json<PermissionListResponse>, AppError> {
     let mut client = state.user_client.clone();
-    let request = tonic::Request::new(());
+    let mut request = tonic::Request::new(());
+    add_auth_header(&mut request, &headers);
     let response = client.list_available_permissions(request).await?.into_inner();
     Ok(Json(PermissionListResponse { permissions: response.permissions }))
 }
@@ -337,16 +343,22 @@ pub async fn upload_profile_picture_handler(
     let mut image_data = Vec::new();
     let mut extension = String::new();
 
+    println!("Received multipart upload request");
+
     while let Some(field) = multipart.next_field().await.map_err(|e| AppError::Internal(e.to_string()))? {
         let name = field.name().unwrap_or_default().to_string();
+        println!("Processing field: {}", name);
         if name == "image" {
             let content_type = field.content_type().unwrap_or_default().to_string();
+            println!("Field 'image' found. Content-Type: {}", content_type);
             extension = content_type.split('/').last().unwrap_or("png").to_string();
             image_data = field.bytes().await.map_err(|e| AppError::Internal(e.to_string()))?.to_vec();
+            println!("Read {} bytes of image data", image_data.len());
         }
     }
 
     if image_data.is_empty() {
+        println!("Error: No image data found in multipart request");
         return Err(AppError::Internal("No image data provided".into()));
     }
 
@@ -358,6 +370,29 @@ pub async fn upload_profile_picture_handler(
     add_auth_header(&mut request, &headers);
 
     let response = client.upload_profile_picture(request).await?.into_inner();
+    Ok(Json(map_grpc_profile(response)))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/user/profile/picture",
+    operation_id = "delete_profile_picture",
+    responses(
+        (status = 200, description = "Picture removed", body = ProfileResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn delete_profile_picture_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<ProfileResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(());
+    add_auth_header(&mut request, &headers);
+
+    let response = client.remove_profile_picture(request).await?.into_inner();
     Ok(Json(map_grpc_profile(response)))
 }
 

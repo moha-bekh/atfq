@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  gen-api:
+    desc: "Generate TypeScript types from OpenAPI spec (inside Docker)"
+    cmds:
+      - docker compose -f ../docker-compose.yaml exec app npm run gen:api
+
+  install:
+    desc: "Install npm dependencies inside the container"
+    cmds:
+      - docker compose -f ../docker-compose.yaml exec app npm install
+
+  build:
+    desc: "Build the application inside the container"
+    cmds:
+      - docker compose -f ../docker-compose.yaml exec app npm run build

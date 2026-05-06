@@ -3,15 +3,14 @@ import type {
   LoginRequest, 
   LoginResponse, 
   RegisterRequest, 
-  RegisterResponse,
   OAuthProvider,
   OAuthUrlResponse,
   OAuthCallbackParams
 } from '../types';
 
 export const authApi = {
-  register: async (payload: RegisterRequest): Promise<RegisterResponse> => {
-    return await api.post('auth/register', { json: payload }).json<RegisterResponse>();
+  register: async (payload: RegisterRequest): Promise<LoginResponse> => {
+    return await api.post('auth/register', { json: payload }).json<LoginResponse>();
   },
 
   login: async (payload: LoginRequest): Promise<LoginResponse> => {
