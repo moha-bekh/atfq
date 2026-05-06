@@ -20,6 +20,7 @@ use auth::app::auth::oauth::OAuthUseCase;
 use auth::app::auth::get_user::GetUserUseCase;
 use auth::app::auth::delete_user::DeleteUserUseCase;
 use auth::app::auth::update_email::UpdateEmailUseCase;
+use auth::app::auth::update_username::UpdateUsernameUseCase;
 use auth::app::auth::update_password::UpdatePasswordUseCase;
 use auth::infra::oauth::google_adapter::GoogleAdapter;
 use auth::api::grpc::handler::AuthHandler;
@@ -125,6 +126,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_repo.clone(),
     ));
 
+    let update_username_uc = Arc::new(UpdateUsernameUseCase::new(
+        user_repo.clone(),
+    ));
+
     let update_password_uc = Arc::new(UpdatePasswordUseCase::new(
         user_repo.clone(),
         crypto_service.clone(),
@@ -154,6 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         get_user_uc,
         delete_user_uc,
         update_email_uc,
+        update_username_uc,
         update_password_uc,
         cache_service.clone(),
         jwt_service.clone(),

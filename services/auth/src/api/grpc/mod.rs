@@ -10,4 +10,5 @@ pub mod verify_mfa;
 pub mod get_user;
 pub mod delete_user;
 pub mod update_email;
+pub mod update_username;
 pub mod update_password;

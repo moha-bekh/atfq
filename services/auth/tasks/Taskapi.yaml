@@ -87,6 +87,15 @@ tasks:
           "new_email": "{{.NEW_EMAIL}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdateEmail
 
+  update-username:
+    desc: "Update user username (Usage: task api:update-username ACCESS_TOKEN=... NEW_USERNAME=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "new_username": "{{.NEW_USERNAME}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdateUsername
+
   update-password:
     desc: "Update user password (Usage: task api:update-password ACCESS_TOKEN=... OLD_PASSWORD=... NEW_PASSWORD=...)"
     cmds:

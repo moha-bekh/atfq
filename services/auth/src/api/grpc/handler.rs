@@ -22,13 +22,14 @@ use crate::app::auth::oauth::OAuthUseCase;
 use crate::app::auth::get_user::GetUserUseCase;
 use crate::app::auth::delete_user::DeleteUserUseCase;
 use crate::app::auth::update_email::UpdateEmailUseCase;
+use crate::app::auth::update_username::UpdateUsernameUseCase;
 use crate::app::auth::update_password::UpdatePasswordUseCase;
 use crate::domain::error::DomainError;
 
 use crate::domain::ports::cache_service::CacheService;
 use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
-use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdatePasswordRequest, User};
+use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdateUsernameRequest, UpdatePasswordRequest, User};
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
@@ -41,6 +42,7 @@ pub struct AuthHandler {
     pub get_user_uc: Arc<GetUserUseCase>,
     pub delete_user_uc: Arc<DeleteUserUseCase>,
     pub update_email_uc: Arc<UpdateEmailUseCase>,
+    pub update_username_uc: Arc<UpdateUsernameUseCase>,
     pub update_password_uc: Arc<UpdatePasswordUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
@@ -60,6 +62,7 @@ impl AuthHandler {
         get_user_uc: Arc<GetUserUseCase>,
         delete_user_uc: Arc<DeleteUserUseCase>,
         update_email_uc: Arc<UpdateEmailUseCase>,
+        update_username_uc: Arc<UpdateUsernameUseCase>,
         update_password_uc: Arc<UpdatePasswordUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
@@ -77,6 +80,7 @@ impl AuthHandler {
             get_user_uc,
             delete_user_uc,
             update_email_uc,
+            update_username_uc,
             update_password_uc,
             cache_service,
             token_service,
@@ -118,6 +122,10 @@ impl AuthService for AuthHandler {
 
     async fn update_email(&self, request: Request<UpdateEmailRequest>) -> Result<Response<()>, Status> {
         self.update_email_handler(request).await
+    }
+
+    async fn update_username(&self, request: Request<UpdateUsernameRequest>) -> Result<Response<()>, Status> {
+        self.update_username_handler(request).await
     }
 
     async fn update_password(&self, request: Request<UpdatePasswordRequest>) -> Result<Response<()>, Status> {

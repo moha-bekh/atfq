@@ -16,6 +16,7 @@ service AuthService {
 
   rpc GetUser(GetUserRequest) returns (User);
   rpc UpdateEmail(UpdateEmailRequest) returns (google.protobuf.Empty);
+  rpc UpdateUsername(UpdateUsernameRequest) returns (google.protobuf.Empty);
   rpc UpdatePassword(UpdatePasswordRequest) returns (google.protobuf.Empty);
   rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
 

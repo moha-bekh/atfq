@@ -9,5 +9,6 @@ pub mod link_oauth_account;
 pub mod delete_by_id;
 pub mod update_email;
 pub mod update_password;
+pub mod update_username;
 
 pub use handler::PostgresUserRepository;

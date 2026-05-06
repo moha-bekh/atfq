@@ -83,6 +83,11 @@ message UpdateEmailRequest {
   string new_email = 2;
 }
 
+message UpdateUsernameRequest {
+  string access_token = 1;
+  string new_username = 2;
+}
+
 message UpdatePasswordRequest {
   string access_token = 1;
   string old_password = 2;
