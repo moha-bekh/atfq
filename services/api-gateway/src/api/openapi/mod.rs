@@ -39,6 +39,7 @@ pub use user::hello::{HelloRequest, HelloResponse};
         crate::api::user::profile::list_role_requests_handler,
         crate::api::user::profile::review_role_request_handler,
         crate::api::user::profile::upload_profile_picture_handler,
+        crate::api::user::profile::delete_profile_picture_handler,
         crate::api::user::profile::delete_profile_handler
     ),
     components(

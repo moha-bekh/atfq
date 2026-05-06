@@ -1,7 +1,6 @@
 use tonic::{transport::Server, Request, Response, Status, body::BoxBody};
 use tonic_reflection::server::Builder;
 use std::env;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use dotenvy::dotenv;
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -88,7 +87,7 @@ where
             let path = req.uri().path();
             
             // Liste des méthodes publiques (sans auth)
-            let is_public = path.contains("SayHello") || path.contains("grpc.reflection");
+            let is_public = path.contains("SayHello") || path.contains("CreateProfile") || path.contains("grpc.reflection");
 
             if is_public {
                 return inner.call(req).await;
@@ -238,7 +237,9 @@ impl UserService for MyUserService {
     }
 
     async fn create_profile(&self, request: Request<CreateProfileRequest>) -> Result<Response<Profile>, Status> {
-        let user_id = self.get_user_id(&request)?;
+        let req = request.into_inner();
+        let user_id = Uuid::parse_str(&req.id)
+            .map_err(|_| Status::invalid_argument("Invalid UUID format"))?;
         
         sqlx::query(
             r#"
@@ -297,6 +298,29 @@ impl UserService for MyUserService {
         .execute(&self.pool)
         .await
         .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
+
+        Ok(Response::new(self.fetch_full_profile(user_id).await?))
+    }
+
+    async fn remove_profile_picture(&self, request: Request<()>) -> Result<Response<Profile>, Status> {
+        let user_id = self.get_user_id(&request)?;
+
+        let old_profile = self.fetch_full_profile(user_id).await?;
+        if let Some(old_url) = old_profile.profile_picture_url {
+            if let Some(old_key) = old_url.split('/').last() {
+                let _ = self.s3_client.delete_object()
+                    .bucket(&self.bucket_name)
+                    .key(old_key)
+                    .send()
+                    .await;
+            }
+        }
+
+        sqlx::query("UPDATE profiles SET profile_picture_url = NULL, updated_at = NOW() WHERE id = $1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
 
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
@@ -484,7 +508,10 @@ impl UserService for MyUserService {
 
     async fn upload_profile_picture(&self, request: Request<UploadProfilePictureRequest>) -> Result<Response<Profile>, Status> {
         let user_id = self.get_user_id(&request)?;
+        println!("Uploading profile picture for user: {}", user_id);
         let req = request.into_inner();
+        
+        println!("Image data size: {} bytes, extension: {}", req.image_data.len(), req.extension);
 
         let old_profile = self.fetch_full_profile(user_id).await?;
         if let Some(old_url) = old_profile.profile_picture_url {
@@ -497,7 +524,7 @@ impl UserService for MyUserService {
             }
         }
 
-        let file_name = format!("{}.{}", user_id, req.extension);
+        let file_name = format!("{}-{}.{}", user_id, chrono::Utc::now().timestamp(), req.extension);
         
         self.s3_client.put_object()
             .bucket(&self.bucket_name)
@@ -552,6 +579,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .max_connections(5)
         .connect(&db_url)
         .await?;
+
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     let user_service = MyUserService::new(pool, s3_client, s3_bucket, s3_public_url);
 

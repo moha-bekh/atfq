@@ -134,6 +134,7 @@ dependencies = [
  "oauth2",
  "pin-project",
  "prost",
+ "prost-types",
  "rand 0.10.1",
  "redis",
  "reqwest",

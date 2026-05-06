@@ -2,7 +2,8 @@ use std::sync::Arc;
 use crate::domain::ports::{
     user_repository::UserRepository, 
     token_service::TokenService,
-    crypto_service::CryptoService
+    crypto_service::CryptoService,
+    user_profile_service::UserProfileService,
 };
 
 use crate::domain::ports::user_repository::UserDto; 
@@ -14,15 +15,17 @@ pub struct RegisterUseCase {
     repo: Arc<dyn UserRepository>,
     tokens: Arc<dyn TokenService>,
     crypto: Arc<dyn CryptoService>,
+    profiles: Arc<dyn UserProfileService>,
 }
 
 impl RegisterUseCase {
     pub fn new(
         repo: Arc<dyn UserRepository>, 
         tokens: Arc<dyn TokenService>,
-        crypto: Arc<dyn CryptoService>
+        crypto: Arc<dyn CryptoService>,
+        profiles: Arc<dyn UserProfileService>,
     ) -> Self {
-        Self { repo, tokens, crypto }
+        Self { repo, tokens, crypto, profiles }
     }
 
     pub async fn execute(
@@ -46,6 +49,11 @@ impl RegisterUseCase {
         };
 
         let user = self.repo.save_user(dto).await?;
+
+        // Create profile in User service
+        if let Err(e) = self.profiles.create_profile(user.id).await {
+             eprintln!("Failed to create user profile for {}: {}", user.id, e);
+        }
 
         let token_pair = self.tokens.generate_tokens(user.id);
 

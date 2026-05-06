@@ -4,6 +4,7 @@ import { AuthLayout } from "@/components/layout/AuthLayout";
 import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
 import { authRoutes } from "./auth/auth.routes";
 import { Home } from "@/pages/Home";
+import ProfilePage from "@/pages/user/Profile";
 
 export function AppRouter() {
   return (
@@ -14,7 +15,7 @@ export function AppRouter() {
           <Route path="/wiki" element={<div>Wiki</div>} />
 
           <Route element={<ProtectedRoute />}>
-            <Route path="/profile" element={<div>Profile</div>} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
 

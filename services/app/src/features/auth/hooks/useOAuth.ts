@@ -1,12 +1,12 @@
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api';
-import { useAuthStore } from '../stores/auth.store';
+import { useAppStore } from '@/stores/app.store';
 import type { OAuthProvider, OAuthCallbackParams } from '../types';
 
 export function useOAuth() {
   const navigate = useNavigate();
-  const setAuth = useAuthStore(state => state.setAuth);
+  const setAuth = useAppStore(state => state.setAuth);
 
   const getOAuthUrl = async (provider: OAuthProvider) => {
     try {
@@ -21,9 +21,9 @@ export function useOAuth() {
     mutationFn: ({ provider, params }: { provider: OAuthProvider, params: OAuthCallbackParams }) => 
       authApi.oauthCallback(provider, params),
     onSuccess: (data) => {
-      if (data.access_token) {
+      if (data.access_token && data.refresh_token && data.user) {
         setAuth({
-          user: data.user,
+          user: data.user as any,
           access_token: data.access_token,
           refresh_token: data.refresh_token
         });

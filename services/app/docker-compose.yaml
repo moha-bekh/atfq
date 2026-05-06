@@ -8,5 +8,5 @@ services:
       - frontend
     restart: unless-stopped
     environment:
-      - VITE_ENABLE_MOCKS=true
+      - VITE_ENABLE_MOCKS=false
       - VITE_API_URL=http://localhost:8081/api/v1

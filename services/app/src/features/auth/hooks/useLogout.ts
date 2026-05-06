@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../stores/auth.store';
+import { useAppStore } from '@/stores/app.store';
 
 export function useLogout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const logoutAction = useAuthStore((state) => state.logout);
+  const logoutAction = useAppStore((state) => state.logout);
 
   const logout = async () => {
     // clear Zustand store (calls API if tokens exist)

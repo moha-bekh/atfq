@@ -18,6 +18,7 @@ use auth::app::auth::refresh::RefreshTokenUseCase;
 use auth::app::auth::verify_mfa::VerifyMfaUseCase;
 use auth::app::auth::oauth::OAuthUseCase;
 use auth::infra::oauth::google_adapter::GoogleAdapter;
+use auth::infra::user_profile::GrpcUserProfileService;
 use auth::api::grpc::handler::AuthHandler;
 use auth::auth_proto::auth_service_server::AuthServiceServer;
 use auth::auth_proto;
@@ -35,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server_addr = env::var("SERVER_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string()).parse()?;
     let redis_url = env::var("REDIS_URL").expect("REDIS_URL must be set");
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let user_service_addr = env::var("USER_SERVICE_ADDR").unwrap_or_else(|_| "http://user:8080".to_string());
 
     let google_client_id = env::var("GOOGLE_CLIENT_ID").ok();
     let google_client_secret = env::var("GOOGLE_CLIENT_SECRET").ok();
@@ -45,10 +47,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let github_redirect_url = env::var("GITHUB_REDIRECT_URL").ok();
 
     println!("Connecting to database...");
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&db_url)
-        .await?;
+    let mut retry_count = 0;
+    let max_retries = 15;
+    let pool = loop {
+        match PgPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(2))
+            .connect(&db_url)
+            .await 
+        {
+            Ok(pool) => break pool,
+            Err(e) => {
+                retry_count += 1;
+                if retry_count >= max_retries {
+                    return Err(e.into());
+                }
+                println!("Database not ready ({}/{})... Retrying in 2s. Error: {}", retry_count, max_retries, e);
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+        }
+    };
 
     sqlx::migrate!("./migrations").run(&pool).await?;
 
@@ -65,11 +83,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let crypto_service = Arc::new(Argon2Hasher);
 
+    let user_profile_service = Arc::new(GrpcUserProfileService::new(user_service_addr).await?);
+
     // APP
     let register_uc = Arc::new(RegisterUseCase::new(
         user_repo.clone(),
         jwt_service.clone(),
         crypto_service.clone(),
+        user_profile_service.clone(),
     ));
 
     let login_uc = Arc::new(LoginUseCase::new(
@@ -106,6 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_repo.clone(),
         jwt_service.clone(),
         cache_service.clone(),
+        user_profile_service.clone(),
     ));
 
     let google_provider = if let (Some(id), Some(secret), Some(url)) = (google_client_id, google_client_secret, google_redirect_url) {

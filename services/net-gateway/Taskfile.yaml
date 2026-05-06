@@ -4,12 +4,12 @@ tasks:
   up:
     desc: Start the net-gateway service
     cmds:
-      - docker compose up -d --build net-gateway
+      - docker compose -f ../docker-compose.yaml up -d --build net-gateway
 
   down:
     desc: Stop the net-gateway service
     cmds:
-      - docker compose down net-gateway
+      - docker compose -f ../docker-compose.yaml down net-gateway
 
   logs:
     desc: View net-gateway logs (useful to see WAF blocks)

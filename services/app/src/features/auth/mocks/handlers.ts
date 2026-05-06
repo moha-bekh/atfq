@@ -1,6 +1,6 @@
 import { http, HttpResponse, delay } from 'msw';
 // import { useNavigate } from 'react-router-dom';
-import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse } from '../types';
+import type { LoginRequest, LoginResponse, RegisterRequest } from '../types';
 
 // On utilise une URL absolue ou relative selon ton setup Vite
 const API_URL = import.meta.env.VITE_API_URL;
@@ -24,7 +24,7 @@ export const authHandlers = [
         username: body.username,
         email: body.email,
       }
-    } as RegisterResponse, { status: 201 });
+    } as LoginResponse, { status: 201 });
   }),
 
   // Mock Login

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useAppStore } from '@/stores/app.store';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -8,6 +9,12 @@ const queryClient = new QueryClient({
 });
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const initApp = useAppStore(state => state.initApp);
+
+  useEffect(() => {
+    initApp();
+  }, [initApp]);
+
   return (
     <QueryClientProvider client={queryClient}>
       {children}
