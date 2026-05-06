@@ -52,4 +52,8 @@ impl UserRepository for PostgresUserRepository {
     async fn update_email(&self, id: uuid::Uuid, new_email: &str) -> Result<(), DomainError> {
         self.update_email_handler(id, new_email).await
     }
+
+    async fn update_password(&self, id: uuid::Uuid, old_password_hash: &str, new_password_hash: &str) -> Result<(), DomainError> {
+        self.update_password_handler(id, old_password_hash, new_password_hash).await
+    }
 }

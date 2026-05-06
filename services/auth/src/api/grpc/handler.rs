@@ -22,12 +22,13 @@ use crate::app::auth::oauth::OAuthUseCase;
 use crate::app::auth::get_user::GetUserUseCase;
 use crate::app::auth::delete_user::DeleteUserUseCase;
 use crate::app::auth::update_email::UpdateEmailUseCase;
+use crate::app::auth::update_password::UpdatePasswordUseCase;
 use crate::domain::error::DomainError;
 
 use crate::domain::ports::cache_service::CacheService;
 use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
-use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, User};
+use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdatePasswordRequest, User};
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
@@ -40,6 +41,7 @@ pub struct AuthHandler {
     pub get_user_uc: Arc<GetUserUseCase>,
     pub delete_user_uc: Arc<DeleteUserUseCase>,
     pub update_email_uc: Arc<UpdateEmailUseCase>,
+    pub update_password_uc: Arc<UpdatePasswordUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
     pub google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -58,6 +60,7 @@ impl AuthHandler {
         get_user_uc: Arc<GetUserUseCase>,
         delete_user_uc: Arc<DeleteUserUseCase>,
         update_email_uc: Arc<UpdateEmailUseCase>,
+        update_password_uc: Arc<UpdatePasswordUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
         google_provider: Option<Arc<dyn DomainOAuthProvider>>,
@@ -74,6 +77,7 @@ impl AuthHandler {
             get_user_uc,
             delete_user_uc,
             update_email_uc,
+            update_password_uc,
             cache_service,
             token_service,
             google_provider,
@@ -114,6 +118,10 @@ impl AuthService for AuthHandler {
 
     async fn update_email(&self, request: Request<UpdateEmailRequest>) -> Result<Response<()>, Status> {
         self.update_email_handler(request).await
+    }
+
+    async fn update_password(&self, request: Request<UpdatePasswordRequest>) -> Result<Response<()>, Status> {
+        self.update_password_handler(request).await
     }
 
     async fn delete_user(&self, request: Request<DeleteUserRequest>) -> Result<Response<()>, Status> {

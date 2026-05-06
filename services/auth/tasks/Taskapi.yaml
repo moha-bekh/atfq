@@ -87,6 +87,16 @@ tasks:
           "new_email": "{{.NEW_EMAIL}}"
         }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdateEmail
 
+  update-password:
+    desc: "Update user password (Usage: task api:update-password ACCESS_TOKEN=... OLD_PASSWORD=... NEW_PASSWORD=...)"
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "access_token": "{{.ACCESS_TOKEN}}",
+          "old_password": "{{.OLD_PASSWORD}}",
+          "new_password": "{{.NEW_PASSWORD}}"
+        }' {{.IP}}:{{.PORT}} auth.v1.AuthService/UpdatePassword
+
   delete-user:
     desc: "Delete user account (Usage: task api:delete-user ACCESS_TOKEN=... REFRESH_TOKEN=...)"
     cmds:
