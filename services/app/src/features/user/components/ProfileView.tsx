@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useLocation } from 'react-router-dom';
 import { useAppStore } from '@/stores/app.store';
 import { useProfile } from '../hooks/useProfile';
 import { useLogout } from '@/features/auth/hooks/useLogout';
+import { useAuthManagement } from '@/features/auth/hooks/useAuthManagement';
+import { useOAuth } from '@/features/auth/hooks/useOAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { GoogleCircle } from '@/assets/icons/GoogleCircle';
@@ -10,17 +13,19 @@ import { GithubCircle } from '@/assets/icons/GithubCircle';
 
 type Section = 'auth' | 'roles' | 'appearance';
 
+const StatusDisplay = ({ type, message }: { type: 'success' | 'error', message: string }) => (
+  <div className={`mt-2 text-[10px] font-bold uppercase tracking-widest animate-in fade-in slide-in-from-top-1 ${type === 'error' ? 'text-error' : 'text-main'}`}>
+    {type === 'error' ? '⚠ ' : '✓ '} {message}
+  </div>
+);
+
 export const ProfileView = () => {
   const [activeSection, setActiveSection] = useState<Section>('auth');
+  const location = useLocation();
   
   const { 
     user, 
     profile, 
-    roles,
-    permissions,
-    theme, 
-    font, 
-    customColors,
     updateTheme: updateThemeStore,
     setCustomColor,
     resetCustomColors,
@@ -41,14 +46,30 @@ export const ProfileView = () => {
     uploadPicture, 
     removePicture,
     requestRole, 
-    deleteProfile 
   } = useProfile();
 
+  const {
+    updateEmail,
+    updateUsername,
+    updatePassword,
+    deleteAccount,
+    enableMfa,
+    disableMfa,
+  } = useAuthManagement();
+
+  const {
+    getOAuthUrl,
+    unlinkProvider,
+    isUnlinking,
+    linkedProviders,
+    isLoadingProviders
+  } = useOAuth();
+
   // Forms
-  const { register: regUsername, handleSubmit: handleUsernameSubmit } = useForm({
+  const { register: regUsername, handleSubmit: handleUsernameSubmit, reset: resetUsername } = useForm({
     defaultValues: { username: user?.username }
   });
-  const { register: regEmail, handleSubmit: handleEmailSubmit } = useForm({
+  const { register: regEmail, handleSubmit: handleEmailSubmit, reset: resetEmail } = useForm({
     defaultValues: { newEmail: user?.email }
   });
   const { register: regPassword, handleSubmit: handlePasswordSubmit, reset: resetPassword } = useForm();
@@ -59,10 +80,37 @@ export const ProfileView = () => {
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(user?.mfa_enabled || false);
   const [showCustom, setShowCustom] = useState(false);
   const [requestedRole, setRequestedRole] = useState('');
   const [requestReason, setRequestReason] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setIs2FAEnabled(user.mfa_enabled);
+    }
+  }, [user]);
+
+  const [status, setStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    target: 'username' | 'email' | 'password' | 'mfa' | 'account' | 'role';
+  } | null>(null);
+
+  useEffect(() => {
+    if (location.state?.error) {
+      setStatus({ type: 'error', message: location.state.error, target: 'mfa' }); // Use mfa target for general profile errors
+      // Clear the state to avoid repeating the error on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
+
+  useEffect(() => {
+    if (status) {
+      const timer = setTimeout(() => setStatus(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
 
   const navItems = [
     { id: 'auth', label: 'Authentication' },
@@ -73,26 +121,105 @@ export const ProfileView = () => {
   // --- HANDLERS ---
 
   const onUpdateUsername = async (data: any) => {
-    console.log("Service Auth: Update username", data);
-    // Note: Username update might need a separate endpoint in Auth service
-    // For now we just simulate success
-    setIsEditingUsername(false);
+    try {
+      await updateUsername({ new_username: data.username });
+      setIsEditingUsername(false);
+      setStatus({ type: 'success', message: 'Username updated', target: 'username' });
+    } catch (error) {
+      setStatus({ type: 'error', message: 'Username already taken or invalid', target: 'username' });
+    }
   };
 
   const onUpdateEmail = async (data: any) => {
-    console.log("Service Auth: Update email", data);
-    setIsEditingEmail(false);
+    try {
+      await updateEmail({ new_email: data.newEmail });
+      setIsEditingEmail(false);
+      setStatus({ type: 'success', message: 'Email updated', target: 'email' });
+    } catch (error) {
+      setStatus({ type: 'error', message: 'Email already taken or invalid', target: 'email' });
+    }
   };
 
   const onUpdatePassword = async (data: any) => {
     if (data.newPassword !== data.confirmPassword) {
-      alert("Passwords do not match");
+      setStatus({ type: 'error', message: 'Passwords do not match', target: 'password' });
       return;
     }
-    console.log("Service Auth: Update password", data);
-    resetPassword();
-    setIsEditingPassword(false);
-    alert("Password updated successfully");
+    try {
+      await updatePassword({ 
+        old_password: data.currentPassword || "", 
+        new_password: data.newPassword 
+      });
+      resetPassword();
+      setIsEditingPassword(false);
+      setStatus({ type: 'success', message: user?.has_password ? 'Password rotated successfully' : 'Password set successfully', target: 'password' });
+      
+      // Update local state to reflect that user now has a password
+      if (user) {
+        useAppStore.getState().setUser({ ...user, has_password: true });
+      }
+    } catch (error: any) {
+      let message = 'Failed to set password';
+      try {
+        const errorData = await error.response?.json();
+        message = errorData?.error || error.message || message;
+      } catch (e) {
+        message = error.message || message;
+      }
+      setStatus({ type: 'error', message, target: 'password' });
+    }
+  };
+
+  const onDeleteAccount = async () => {
+    if (deleteConfirmationText !== user?.username) {
+      setStatus({ type: 'error', message: 'Confirmation username mismatch', target: 'account' });
+      return;
+    }
+
+    const refreshToken = useAppStore.getState().refreshToken;
+    if (!refreshToken) {
+      setStatus({ type: 'error', message: 'Authentication session expired', target: 'account' });
+      return;
+    }
+
+    try {
+      await deleteAccount({ refresh_token: refreshToken });
+    } catch (error) {
+      setStatus({ type: 'error', message: 'Account termination failed', target: 'account' });
+    }
+  };
+
+  const handleMfaToggle = async () => {
+    if (!is2FAEnabled) {
+      try {
+        const response = await enableMfa('TOTP');
+        setStatus({ type: 'success', message: `MFA Seed: ${response.secret_base32}`, target: 'mfa' });
+        if (user) {
+          useAppStore.getState().setUser({ ...user, mfa_enabled: true });
+        }
+      } catch (error) {
+        setStatus({ type: 'error', message: 'MFA activation failed', target: 'mfa' });
+      }
+    } else {
+      try {
+        await disableMfa();
+        setStatus({ type: 'success', message: 'MFA deactivated successfully', target: 'mfa' });
+        if (user) {
+          useAppStore.getState().setUser({ ...user, mfa_enabled: false });
+        }
+      } catch (error) {
+        setStatus({ type: 'error', message: 'MFA deactivation failed', target: 'mfa' });
+      }
+    }
+  };
+
+  const handleUnlink = async (provider: 'google' | 'github') => {
+    try {
+      await unlinkProvider(provider);
+      setStatus({ type: 'success', message: `${provider} unlinked successfully`, target: 'mfa' });
+    } catch (error) {
+      setStatus({ type: 'error', message: `Failed to unlink ${provider}`, target: 'mfa' });
+    }
   };
 
   const onSaveTheme = async (t: string) => {
@@ -101,22 +228,13 @@ export const ProfileView = () => {
       theme: {
         name: t,
         is_preset: true,
-        font_main: font,
-        colors: customColors
+        font_main: useAppStore.getState().font,
+        colors: useAppStore.getState().customColors
       }
     });
     // The profile in the store will be updated by useProfile's onSuccess 
     // but we can also manually refresh it for certainty.
     await refreshProfile();
-  };
-
-  const onDeleteAccount = async () => {
-    if (deleteConfirmationText !== user?.username) {
-      alert("Confirmation text does not match username");
-      return;
-    }
-    await deleteProfile();
-    alert("Protocol Initiated: Account has been scheduled for deletion.");
   };
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,6 +245,8 @@ export const ProfileView = () => {
   };
 
   if (isLoading) return <div className="p-10 text-center uppercase font-bold tracking-widest animate-pulse">Initializing Data Stream...</div>;
+
+  const { theme, font, customColors } = useAppStore.getState();
 
   return (
     <div className="max-w-[1000px] mx-auto pt-10 h-[calc(100vh-80px)] flex flex-col overflow-hidden font-main text-text">
@@ -228,10 +348,15 @@ export const ProfileView = () => {
                         onClick={() => setIsEditingUsername(true)}
                         className={!isEditingUsername ? "cursor-pointer hover:border-main/30 transition-colors" : ""}
                       />
+                      {status?.target === 'username' && <StatusDisplay type={status.type} message={status.message} />}
                       {isEditingUsername && (
                         <div className="flex gap-2 animate-in slide-in-from-top-2">
                           <Button type="submit" variant="primary">COMMIT_USERNAME</Button>
-                          <Button type="button" variant="outline" onClick={(e) => { e.stopPropagation(); setIsEditingUsername(false); }}>CANCEL</Button>
+                          <Button type="button" variant="outline" onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setIsEditingUsername(false); 
+                            resetUsername({ username: user?.username });
+                          }}>CANCEL</Button>
                         </div>
                       )}
                     </form>
@@ -245,10 +370,15 @@ export const ProfileView = () => {
                         onClick={() => setIsEditingEmail(true)}
                         className={!isEditingEmail ? "cursor-pointer hover:border-main/30 transition-colors" : ""}
                       />
+                      {status?.target === 'email' && <StatusDisplay type={status.type} message={status.message} />}
                       {isEditingEmail && (
                         <div className="flex gap-2 animate-in slide-in-from-top-2">
-                          <Button type="submit" variant="primary">UPDATE_EMAIL</Button>
-                          <Button type="button" variant="outline" onClick={(e) => { e.stopPropagation(); setIsEditingEmail(false); }}>CANCEL</Button>
+                          <Button type="submit" variant="primary">COMMIT_EMAIL</Button>
+                          <Button type="button" variant="outline" onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setIsEditingEmail(false); 
+                            resetEmail({ newEmail: user?.email });
+                          }}>CANCEL</Button>
                         </div>
                       )}
                     </form>
@@ -257,7 +387,7 @@ export const ProfileView = () => {
                     <form onSubmit={handlePasswordSubmit(onUpdatePassword)} className="grid gap-4 p-6 bg-sub-alt/5 border border-main/10 rounded-2xl">
                       {!isEditingPassword ? (
                         <Input 
-                          label="Security Password" 
+                          label={user?.has_password ? "Security Password" : "Set Security Password"} 
                           type="password" 
                           value="********" 
                           readOnly 
@@ -266,17 +396,22 @@ export const ProfileView = () => {
                         />
                       ) : (
                         <div className="space-y-4 animate-in slide-in-from-top-2">
-                          <Input label="Current Password" type="password" {...regPassword("currentPassword")} required />
+                          {user?.has_password && (
+                            <Input label="Current Password" type="password" {...regPassword("currentPassword")} required />
+                          )}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <Input label="New Password" type="password" {...regPassword("newPassword")} required />
                             <Input label="Confirm New Password" type="password" {...regPassword("confirmPassword")} required />
                           </div>
                           <div className="flex gap-2">
-                            <Button type="submit" variant="primary">ROTATE_CREDENTIALS</Button>
+                            <Button type="submit" variant="primary">
+                              {user?.has_password ? "ROTATE_CREDENTIALS" : "SET_INITIAL_PASSWORD"}
+                            </Button>
                             <Button type="button" variant="outline" onClick={() => { setIsEditingPassword(false); resetPassword(); }}>CANCEL</Button>
                           </div>
                         </div>
                       )}
+                      {status?.target === 'password' && <StatusDisplay type={status.type} message={status.message} />}
                     </form>
                   </div>
                 </section>
@@ -284,8 +419,14 @@ export const ProfileView = () => {
                 <section className="pt-10 border-t border-main/10">
                   <h4 className="text-[10px] font-bold text-sub uppercase mb-6 font-mono tracking-widest italic opacity-60">Authentication Layers</h4>
                   <div className="p-6 bg-sub-alt/5 border border-main/10 rounded-xl flex items-center justify-between shadow-inner">
-                    <p className="text-sm font-bold text-text uppercase">Multi-Factor Authentication</p>
-                    <button onClick={() => setIs2FAEnabled(!is2FAEnabled)} className={`w-11 h-6 rounded-full transition-all relative border-2 ${is2FAEnabled ? 'bg-main border-main' : 'bg-transparent border-sub/30'}`}>
+                    <div>
+                      <p className="text-sm font-bold text-text uppercase">Multi-Factor Authentication</p>
+                      {status?.target === 'mfa' && <StatusDisplay type={status.type} message={status.message} />}
+                    </div>
+                    <button 
+                      onClick={handleMfaToggle} 
+                      className={`w-11 h-6 rounded-full transition-all relative border-2 ${is2FAEnabled ? 'bg-main border-main' : 'bg-transparent border-sub/30'}`}
+                    >
                       <div className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${is2FAEnabled ? 'left-6 bg-bg' : 'left-0.5 bg-sub/50'}`} />
                     </button>
                   </div>
@@ -294,20 +435,73 @@ export const ProfileView = () => {
                 <section className="pt-10 border-t border-main/10">
                   <h4 className="text-[10px] font-bold text-sub uppercase mb-6 font-mono opacity-60 italic">Identity Providers</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-4 p-4 bg-main/5 border-2 border-main rounded-2xl">
-                      <GithubCircle className="w-6 h-6 text-main" />
-                      <div>
-                        <p className="text-[10px] font-bold text-main uppercase">Linked</p>
-                        <p className="text-sm text-text font-mono italic text-[11px]">github/{user?.username}</p>
+                    {/* GitHub Provider */}
+                    {linkedProviders.find(p => p.name === 'github') ? (
+                      <div className="flex items-center justify-between p-4 bg-main/5 border-2 border-main rounded-2xl animate-in zoom-in-95">
+                        <div className="flex items-center gap-4">
+                          <GithubCircle className="w-6 h-6 text-main" />
+                          <div>
+                            <p className="text-[10px] font-bold text-main uppercase tracking-widest">Linked</p>
+                            <p className="text-sm text-text font-mono italic text-[11px]">
+                              {linkedProviders.find(p => p.name === 'github')?.provider_id}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleUnlink('github')}
+                          disabled={isUnlinking}
+                          className="text-[10px] font-bold text-main/50 hover:text-error uppercase tracking-widest transition-colors"
+                        >
+                          [ UNLINK ]
+                        </button>
                       </div>
-                    </div>
-                    <button className="flex items-center gap-4 p-4 border-2 border-sub/20 rounded-2xl hover:border-main/50 transition-all group text-left">
-                      <GoogleCircle className="w-6 h-6 text-sub group-hover:text-main" />
-                      <div>
-                        <p className="text-[10px] font-bold text-sub uppercase group-hover:text-main tracking-widest">Available</p>
-                        <p className="text-sm text-sub group-hover:text-text font-bold">Connect Google</p>
+                    ) : (
+                      <button 
+                        onClick={() => getOAuthUrl('github')}
+                        disabled={isLoadingProviders}
+                        className="flex items-center gap-4 p-4 border-2 border-sub/20 rounded-2xl hover:border-main/50 transition-all group text-left disabled:opacity-50"
+                      >
+                        <GithubCircle className="w-6 h-6 text-sub group-hover:text-main" />
+                        <div>
+                          <p className="text-[10px] font-bold text-sub uppercase group-hover:text-main tracking-widest">Available</p>
+                          <p className="text-sm text-sub group-hover:text-text font-bold uppercase">Connect GitHub</p>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Google Provider */}
+                    {linkedProviders.find(p => p.name === 'google') ? (
+                      <div className="flex items-center justify-between p-4 bg-main/5 border-2 border-main rounded-2xl animate-in zoom-in-95">
+                        <div className="flex items-center gap-4">
+                          <GoogleCircle className="w-6 h-6 text-main" />
+                          <div>
+                            <p className="text-[10px] font-bold text-main uppercase tracking-widest">Linked</p>
+                            <p className="text-sm text-text font-mono italic text-[11px]">
+                              {linkedProviders.find(p => p.name === 'google')?.provider_id}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => handleUnlink('google')}
+                          disabled={isUnlinking}
+                          className="text-[10px] font-bold text-main/50 hover:text-error uppercase tracking-widest transition-colors"
+                        >
+                          [ UNLINK ]
+                        </button>
                       </div>
-                    </button>
+                    ) : (
+                      <button 
+                        onClick={() => getOAuthUrl('google')}
+                        disabled={isLoadingProviders}
+                        className="flex items-center gap-4 p-4 border-2 border-sub/20 rounded-2xl hover:border-main/50 transition-all group text-left disabled:opacity-50"
+                      >
+                        <GoogleCircle className="w-6 h-6 text-sub group-hover:text-main" />
+                        <div>
+                          <p className="text-[10px] font-bold text-sub uppercase group-hover:text-main tracking-widest">Available</p>
+                          <p className="text-sm text-sub group-hover:text-text font-bold uppercase">Connect Google</p>
+                        </div>
+                      </button>
+                    )}
                   </div>
                 </section>
 
@@ -335,6 +529,7 @@ export const ProfileView = () => {
                           onChange={(e) => setDeleteConfirmationText(e.target.value)}
                           className="border-error/50 focus:border-error"
                         />
+                        {status?.target === 'account' && <StatusDisplay type={status.type} message={status.message} />}
                         <div className="flex gap-2">
                           <Button 
                             variant="primary" 

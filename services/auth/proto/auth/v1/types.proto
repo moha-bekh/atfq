@@ -8,6 +8,8 @@ message User {
   string id = 1;
   string username = 2;
   string email = 3;
+  bool has_password = 4;
+  bool mfa_enabled = 5;
 }
 
 message AuthSuccess {
@@ -101,4 +103,18 @@ message DeleteUserRequest {
 
 message UserIdMessage {
   string id = 1;
+}
+
+message LinkedProvider {
+  string name = 1;
+  string provider_id = 2;
+}
+
+message LinkedProvidersResponse {
+  repeated LinkedProvider providers = 1;
+}
+
+message UnlinkProviderRequest {
+  string access_token = 1;
+  string provider = 2;
 }

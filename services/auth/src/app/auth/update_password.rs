@@ -18,15 +18,15 @@ impl UpdatePasswordUseCase {
         let user = self.repo.find_by_id(id).await?
             .ok_or(DomainError::NotFound)?;
 
-        let current_hash = user.password_hash.ok_or(DomainError::Unauthenticated)?;
-
-        if !self.crypto.verify_password(old_password, &current_hash) {
-            return Err(DomainError::Unauthenticated);
+        if let Some(current_hash) = user.password_hash.as_ref().filter(|h| !h.is_empty()) {
+            if !self.crypto.verify_password(old_password, current_hash) {
+                return Err(DomainError::Unauthenticated);
+            }
         }
 
         let new_hash = self.crypto.hash_password(new_password)
             .map_err(DomainError::Internal)?;
 
-        self.repo.update_password(id, &current_hash, &new_hash).await
+        self.repo.update_password(id, &new_hash).await
     }
 }

@@ -54,7 +54,7 @@ impl UserRepository for MockUserRepo {
             id: Uuid::new_v4(),
             username: data.username,
             email: data.email,
-            password_hash: if data.password_hash.is_empty() { None } else { Some(data.password_hash) },
+            password_hash: data.password_hash,
             mfa_secret: None,
             mfa_nonce: None,
             created_at: chrono::Utc::now(),
@@ -113,7 +113,7 @@ impl UserRepository for MockUserRepo {
         unimplemented!()
     }
 
-    async fn update_password(&self, _id: uuid::Uuid, _old_password_hash: &str, _new_password_hash: &str) -> Result<(), DomainError> {
+    async fn update_password(&self, _id: uuid::Uuid, _new_password_hash: &str) -> Result<(), DomainError> {
         unimplemented!()
     }
 }
@@ -424,7 +424,7 @@ async fn test_oauth_handle_callback_existing_oauth_account() {
     let user = repo.save_user(UserDto {
         username: crate::domain::types::Username::new("already_linked").unwrap(),
         email: crate::domain::types::Email::new("linked@example.com").unwrap(),
-        password_hash: "".into(),
+        password_hash: None,
     }).await.unwrap();
     repo.link_oauth_account(user.id, provider_name, provider_id).await.unwrap();
     

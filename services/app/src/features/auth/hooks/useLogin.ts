@@ -5,7 +5,7 @@ import { useAppStore } from '@/stores/app.store';
 import type { LoginRequest } from '../types';
 import type { HTTPError } from 'ky';
 
-export function useLogin() {
+export function useLogin(onMfaRequired?: (id: string) => void) {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuth = useAppStore(state => state.setAuth);
@@ -24,7 +24,12 @@ export function useLogin() {
         const from = (location.state as any)?.from?.pathname || '/wiki';
         navigate(from, { replace: true });
       } else if (data.status === "MFA_REQUIRED") {
-        console.log("MFA required");
+        if (onMfaRequired && data.mfa_login_id) {
+          onMfaRequired(data.mfa_login_id);
+        } else if (onMfaRequired) {
+          // Fallback if the backend uses a different field name for the ID
+          onMfaRequired(data.login_request_id || "pending");
+        }
       }
     },
     onError: async (error: HTTPError) => {

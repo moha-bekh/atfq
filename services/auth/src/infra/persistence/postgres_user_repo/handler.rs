@@ -27,6 +27,10 @@ impl UserRepository for PostgresUserRepository {
         self.enable_mfa_handler(id, mfa).await
     }
 
+    async fn disable_mfa(&self, id: uuid::Uuid) -> Result<(), DomainError> {
+        self.disable_mfa_handler(id).await
+    }
+
     async fn find_by_id(&self, id: uuid::Uuid) -> Result<Option<User>, DomainError> {
         self.find_by_id_handler(id).await
     }
@@ -45,6 +49,10 @@ impl UserRepository for PostgresUserRepository {
         self.link_oauth_account_handler(user_id, provider, provider_id).await
     }
 
+    async fn unlink_oauth_account(&self, user_id: uuid::Uuid, provider: &str) -> Result<(), DomainError> {
+        self.unlink_oauth_account_handler(user_id, provider).await
+    }
+
     async fn delete_by_id(&self, id: uuid::Uuid) -> Result<(), DomainError> {
         self.delete_by_id_handler(id).await
     }
@@ -57,7 +65,11 @@ impl UserRepository for PostgresUserRepository {
         self.update_username_handler(id, new_username).await
     }
 
-    async fn update_password(&self, id: uuid::Uuid, old_password_hash: &str, new_password_hash: &str) -> Result<(), DomainError> {
-        self.update_password_handler(id, old_password_hash, new_password_hash).await
+    async fn update_password(&self, id: uuid::Uuid, new_password_hash: &str) -> Result<(), DomainError> {
+        self.update_password_handler(id, new_password_hash).await
+    }
+
+    async fn find_oauth_accounts(&self, user_id: uuid::Uuid) -> Result<Vec<(String, String)>, DomainError> {
+        self.find_oauth_accounts_handler(user_id).await
     }
 }

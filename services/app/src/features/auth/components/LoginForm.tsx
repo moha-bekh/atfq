@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { GoogleCircle } from '@/assets/icons/GoogleCircle';
 import { GithubCircle } from '@/assets/icons/GithubCircle';
 
-export function LoginForm() {
-  const mutation = useLogin();
+export function LoginForm({ onMfaRequired }: { onMfaRequired?: (id: string) => void }) {
+  const mutation = useLogin(onMfaRequired);
   const { getOAuthUrl, isProcessing } = useOAuth();
 
   const {

@@ -24,6 +24,7 @@ interface AppState {
 
   // Actions
   setAuth: (data: AuthSuccess) => void;
+  setUser: (user: User) => void;
   setProfile: (profile: Profile) => void;
   updateTheme: (themeUpdate: Partial<Theme>) => void;
   setCustomColor: (key: string, color: string) => void;
@@ -71,6 +72,10 @@ export const useAppStore = create<AppState>()(
           isAuthenticated: true 
         });
         get().refreshProfile();
+      },
+
+      setUser: (user) => {
+        set({ user });
       },
 
       setProfile: (profile) => {

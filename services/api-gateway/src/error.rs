@@ -6,6 +6,7 @@ use tonic::Code;
 pub enum AppError {
     Grpc(tonic::Status),
     Internal(String),
+    Unauthorized(String),
 }
 
 impl IntoResponse for AppError {
@@ -22,6 +23,7 @@ impl IntoResponse for AppError {
                 (code, status.message().to_string())
             }
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
         };
 
         let body = Json(json!({

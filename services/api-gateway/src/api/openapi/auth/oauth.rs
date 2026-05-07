@@ -19,3 +19,14 @@ pub struct OAuthCallbackParams {
     pub code: String,
     pub state: String,
 }
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct LinkedProvider {
+    pub name: String,
+    pub provider_id: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct LinkedProvidersResponse {
+    pub providers: Vec<LinkedProvider>,
+}

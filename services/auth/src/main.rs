@@ -111,6 +111,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         jwt_service.clone(),
     ));
 
+    let disable_mfa_uc = Arc::new(auth::app::auth::disable_mfa::DisableMfaUseCase::new(
+        user_repo.clone(),
+    ));
+
     let verify_mfa_uc = Arc::new(VerifyMfaUseCase::new(
         user_repo.clone(),
         encryption_service.clone(),
@@ -135,7 +139,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_profile_service.clone(),
     ));
 
+    let unlink_oauth_uc = Arc::new(auth::app::auth::unlink_oauth::UnlinkOAuthUseCase::new(
+        user_repo.clone(),
+    ));
+
     let get_user_uc = Arc::new(GetUserUseCase::new(
+        user_repo.clone(),
+    ));
+
+    let get_linked_providers_uc = Arc::new(auth::app::auth::get_linked_providers::GetLinkedProvidersUseCase::new(
         user_repo.clone(),
     ));
 
@@ -174,11 +186,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         register_uc,
         login_uc,
         enable_mfa_uc,
+        disable_mfa_uc,
         verify_mfa_uc,
         logout_uc,
         refresh_uc,
         oauth_uc,
+        unlink_oauth_uc,
         get_user_uc,
+        get_linked_providers_uc,
         delete_user_uc,
         update_email_uc,
         update_username_uc,

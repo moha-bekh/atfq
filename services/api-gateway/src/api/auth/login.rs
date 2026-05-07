@@ -50,24 +50,27 @@ pub async fn login_handler(
                     status: "SUCCESS".into(),
                     access_token: Some(success.access_token),
                     refresh_token: Some(success.refresh_token),
+                    mfa_login_id: None,
                     user: Some(UserSchema {
                         id: user.id,
                         username: user.username.clone(),
                         email: user.email,
                         avatar_url: Some(user.username),
+                        has_password: user.has_password,
+                        mfa_enabled: user.mfa_enabled,
                     })
 
                 })
             ))
         },
-        Some(AuthResult::MfaRequired(_)) => {
-            // Optionnel: Gérer le MFA ici
+        Some(AuthResult::MfaRequired(mfa)) => {
             Ok((
                 axum::http::StatusCode::ACCEPTED,
                 Json(LoginResponse { 
                     status: "MFA_REQUIRED".into(),
                     access_token: None,
                     refresh_token: None,
+                    mfa_login_id: Some(mfa.login_request_id),
                     user: None,
                 })
             ))

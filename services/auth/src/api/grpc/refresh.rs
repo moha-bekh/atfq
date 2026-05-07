@@ -17,6 +17,8 @@ impl AuthHandler {
                     id: result.user.id.to_string(),
                     username: result.user.username.to_string(),
                     email: result.user.email.to_string(),
+                    has_password: result.user.password_hash.as_ref().map(|h| !h.is_empty()).unwrap_or(false),
+                    mfa_enabled: result.user.mfa_secret.is_some(),
                 }),
                 access_token: result.access_token,
                 refresh_token: result.refresh_token,

@@ -6,6 +6,7 @@ pub struct TokenPair {
     pub refresh: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct TokenClaims {
     pub user_id: Uuid,
     pub exp: usize,

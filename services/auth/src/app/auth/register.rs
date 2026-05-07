@@ -45,7 +45,7 @@ impl RegisterUseCase {
         let dto = UserDto {
             username,
             email,
-            password_hash: hashed_password,
+            password_hash: Some(hashed_password),
         };
 
         let user = self.repo.save_user(dto).await?;

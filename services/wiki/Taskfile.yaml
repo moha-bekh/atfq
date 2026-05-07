@@ -125,6 +125,11 @@ tasks:
           localhost:8084 wiki.WikiService/SearchArticles
 
 
+  seed:
+    desc: "Seed the database with initial articles"
+    cmds:
+      - ./scripts/seed.sh
+
   db-shell:
     desc: "Open an interactive Postgres shell inside the container"
     interactive: true

@@ -39,11 +39,11 @@ impl AuthServiceMethod {
 #[derive(Clone)]
 pub struct AuthLayer {
     pub token_service: Arc<dyn TokenService>,
-    pub cache_service: Arc<RedisCache>,
+    pub cache_service: Arc<dyn CacheService>,
 }
 
 impl AuthLayer {
-    pub fn new(token_service: Arc<dyn TokenService>, cache_service: Arc<RedisCache>) -> Self {
+    pub fn new(token_service: Arc<dyn TokenService>, cache_service: Arc<dyn CacheService>) -> Self {
         Self {
             token_service,
             cache_service,
@@ -67,12 +67,12 @@ impl<S> Layer<S> for AuthLayer {
 pub struct AuthService<S> {
     inner: S,
     token_service: Arc<dyn TokenService>,
-    cache_service: Arc<RedisCache>,
+    cache_service: Arc<dyn CacheService>,
 }
 
-impl<S> Service<HttpRequest<Body>> for AuthService<S>
+impl<S> Service<HttpRequest<BoxBody>> for AuthService<S>
 where
-    S: Service<HttpRequest<Body>, Response = HttpResponse<BoxBody>> + Clone + Send + 'static,
+    S: Service<HttpRequest<BoxBody>, Response = HttpResponse<BoxBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = HttpResponse<BoxBody>;
@@ -83,7 +83,7 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: HttpRequest<Body>) -> Self::Future {
+    fn call(&mut self, req: HttpRequest<BoxBody>) -> Self::Future {
         let mut inner = self.inner.clone();
         let token_service = self.token_service.clone();
         let cache_service = self.cache_service.clone();

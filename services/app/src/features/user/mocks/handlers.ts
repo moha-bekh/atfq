@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import type { Profile, Theme } from '../types';
+import type { Profile } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL;
 

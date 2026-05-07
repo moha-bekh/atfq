@@ -11,6 +11,7 @@ service AuthService {
   rpc Login(LoginRequest) returns (AuthResponse);
   rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
   rpc EnableMFA(EnableMFARequest) returns (EnableMFAResponse);
+  rpc DisableMFA(GetUserRequest) returns (google.protobuf.Empty);
   rpc VerifyMFA(VerifyMFARequest) returns (AuthSuccess);
   rpc RefreshToken(RefreshRequest) returns (AuthResponse);
 
@@ -19,6 +20,9 @@ service AuthService {
   rpc UpdateUsername(UpdateUsernameRequest) returns (google.protobuf.Empty);
   rpc UpdatePassword(UpdatePasswordRequest) returns (google.protobuf.Empty);
   rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+
+  rpc GetLinkedProviders(GetUserRequest) returns (LinkedProvidersResponse);
+  rpc UnlinkProvider(UnlinkProviderRequest) returns (google.protobuf.Empty);
 
   rpc GetOAuthUrl(OAuthUrlRequest) returns (OAuthUrlResponse);
   rpc OAuthCallback(OAuthCallbackRequest) returns (AuthResponse);

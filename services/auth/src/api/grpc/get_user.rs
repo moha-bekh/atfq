@@ -24,6 +24,8 @@ impl AuthHandler {
             id: user.id.to_string(),
             username: user.username.to_string(),
             email: user.email.to_string(),
+            has_password: user.password_hash.as_ref().map(|h| !h.is_empty()).unwrap_or(false),
+            mfa_enabled: user.mfa_secret.is_some(),
         };
 
         Ok(Response::new(response))

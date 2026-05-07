@@ -9,6 +9,7 @@ enum OAuthProvider {
 
 message OAuthUrlRequest {
   OAuthProvider provider = 1;
+  optional string linking_user_id = 2;
 }
 
 message OAuthUrlResponse {

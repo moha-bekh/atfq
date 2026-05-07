@@ -27,10 +27,14 @@ impl OAuthUseCase {
         Self { repo, tokens, cache, profiles }
     }
 
-    pub async fn get_auth_url(&self, provider: Arc<dyn OAuthProvider>) -> Result<String, DomainError> {
+    pub async fn get_auth_url(&self, provider: Arc<dyn OAuthProvider>, linking_user_id: Option<String>) -> Result<String, DomainError> {
         let (url, state) = provider.generate_auth_url();
 
         self.cache.set(&format!("oauth_state:{}", state), "pending", Duration::from_secs(600)).await?;
+        
+        if let Some(user_id) = linking_user_id {
+            self.cache.set(&format!("oauth_link:{}", state), &user_id, Duration::from_secs(600)).await?;
+        }
 
         Ok(url)
     }
@@ -49,40 +53,60 @@ impl OAuthUseCase {
         }
         self.cache.delete(&state_key).await?;
 
+        // Check if this was a linking request
+        let link_key = format!("oauth_link:{}", state);
+        let linking_user_id: Option<String> = self.cache.get(&link_key).await.ok().flatten();
+        if linking_user_id.is_some() {
+            self.cache.delete(&link_key).await?;
+        }
+
         let oauth_user = provider.fetch_user_info(code).await?;
 
-        let user = self.repo.find_by_oauth_id(provider_name, &oauth_user.provider_id).await?;
+        let user = if let Some(id_str) = linking_user_id {
+            // Priority: Link to the specific user requesting the link
+            let target_id = uuid::Uuid::parse_str(&id_str)
+                .map_err(|_| DomainError::InvalidInput("Invalid linking user id".into()))?;
+            
+            let user = self.repo.find_by_id(target_id).await?
+                .ok_or(DomainError::NotFound)?;
+            
+            self.repo.link_oauth_account(user.id, provider_name, &oauth_user.provider_id).await?;
+            user
+        } else {
+            // Standard login/registration logic
+            let user = self.repo.find_by_oauth_id(provider_name, &oauth_user.provider_id).await?;
 
-        let user = match user {
-            Some(u) => u,
-            None => {
-                let existing_user = self.repo.find_by_email(&oauth_user.email).await?;
+            match user {
+                Some(u) => u,
+                None => {
+                    let existing_user = self.repo.find_by_email(&oauth_user.email).await?;
 
-                match existing_user {
-                    Some(u) => {
-                        self.repo.link_oauth_account(u.id, provider_name, &oauth_user.provider_id).await?;
-                        u
-                    },
-                    None => {
-                        let mut username_base = oauth_user.username.replace(" ", "_").to_lowercase();
-                        if username_base.is_empty() {
-                            username_base = oauth_user.email.split('@').next().unwrap_or("user").to_string();
+                    match existing_user {
+                        Some(u) => {
+                            self.repo.link_oauth_account(u.id, provider_name, &oauth_user.provider_id).await?;
+                            u
+                        },
+                        None => {
+                            let mut username_base = oauth_user.username.replace(" ", "_").to_lowercase();
+                            if username_base.is_empty() {
+                                username_base = oauth_user.email.split('@').next().unwrap_or("user").to_string();
+                            }
+
+                            let dto = UserDto {
+                                username: crate::domain::types::Username::new(&username_base)?,
+                                email: crate::domain::types::Email::new(&oauth_user.email)?,
+                                password_hash: None,
+                            };
+                            let new_user = self.repo.save_user(dto).await?;
+                            self.repo.link_oauth_account(new_user.id, provider_name, &oauth_user.provider_id).await?;
+
+                            // Create profile in User service
+                            if let Err(e) = self.profiles.create_profile(new_user.id).await {
+                                 eprintln!("Failed to create user profile for {}: {}", new_user.id, e);
+                            }
+
+                            new_user
                         }
-
-                        let dto = UserDto {
-                            username: crate::domain::types::Username::new(&username_base)?,
-                            email: crate::domain::types::Email::new(&oauth_user.email)?,
-                            password_hash: "".to_string(),
-                        };
-                        let new_user = self.repo.save_user(dto).await?;
-                        self.repo.link_oauth_account(new_user.id, provider_name, &oauth_user.provider_id).await?;
-
-                        // Create profile in User service
-                        if let Err(e) = self.profiles.create_profile(new_user.id).await {
-                             eprintln!("Failed to create user profile for {}: {}", new_user.id, e);
-                        }
-
-                        new_user
                     }
                 }
             }

@@ -15,11 +15,14 @@ use crate::auth_proto::{
 use crate::app::auth::register::RegisterUseCase;
 use crate::app::auth::login::LoginUseCase;
 use crate::app::auth::enable_mfa::EnableMfaUseCase;
+use crate::app::auth::disable_mfa::DisableMfaUseCase;
 use crate::app::auth::verify_mfa::VerifyMfaUseCase;
 use crate::app::auth::logout::LogoutUseCase;
 use crate::app::auth::refresh::RefreshTokenUseCase;
 use crate::app::auth::oauth::OAuthUseCase;
+use crate::app::auth::unlink_oauth::UnlinkOAuthUseCase;
 use crate::app::auth::get_user::GetUserUseCase;
+use crate::app::auth::get_linked_providers::GetLinkedProvidersUseCase;
 use crate::app::auth::delete_user::DeleteUserUseCase;
 use crate::app::auth::update_email::UpdateEmailUseCase;
 use crate::app::auth::update_username::UpdateUsernameUseCase;
@@ -29,17 +32,20 @@ use crate::domain::error::DomainError;
 use crate::domain::ports::cache_service::CacheService;
 use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
-use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdateUsernameRequest, UpdatePasswordRequest, User};
+use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdateUsernameRequest, UpdatePasswordRequest, User, LinkedProvidersResponse, UnlinkProviderRequest};
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
     pub login_uc: Arc<LoginUseCase>,
     pub enable_mfa_uc: Arc<EnableMfaUseCase>,
+    pub disable_mfa_uc: Arc<DisableMfaUseCase>,
     pub verify_mfa_uc: Arc<VerifyMfaUseCase>,
     pub logout_uc: Arc<LogoutUseCase>,
     pub refresh_uc: Arc<RefreshTokenUseCase>,
     pub oauth_uc: Arc<OAuthUseCase>,
+    pub unlink_oauth_uc: Arc<UnlinkOAuthUseCase>,
     pub get_user_uc: Arc<GetUserUseCase>,
+    pub get_linked_providers_uc: Arc<GetLinkedProvidersUseCase>,
     pub delete_user_uc: Arc<DeleteUserUseCase>,
     pub update_email_uc: Arc<UpdateEmailUseCase>,
     pub update_username_uc: Arc<UpdateUsernameUseCase>,
@@ -55,11 +61,14 @@ impl AuthHandler {
         register_uc: Arc<RegisterUseCase>,
         login_uc: Arc<LoginUseCase>,
         enable_mfa_uc: Arc<EnableMfaUseCase>,
+        disable_mfa_uc: Arc<DisableMfaUseCase>,
         verify_mfa_uc: Arc<VerifyMfaUseCase>,
         logout_uc: Arc<LogoutUseCase>,
         refresh_uc: Arc<RefreshTokenUseCase>,
         oauth_uc: Arc<OAuthUseCase>,
+        unlink_oauth_uc: Arc<UnlinkOAuthUseCase>,
         get_user_uc: Arc<GetUserUseCase>,
+        get_linked_providers_uc: Arc<GetLinkedProvidersUseCase>,
         delete_user_uc: Arc<DeleteUserUseCase>,
         update_email_uc: Arc<UpdateEmailUseCase>,
         update_username_uc: Arc<UpdateUsernameUseCase>,
@@ -73,11 +82,14 @@ impl AuthHandler {
             register_uc,
             login_uc,
             enable_mfa_uc,
+            disable_mfa_uc,
             verify_mfa_uc,
             logout_uc,
             refresh_uc,
             oauth_uc,
+            unlink_oauth_uc,
             get_user_uc,
+            get_linked_providers_uc,
             delete_user_uc,
             update_email_uc,
             update_username_uc,
@@ -112,12 +124,24 @@ impl AuthService for AuthHandler {
         self.enable_mfa_handler(request).await
     }
 
+    async fn disable_mfa(&self, request: Request<GetUserRequest>) -> Result<Response<()>, Status> {
+        self.disable_mfa_handler(request).await
+    }
+
     async fn verify_mfa(&self, request: Request<VerifyMfaRequest>) -> Result<Response<AuthSuccess>, Status> {
         self.verify_mfa_handler(request).await
     }
 
     async fn get_user(&self, request: Request<GetUserRequest>) -> Result<Response<User>, Status> {
         self.get_user_handler(request).await
+    }
+
+    async fn get_linked_providers(&self, request: Request<GetUserRequest>) -> Result<Response<LinkedProvidersResponse>, Status> {
+        self.get_linked_providers_handler(request).await
+    }
+
+    async fn unlink_provider(&self, request: Request<UnlinkProviderRequest>) -> Result<Response<()>, Status> {
+        self.unlink_provider_handler(request).await
     }
 
     async fn update_email(&self, request: Request<UpdateEmailRequest>) -> Result<Response<()>, Status> {
@@ -147,7 +171,7 @@ impl AuthService for AuthHandler {
 
 pub fn map_domain_error(err: DomainError) -> Status {
     match err {
-        DomainError::AlreadyExists => Status::already_exists("User already exists"),
+        DomainError::AlreadyExists => Status::already_exists("The external account is already linked to another user"),
         DomainError::MfaAlreadyEnabled => Status::already_exists("2FA already enabled"),
         DomainError::InvalidInput(msg) => Status::invalid_argument(msg),
         DomainError::Unauthenticated => Status::unauthenticated("Invalid identifier or password"),

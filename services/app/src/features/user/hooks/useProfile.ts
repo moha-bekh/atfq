@@ -48,7 +48,7 @@ export const useProfile = () => {
   const deleteProfileMutation = useMutation({
     mutationFn: () => userApi.deleteProfile(),
     onSuccess: () => {
-      useAuthStore.getState().logout();
+      useAppStore.getState().logout();
     },
   });
 

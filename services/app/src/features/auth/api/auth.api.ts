@@ -33,4 +33,48 @@ export const authApi = {
   oauthCallback: async (provider: OAuthProvider, params: OAuthCallbackParams): Promise<LoginResponse> => {
     return await api.get(`auth/oauth/callback/${provider}`, { searchParams: params }).json<LoginResponse>();
   },
+
+  enableMfa: async (payload: { method: 'TOTP' | 'SMS' }): Promise<{ secret_base32: string }> => {
+    return await api.post('auth/mfa/enable', { json: payload }).json();
+  },
+
+  disableMfa: async (): Promise<void> => {
+    await api.post('auth/mfa/disable');
+  },
+
+  verifyMfa: async (payload: { login_request_id: string; code: string }): Promise<LoginResponse> => {
+    return await api.post('auth/mfa/verify', { json: payload }).json();
+  },
+
+  refresh: async (payload: { refresh_token: string }): Promise<LoginResponse> => {
+    return await api.post('auth/refresh', { json: payload }).json();
+  },
+
+  getMe: async (): Promise<any> => {
+    return await api.get('auth/me').json();
+  },
+
+  getLinkedProviders: async (): Promise<{ providers: { name: string, provider_id: string }[] }> => {
+    return await api.get('auth/oauth/providers').json();
+  },
+
+  unlinkProvider: async (provider: OAuthProvider): Promise<void> => {
+    await api.delete(`auth/oauth/providers/${provider}`);
+  },
+
+  updateEmail: async (payload: { new_email: string }): Promise<void> => {
+    await api.put('auth/email', { json: payload });
+  },
+
+  updateUsername: async (payload: { new_username: string }): Promise<void> => {
+    await api.put('auth/username', { json: payload });
+  },
+
+  updatePassword: async (payload: { old_password: string; new_password: string }): Promise<void> => {
+    await api.put('auth/password', { json: payload });
+  },
+
+  deleteAccount: async (payload: { refresh_token: string }): Promise<void> => {
+    await api.delete('auth/account', { json: payload });
+  },
 };

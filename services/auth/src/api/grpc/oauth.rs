@@ -4,6 +4,18 @@ use crate::api::grpc::handler::{AuthHandler, map_domain_error};
 
 impl AuthHandler {
     pub async fn get_oauth_url_handler(&self, request: Request<OAuthUrlRequest>) -> Result<Response<OAuthUrlResponse>, Status> {
+        let mut linking_user_id = None;
+
+        // Try to get user_id from metadata (AuthInterceptor should have populated it or we check header)
+        if let Some(auth_header) = request.metadata().get("authorization") {
+            if let Ok(val) = auth_header.to_str() {
+                let token = val.strip_prefix("Bearer ").unwrap_or(val);
+                if let Ok(claims) = self.token_service.decode_token(token) {
+                    linking_user_id = Some(claims.user_id.to_string());
+                }
+            }
+        }
+
         let req = request.into_inner();
 
         let provider = match OAuthProvider::try_from(req.provider) {
@@ -12,7 +24,7 @@ impl AuthHandler {
             _ => return Err(Status::invalid_argument("Invalid provider")),
         };
 
-        let url = self.oauth_uc.get_auth_url(provider.clone()).await.map_err(map_domain_error)?;
+        let url = self.oauth_uc.get_auth_url(provider.clone(), linking_user_id).await.map_err(map_domain_error)?;
 
         Ok(Response::new(OAuthUrlResponse { url }))
     }
@@ -39,8 +51,10 @@ impl AuthHandler {
                 refresh_token: auth_result.refresh_token,
                 user: Some(crate::auth_proto::User {
                     id: auth_result.user.id.to_string(),
-                    username: auth_result.user.username.as_str().to_string(),
-                    email: auth_result.user.email.as_str().to_string(),
+                    username: auth_result.user.username.to_string(),
+                    email: auth_result.user.email.to_string(),
+                    has_password: auth_result.user.password_hash.as_ref().map(|h| !h.is_empty()).unwrap_or(false),
+                    mfa_enabled: auth_result.user.mfa_secret.is_some(),
                 }),
             })),
         }))

@@ -19,6 +19,8 @@ impl AuthHandler {
                     id: result.user.id.to_string(),
                     username: result.user.username.to_string(),
                     email: result.user.email.to_string(),
+                    has_password: true,
+                    mfa_enabled: false,
                 }),
             })),
         };

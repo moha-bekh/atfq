@@ -9,20 +9,28 @@ impl PostgresUserRepository {
         provider: &str,
         provider_id: &str,
     ) -> Result<(), DomainError> {
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"
             INSERT INTO user_oauth (user_id, provider, provider_id)
             VALUES ($1, $2, $3)
-            ON CONFLICT (provider, provider_id) DO NOTHING
             "#,
             user_id,
             provider,
             provider_id
         )
         .execute(&self.pool)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .await;
 
-        Ok(())
+        match result {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                if let Some(db_err) = e.as_database_error() {
+                    if db_err.is_unique_violation() {
+                        return Err(DomainError::AlreadyExists);
+                    }
+                }
+                Err(DomainError::Internal(e.to_string()))
+            }
+        }
     }
 }

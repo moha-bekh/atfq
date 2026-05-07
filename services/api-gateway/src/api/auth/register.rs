@@ -39,11 +39,14 @@ pub async fn register_handler(
                     status: "SUCCESS".into(),
                     access_token: Some(success.access_token),
                     refresh_token: Some(success.refresh_token),
+                    mfa_login_id: None,
                     user: Some(UserSchema {
                         id: user.id,
                         username: user.username.clone(),
                         email: user.email,
                         avatar_url: Some(user.username),
+                        has_password: true,
+                        mfa_enabled: user.mfa_enabled,
                     })
 
                 })

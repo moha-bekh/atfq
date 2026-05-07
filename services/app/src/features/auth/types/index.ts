@@ -9,6 +9,8 @@ export type User = {
   username: string;
   email: string;
   avatar_url?: string;
+  has_password: boolean;
+  mfa_enabled: boolean;
 };
 
 export type LoginRequest = {
@@ -44,4 +46,42 @@ export type OAuthUrlResponse = {
 export type OAuthCallbackParams = {
   code: string;
   state: string;
+};
+
+// MFA Types
+export type MfaMethod = 'TOTP' | 'SMS';
+
+export type EnableMfaRequest = {
+  method: MfaMethod;
+};
+
+export type EnableMfaResponse = {
+  secret_base32: string;
+};
+
+export type VerifyMfaRequest = {
+  login_request_id: string;
+  code: string;
+};
+
+// Account Management Types
+export type UpdateEmailRequest = {
+  new_email: string;
+};
+
+export type UpdateUsernameRequest = {
+  new_username: string;
+};
+
+export type UpdatePasswordRequest = {
+  old_password: string;
+  new_password: string;
+};
+
+export type DeleteAccountRequest = {
+  refresh_token: string;
+};
+
+export type RefreshRequest = {
+  refresh_token: string;
 };
