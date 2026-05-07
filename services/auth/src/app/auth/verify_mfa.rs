@@ -5,6 +5,7 @@ use crate::domain::ports::{
     mfa_service::MfaService,
     user_repository::UserRepository,
     encryption_service::Ciphertext,
+    crypto_service::CryptoService,
 };
 use crate::domain::error::DomainError;
 use crate::domain::entities::AuthenticatedUser;
@@ -16,6 +17,7 @@ pub struct VerifyMfaUseCase {
     enc: Arc<dyn EncryptionService>,
     mfa: Arc<dyn MfaService>,
     tokens: Arc<dyn TokenService>,
+    crypto: Arc<dyn CryptoService>,
 }
 
 impl VerifyMfaUseCase {
@@ -24,17 +26,25 @@ impl VerifyMfaUseCase {
         enc: Arc<dyn EncryptionService>,
         mfa: Arc<dyn MfaService>,
         tokens: Arc<dyn TokenService>,
+        crypto: Arc<dyn CryptoService>,
     ) -> Self {
-        Self { repo, enc, mfa, tokens }
+        Self { repo, enc, mfa, tokens, crypto }
     }
 
-    pub async fn execute(&self, user_id: &str, code: &str) -> Result<AuthenticatedUser, DomainError> {
+    pub async fn execute(&self, user_id: &str, code: &str, secret_hash: &str) -> Result<AuthenticatedUser, DomainError> {
         let uuid = Uuid::from_str(user_id)
             .map_err(|_| DomainError::Internal("uuid parse error".to_string()))?;
 
         let user = self.repo.find_by_id(uuid)
             .await?
             .ok_or(DomainError::Unauthenticated)?;
+
+        if let Some(secret) = &user.mfa_secret {
+            let current_secret_hash = self.crypto.hash(secret);
+            if current_secret_hash != secret_hash {
+                return Err(DomainError::Unauthenticated);
+            }
+        }
 
         let (mfa_secret, mfa_nonce) = (user.mfa_secret.clone(), user.mfa_nonce.clone());
         let Some((secret, nonce)) = mfa_secret.zip(mfa_nonce) else {
