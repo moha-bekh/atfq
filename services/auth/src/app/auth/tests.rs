@@ -7,6 +7,7 @@ use crate::domain::ports::{
     user_repository::{UserRepository, UserDto},
     token_service::{TokenService, TokenPair, TokenClaims},
     cache_service::CacheService,
+    user_profile_service::UserProfileService,
     crypto_service::CryptoService
 };
 use crate::domain::entities::{LoginResult, User};
@@ -101,6 +102,14 @@ impl UserRepository for MockUserRepo {
         Ok(())
     }
 
+    async fn unlink_oauth_account(&self, _user_id: Uuid, _provider: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+
+    async fn find_oauth_accounts(&self, _user_id: Uuid) -> Result<Vec<(String, String)>, DomainError> {
+        unimplemented!()
+    }
+
     async fn delete_by_id(&self, _id: uuid::Uuid) -> Result<(), DomainError> {
         unimplemented!()
     }
@@ -115,6 +124,18 @@ impl UserRepository for MockUserRepo {
 
     async fn update_password(&self, _id: uuid::Uuid, _new_password_hash: &str) -> Result<(), DomainError> {
         unimplemented!()
+    }
+
+    async fn disable_mfa(&self, _id: uuid::Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+}
+
+struct MockUserProfileService;
+#[async_trait]
+impl UserProfileService for MockUserProfileService {
+    async fn create_profile(&self, _user_id: Uuid) -> Result<(), DomainError> {
+        Ok(())
     }
 }
 
@@ -183,8 +204,9 @@ async fn test_register_success() {
     });
     let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::new_v4()) });
     let crypto = Arc::new(MockCryptoService);
+    let profiles = Arc::new(MockUserProfileService);
     
-    let uc = RegisterUseCase::new(repo, tokens, crypto);
+    let uc = RegisterUseCase::new(repo, tokens, crypto, profiles);
     
     let result = uc.execute("johndoe", "john@example.com", "password123").await;
     
@@ -204,7 +226,7 @@ async fn test_refresh_token_success() {
     let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
     let crypto = Arc::new(MockCryptoService);
     
-    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone());
+    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone(), Arc::new(MockUserProfileService));
     let refresh_uc = RefreshTokenUseCase::new(repo.clone(), cache.clone(), tokens.clone());
     
     // 1. Register a user
@@ -281,7 +303,7 @@ async fn test_login_success_with_email() {
     let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
     let crypto = Arc::new(MockCryptoService);
     
-    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone());
+    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone(), Arc::new(MockUserProfileService));
     let login_uc = LoginUseCase::new(repo, tokens, crypto);
     
     // Register first
@@ -308,14 +330,14 @@ async fn test_oauth_get_url_success() {
     let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
     let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
     
-    let uc = OAuthUseCase::new(repo, tokens, cache.clone());
+    let uc = OAuthUseCase::new(repo, tokens, cache.clone(), Arc::new(MockUserProfileService));
     let provider = Arc::new(MockOAuthProvider {
         auth_url: "https://github.com/login/oauth/authorize?client_id=123".to_string(),
         state: "test_state".to_string(),
         user_info: Err(DomainError::Internal("Not implemented".to_string())),
     });
     
-    let result = uc.get_auth_url(provider).await;
+    let result = uc.get_auth_url(provider, None).await;
     
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "https://github.com/login/oauth/authorize?client_id=123");
@@ -331,7 +353,7 @@ async fn test_oauth_handle_callback_new_user() {
     let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
     let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
     
-    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone());
+    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone(), Arc::new(MockUserProfileService));
     
     let provider_name = "github";
     let state = "test_state";
@@ -375,10 +397,10 @@ async fn test_oauth_handle_callback_link_existing_email() {
     let crypto = Arc::new(MockCryptoService);
     
     // 1. Pre-register a user with the same email
-    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto);
+    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto, Arc::new(MockUserProfileService));
     let existing_user = register_uc.execute("existing_user", "match@example.com", "pass").await.unwrap().user;
     
-    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone());
+    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone(), Arc::new(MockUserProfileService));
     
     let provider_name = "github";
     let state = "test_state";
@@ -415,7 +437,7 @@ async fn test_oauth_handle_callback_existing_oauth_account() {
     let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
     let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
     
-    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone());
+    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone(), Arc::new(MockUserProfileService));
     
     let provider_name = "github";
     let provider_id = "gh_789";

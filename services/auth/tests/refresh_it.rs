@@ -9,6 +9,15 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use std::env;
 use dotenvy::dotenv;
+use async_trait::async_trait;
+
+struct MockUserProfileService;
+#[async_trait]
+impl auth::domain::ports::user_profile_service::UserProfileService for MockUserProfileService {
+    async fn create_profile(&self, _user_id: uuid::Uuid) -> Result<(), auth::domain::error::DomainError> {
+        Ok(())
+    }
+}
 
 async fn setup_pool() -> PgPool {
     dotenvy::from_path("/vault/secrets/.env").ok();
@@ -39,11 +48,13 @@ async fn test_refresh_token_integration() {
     let cache_service = Arc::new(RedisCache::new(&redis_url));
     let jwt_service = Arc::new(JwtAdapter::new("test_secret".into()));
     let crypto_service = Arc::new(Argon2Hasher);
+    let profiles_service = Arc::new(MockUserProfileService);
 
     let register_uc = RegisterUseCase::new(
         user_repo.clone(),
         jwt_service.clone(),
         crypto_service.clone(),
+        profiles_service,
     );
 
     let refresh_uc = RefreshTokenUseCase::new(

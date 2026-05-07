@@ -11,6 +11,14 @@ use std::env;
 use dotenvy::dotenv;
 use async_trait::async_trait;
 
+struct MockUserProfileService;
+#[async_trait]
+impl auth::domain::ports::user_profile_service::UserProfileService for MockUserProfileService {
+    async fn create_profile(&self, _user_id: uuid::Uuid) -> Result<(), auth::domain::error::DomainError> {
+        Ok(())
+    }
+}
+
 async fn setup_pool() -> PgPool {
     dotenvy::from_path("/vault/secrets/.env").ok();
     dotenv().ok();
@@ -66,8 +74,9 @@ async fn test_oauth_registration_and_login_it() {
     let repo = Arc::new(PostgresUserRepository::new(pool.clone()));
     let cache = Arc::new(MockCache { storage: Mutex::new(std::collections::HashMap::new()) });
     let tokens = Arc::new(JwtAdapter::new("test_secret".into()));
+    let profiles = Arc::new(MockUserProfileService);
     
-    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone());
+    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone(), profiles);
     
     let provider_name = "github";
     let provider_id = "gh_it_123";
@@ -87,7 +96,7 @@ async fn test_oauth_registration_and_login_it() {
     });
 
     // 1. Get URL
-    let _ = uc.get_auth_url(provider.clone()).await.unwrap();
+    let _ = uc.get_auth_url(provider.clone(), None).await.unwrap();
     
     // 2. Callback (New User)
     let res = uc.handle_callback(provider_name, provider.clone(), "code".into(), "test_state".into()).await.unwrap();
