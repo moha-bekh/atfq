@@ -120,6 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         encryption_service.clone(),
         mfa_service.clone(),
         jwt_service.clone(),
+        crypto_service.clone(),
     ));
 
     let logout_uc = Arc::new(LogoutUseCase::new(
@@ -200,6 +201,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         update_password_uc,
         cache_service.clone(),
         jwt_service.clone(),
+        crypto_service.clone(),
         google_provider,
         github_provider,
     );

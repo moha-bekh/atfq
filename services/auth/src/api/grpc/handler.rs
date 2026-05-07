@@ -31,6 +31,7 @@ use crate::domain::error::DomainError;
 
 use crate::domain::ports::cache_service::CacheService;
 use crate::domain::ports::token_service::TokenService;
+use crate::domain::ports::crypto_service::CryptoService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
 use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdateUsernameRequest, UpdatePasswordRequest, User, LinkedProvidersResponse, UnlinkProviderRequest};
 
@@ -52,6 +53,7 @@ pub struct AuthHandler {
     pub update_password_uc: Arc<UpdatePasswordUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
+    pub crypto_service: Arc<dyn CryptoService>,
     pub google_provider: Option<Arc<dyn DomainOAuthProvider>>,
     pub github_provider: Option<Arc<dyn DomainOAuthProvider>>,
 }
@@ -75,6 +77,7 @@ impl AuthHandler {
         update_password_uc: Arc<UpdatePasswordUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
+        crypto_service: Arc<dyn CryptoService>,
         google_provider: Option<Arc<dyn DomainOAuthProvider>>,
         github_provider: Option<Arc<dyn DomainOAuthProvider>>,
     ) -> Self {
@@ -96,6 +99,7 @@ impl AuthHandler {
             update_password_uc,
             cache_service,
             token_service,
+            crypto_service,
             google_provider,
             github_provider
         }

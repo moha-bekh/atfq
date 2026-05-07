@@ -2,6 +2,7 @@ use tonic::{Request, Response, Status};
 use crate::api::grpc::handler::{AuthHandler, map_domain_error};
 use crate::auth_proto::{AuthResponse, AuthSuccess, MfaMethod, MfaRequired, User as ProtoUser, auth_response, LoginRequest, identifier};
 use crate::domain::ports::cache_service::CacheService;
+use crate::domain::ports::crypto_service::CryptoService;
 use crate::domain::error::DomainError;
 use crate::domain::entities::{LoginResult, User};
 use std::convert::AsRef;
@@ -10,12 +11,18 @@ use uuid::Uuid;
 
 const DEFAULT_MFA_REQUEST_TTL: Duration = Duration::from_mins(3);
 
-async fn make_login_request(cache: &dyn CacheService, user: &User) -> Result<Uuid, DomainError> {
+async fn make_login_request(cache: &dyn CacheService, crypto: &dyn CryptoService, user: &User) -> Result<Uuid, DomainError> {
     let id = Uuid::new_v4();
 
     let key = format!("mfa:{}", id);
     let counter_key = format!("mfa_attempts:{}", id);
-    let value = user.id.to_string();
+
+    let secret_hash = user.mfa_secret.as_ref()
+        .map(|s| crypto.hash(s))
+        .unwrap_or_default();
+
+    let value = format!("{}:{}", user.id, secret_hash);
+
     cache.set(key.as_str(), value.as_str(), DEFAULT_MFA_REQUEST_TTL)
          .await
          .map_err(|e| DomainError::Internal(e.to_string()))?;
@@ -45,7 +52,7 @@ impl AuthHandler {
 
         let response = match result {
             LoginResult::Requires2FA(user) => {
-                let login_request_id = make_login_request(self.cache_service.as_ref(), &user)
+                let login_request_id = make_login_request(self.cache_service.as_ref(), self.crypto_service.as_ref(), &user)
                     .await
                     .map_err(map_domain_error)?;
                 AuthResponse {

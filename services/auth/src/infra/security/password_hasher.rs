@@ -3,6 +3,7 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
+use sha2::{Sha256, Digest};
 
 pub struct Argon2Hasher;
 
@@ -23,5 +24,11 @@ impl CryptoService for Argon2Hasher {
             return argon2.verify_password(password.as_bytes(), &parsed_hash).is_ok();
         }
         false
+    }
+
+    fn hash(&self, data: &[u8]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        hex::encode(hasher.finalize())
     }
 }

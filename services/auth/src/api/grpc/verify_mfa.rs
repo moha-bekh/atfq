@@ -8,11 +8,19 @@ use std::convert::AsRef;
 
 const MAX_MFA_ATTEMPTS: u64 = 5;
 
-async fn get_requesting_user_id(cache: &dyn CacheService, id: &str) -> Result<String, DomainError> {
+async fn get_requesting_info(cache: &dyn CacheService, id: &str) -> Result<(String, String), DomainError> {
     let key = format!("mfa:{}", id);
-    let user_id = cache.get(&key)
+    let value = cache.get(&key)
          .await?
          .ok_or_else(|| DomainError::Internal("auth request not found".to_string()))?;
+
+    let parts: Vec<&str> = value.split(':').collect();
+    if parts.len() < 2 {
+        return Err(DomainError::Internal("malformed mfa request data".to_string()));
+    }
+
+    let user_id = parts[0].to_string();
+    let secret_hash = parts[1].to_string();
 
     let counter_key = format!("mfa_attempts:{}", id);
     let attempt_count = cache.increment(&counter_key).await?;
@@ -20,7 +28,7 @@ async fn get_requesting_user_id(cache: &dyn CacheService, id: &str) -> Result<St
         return Err(DomainError::Unauthorized);
     }
 
-    Ok(user_id)
+    Ok((user_id, secret_hash))
 }
 
 async fn remove_auth_request(cache: &dyn CacheService, id: &str) -> Result<(), DomainError> {
@@ -36,12 +44,12 @@ impl AuthHandler {
     pub async fn verify_mfa_handler(&self, request: Request<VerifyMfaRequest>) -> Result<Response<AuthSuccess>, Status> {
         let req = request.into_inner();
 
-        let user_id = get_requesting_user_id(self.cache_service.as_ref(), &req.login_request_id)
+        let (user_id, secret_hash) = get_requesting_info(self.cache_service.as_ref(), &req.login_request_id)
             .await
             .map_err(map_domain_error)?;
 
         let authenticated_user = self.verify_mfa_uc
-            .execute(user_id.as_str(), &req.code)
+            .execute(user_id.as_str(), &req.code, &secret_hash)
             .await
             .map_err(map_domain_error)?;
         let user = &authenticated_user.user;
