@@ -6,7 +6,7 @@ include:
   - ./user/docker-compose.yaml
   - ./wiki/docker-compose.yaml
   # - ./vault/docker-compose.yaml
-  # - ./monitoring/docker-compose.yaml
+  - ./monitoring/docker-compose.yaml
 
 networks:
   frontend:

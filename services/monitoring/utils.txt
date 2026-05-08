@@ -1,1 +1,17 @@
-Dashboard-ID: 14282
+Grafana:
+  URL: http://localhost:3000
+  Login: admin
+  Password: admin
+
+Prometheus:
+  URL: http://localhost:9090
+
+cAdvisor:
+  URL: http://localhost:8085
+
+Dashboard provisioned automatically:
+  ATFQ Overview
+
+Note:
+  On Docker Desktop for macOS, cAdvisor may expose Docker VM level metrics instead of
+  detailed per-container metrics because Docker's internal storage path is hidden.

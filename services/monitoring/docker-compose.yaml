@@ -2,21 +2,42 @@ volumes:
   prometheus_data:
   grafana_data:
 
+networks:
+  frontend:
+    name: atfq_frontend
+    driver: bridge
+  backend:
+    name: atfq_backend
+    driver: bridge
+
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.55.1
     container_name: monitoring-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     networks:
       - backend
+    restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.3.1
     container_name: monitoring-grafana
     ports:
       - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
@@ -25,28 +46,34 @@ services:
       - frontend
     depends_on:
       - prometheus
+    restart: unless-stopped
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: monitoring-cadvisor
     privileged: true
     volumes:
-      - /var/run:/var/run:rw
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/rootfs:ro
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
       - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
     networks:
       - backend
+    ports:
+      - "8085:8080"
     command:
       - "--docker_only=true"
       - "--housekeeping_interval=10s"
       - "--disable_metrics=disk,diskIO,tcp,udp,percpu,sched"
       - "--store_container_labels=false"
       - "--whitelisted_container_labels=io.kubernetes.container.name,io.kubernetes.pod.name,io.kubernetes.pod.namespace"
+    restart: unless-stopped
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.8.2
     container_name: monitoring-node-exporter
     # On macOS, node-exporter is limited as it runs inside the Docker Desktop VM.
     # We remove host-specific mounts that don't exist on macOS.
     networks:
       - backend
+    restart: unless-stopped
