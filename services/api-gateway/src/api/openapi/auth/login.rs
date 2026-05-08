@@ -1,6 +1,6 @@
+use super::common::AuthResponse;
 use serde::Deserialize;
 use utoipa::ToSchema;
-use super::common::AuthResponse;
 
 #[derive(Deserialize, ToSchema)]
 pub struct LoginRequest {

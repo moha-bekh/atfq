@@ -1,8 +1,8 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
-use crate::error::AppError;
 use crate::api::openapi::{HelloRequest, HelloResponse};
+use crate::error::AppError;
 use crate::state::AppState;
+use axum::{Json, extract::State};
+use std::sync::Arc;
 
 #[utoipa::path(
     post,
@@ -20,9 +20,7 @@ pub async fn say_hello_handler(
 ) -> Result<Json<HelloResponse>, AppError> {
     let mut client = state.user_client.clone();
 
-    let request = tonic::Request::new(crate::grpc::user::HelloRequest {
-        name: payload.name,
-    });
+    let request = tonic::Request::new(crate::grpc::user::HelloRequest { name: payload.name });
 
     let response = client.say_hello(request).await?.into_inner();
 

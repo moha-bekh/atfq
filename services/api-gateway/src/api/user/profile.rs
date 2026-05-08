@@ -1,14 +1,29 @@
-use axum::{extract::{State, Path, Multipart}, Json, http::HeaderMap};
-use std::sync::Arc;
-use crate::error::AppError;
 use crate::api::openapi::user::profile::{
-    ProfileResponse, CreateProfileRequest, UpdateProfileRequest, 
-    ThemeSchema, UpdateThemeRequest, RoleRequest, PermissionListResponse,
-    RoleChangeRequest, RoleRequestStatusResponse, RoleRequestsListResponse,
-    RoleRequestEntry, ReviewRoleRequest
+    CreateProfileRequest, PermissionListResponse, ProfileResponse, ReviewRoleRequest,
+    RoleChangeRequest, RoleRequest, RoleRequestEntry, RoleRequestStatusResponse,
+    RoleRequestsListResponse, ThemeSchema, UpdateProfileRequest, UpdateThemeRequest,
 };
+use crate::error::AppError;
 use crate::state::AppState;
+use axum::{
+    Json,
+    extract::{Multipart, Path, State},
+    http::HeaderMap,
+};
+use jsonwebtoken::{EncodingKey, Header, encode};
+use serde::Serialize;
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tonic::metadata::MetadataValue;
+
+#[derive(Serialize)]
+struct InternalTokenClaims {
+    sub: String,
+    iat: usize,
+    exp: usize,
+    jti: String,
+    typ: String,
+}
 
 fn add_auth_header<T>(request: &mut tonic::Request<T>, headers: &HeaderMap) {
     if let Some(auth_header) = headers.get("authorization") {
@@ -31,9 +46,72 @@ fn map_grpc_profile(p: crate::grpc::user::Profile) -> ProfileResponse {
             name: t.name,
             colors: t.colors,
             font_main: t.font_main,
+            font_display: t.font_display,
         }),
         created_at: p.created_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
         updated_at: p.updated_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
+    }
+}
+
+fn make_internal_access_token(user_id: &str) -> Result<String, AppError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| AppError::Internal(format!("System clock error: {}", e)))?
+        .as_secs() as usize;
+    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "jwt_secret".to_string());
+
+    encode(
+        &Header::default(),
+        &InternalTokenClaims {
+            sub: user_id.to_string(),
+            iat: now,
+            exp: now + 60,
+            jti: format!("gateway-role-request-{}-{}", user_id, now),
+            typ: "access".to_string(),
+        },
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .map_err(|e| AppError::Internal(format!("Failed to build internal auth token: {}", e)))
+}
+
+async fn resolve_user_identity(
+    state: &Arc<AppState>,
+    user_id: &str,
+) -> (Option<String>, Option<String>) {
+    let Ok(access_token) = make_internal_access_token(user_id) else {
+        return (None, None);
+    };
+
+    let mut client = state.auth_client.clone();
+    let request = tonic::Request::new(crate::grpc::auth::GetUserRequest { access_token });
+
+    match client.get_user(request).await {
+        Ok(response) => {
+            let user = response.into_inner();
+            (Some(user.username), Some(user.email))
+        }
+        Err(_) => (None, None),
+    }
+}
+
+async fn map_role_request_entry(
+    state: &Arc<AppState>,
+    e: crate::grpc::user::role_requests_list::Entry,
+) -> RoleRequestEntry {
+    let user_id = e.id;
+    let (user_username, user_email) = resolve_user_identity(state, &user_id).await;
+
+    RoleRequestEntry {
+        request_id: e.request_id,
+        user_id,
+        user_username,
+        user_email,
+        requested_role: e.requested_role,
+        reason: e.reason,
+        created_at: e.created_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
+        status: e.status,
+        rejection_reason: e.rejection_reason,
+        updated_at: e.updated_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
     }
 }
 
@@ -55,13 +133,15 @@ pub async fn create_profile_handler(
     Json(payload): Json<CreateProfileRequest>,
 ) -> Result<(axum::http::StatusCode, Json<ProfileResponse>), AppError> {
     let mut client = state.user_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::user::CreateProfileRequest {
-        id: payload.id,
-    });
+    let mut request =
+        tonic::Request::new(crate::grpc::user::CreateProfileRequest { id: payload.id });
     add_auth_header(&mut request, &headers);
 
     let response = client.create_profile(request).await?.into_inner();
-    Ok((axum::http::StatusCode::CREATED, Json(map_grpc_profile(response))))
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(map_grpc_profile(response)),
+    ))
 }
 
 #[utoipa::path(
@@ -145,6 +225,7 @@ pub async fn update_theme_handler(
             name: payload.theme.name,
             colors: payload.theme.colors,
             font_main: payload.theme.font_main,
+            font_display: payload.theme.font_display,
         }),
     });
     add_auth_header(&mut request, &headers);
@@ -210,6 +291,35 @@ pub async fn remove_role_handler(
 }
 
 #[utoipa::path(
+    delete,
+    path = "/api/v1/user/profile/roles/{role_name}",
+    operation_id = "leave_role",
+    params(
+        ("role_name" = String, Path, description = "Role name")
+    ),
+    responses(
+        (status = 200, description = "Role left", body = ProfileResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Role not assigned"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn leave_role_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(role_name): Path<String>,
+) -> Result<Json<ProfileResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(crate::grpc::user::LeaveRoleRequest { role_name });
+    add_auth_header(&mut request, &headers);
+
+    let response = client.leave_role(request).await?.into_inner();
+    Ok(Json(map_grpc_profile(response)))
+}
+
+#[utoipa::path(
     get,
     path = "/api/v1/user/permissions",
     operation_id = "list_permissions",
@@ -226,8 +336,13 @@ pub async fn list_permissions_handler(
     let mut client = state.user_client.clone();
     let mut request = tonic::Request::new(());
     add_auth_header(&mut request, &headers);
-    let response = client.list_available_permissions(request).await?.into_inner();
-    Ok(Json(PermissionListResponse { permissions: response.permissions }))
+    let response = client
+        .list_available_permissions(request)
+        .await?
+        .into_inner();
+    Ok(Json(PermissionListResponse {
+        permissions: response.permissions,
+    }))
 }
 
 #[utoipa::path(
@@ -256,10 +371,13 @@ pub async fn create_role_request_handler(
     add_auth_header(&mut request, &headers);
 
     let response = client.create_role_request(request).await?.into_inner();
-    Ok((axum::http::StatusCode::CREATED, Json(RoleRequestStatusResponse {
-        request_id: response.request_id,
-        status: response.status,
-    })))
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(RoleRequestStatusResponse {
+            request_id: response.request_id,
+            status: response.status,
+        }),
+    ))
 }
 
 #[utoipa::path(
@@ -281,14 +399,70 @@ pub async fn list_role_requests_handler(
     let mut request = tonic::Request::new(());
     add_auth_header(&mut request, &headers);
 
-    let response = client.list_pending_role_requests(request).await?.into_inner();
-    let requests = response.requests.into_iter().map(|e| RoleRequestEntry {
-        request_id: e.request_id,
-        user_id: e.id,
-        requested_role: e.requested_role,
-        reason: e.reason,
-        created_at: e.created_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
-    }).collect();
+    let response = client
+        .list_pending_role_requests(request)
+        .await?
+        .into_inner();
+    let mut requests = Vec::with_capacity(response.requests.len());
+    for entry in response.requests {
+        requests.push(map_role_request_entry(&state, entry).await);
+    }
+
+    Ok(Json(RoleRequestsListResponse { requests }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/user/role-requests/history",
+    operation_id = "list_all_role_requests",
+    responses(
+        (status = 200, description = "List of all role requests", body = RoleRequestsListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_all_role_requests_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<RoleRequestsListResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(());
+    add_auth_header(&mut request, &headers);
+
+    let response = client.list_all_role_requests(request).await?.into_inner();
+    let mut requests = Vec::with_capacity(response.requests.len());
+    for entry in response.requests {
+        requests.push(map_role_request_entry(&state, entry).await);
+    }
+
+    Ok(Json(RoleRequestsListResponse { requests }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/user/role-requests/me",
+    operation_id = "list_my_role_requests",
+    responses(
+        (status = 200, description = "List of current user's role requests", body = RoleRequestsListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_my_role_requests_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<RoleRequestsListResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(());
+    add_auth_header(&mut request, &headers);
+
+    let response = client.list_my_role_requests(request).await?.into_inner();
+    let mut requests = Vec::with_capacity(response.requests.len());
+    for entry in response.requests {
+        requests.push(map_role_request_entry(&state, entry).await);
+    }
 
     Ok(Json(RoleRequestsListResponse { requests }))
 }
@@ -323,6 +497,38 @@ pub async fn review_role_request_handler(
 }
 
 #[utoipa::path(
+    delete,
+    path = "/api/v1/user/role-requests/{request_id}",
+    operation_id = "cancel_role_request",
+    params(
+        ("request_id" = String, Path, description = "Role request ID")
+    ),
+    responses(
+        (status = 200, description = "Request canceled", body = RoleRequestStatusResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn cancel_role_request_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Result<Json<RoleRequestStatusResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request =
+        tonic::Request::new(crate::grpc::user::CancelRoleRequestRequest { request_id });
+    add_auth_header(&mut request, &headers);
+
+    let response = client.cancel_role_request(request).await?.into_inner();
+    Ok(Json(RoleRequestStatusResponse {
+        request_id: response.request_id,
+        status: response.status,
+    }))
+}
+
+#[utoipa::path(
     post,
     path = "/api/v1/user/profile/picture",
     operation_id = "upload_profile_picture",
@@ -339,20 +545,28 @@ pub async fn upload_profile_picture_handler(
     mut multipart: Multipart,
 ) -> Result<Json<ProfileResponse>, AppError> {
     let mut client = state.user_client.clone();
-    
+
     let mut image_data = Vec::new();
     let mut extension = String::new();
 
     println!("Received multipart upload request");
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::Internal(e.to_string()))? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+    {
         let name = field.name().unwrap_or_default().to_string();
         println!("Processing field: {}", name);
         if name == "image" {
             let content_type = field.content_type().unwrap_or_default().to_string();
             println!("Field 'image' found. Content-Type: {}", content_type);
             extension = content_type.split('/').last().unwrap_or("png").to_string();
-            image_data = field.bytes().await.map_err(|e| AppError::Internal(e.to_string()))?.to_vec();
+            image_data = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::Internal(e.to_string()))?
+                .to_vec();
             println!("Read {} bytes of image data", image_data.len());
         }
     }

@@ -7,4 +7,9 @@ services:
     networks:
       - backend
       - frontend
+    environment:
+      - STARTUP_MAX_RETRIES=90
+      - JWT_SECRET=jwt_secret
+      - AUTH_DATABASE_URL=postgresql://atfq:atfq@db-auth:5432/atfq_db
+      - USER_DATABASE_URL=postgresql://atfq:atfq@db-user:5432/atfq_db
     restart: unless-stopped

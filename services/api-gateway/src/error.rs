@@ -1,5 +1,5 @@
 use axum::response::{IntoResponse, Response};
-use axum::{http::StatusCode, Json};
+use axum::{Json, http::StatusCode};
 use serde_json::json;
 use tonic::Code;
 
@@ -16,8 +16,10 @@ impl IntoResponse for AppError {
                 let code = match status.code() {
                     Code::InvalidArgument => StatusCode::BAD_REQUEST,
                     Code::Unauthenticated => StatusCode::UNAUTHORIZED,
+                    Code::PermissionDenied => StatusCode::FORBIDDEN,
                     Code::AlreadyExists => StatusCode::CONFLICT,
                     Code::NotFound => StatusCode::NOT_FOUND,
+                    Code::FailedPrecondition => StatusCode::BAD_REQUEST,
                     _ => StatusCode::INTERNAL_SERVER_ERROR,
                 };
                 (code, status.message().to_string())

@@ -1,8 +1,8 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
-use crate::error::AppError;
 use crate::api::openapi::LogoutRequest;
+use crate::error::AppError;
 use crate::state::AppState;
+use axum::{Json, extract::State};
+use std::sync::Arc;
 
 #[utoipa::path(
     post,
@@ -27,7 +27,9 @@ pub async fn logout_handler(
 
     // On ajoute le header Authorization pour que l'intercepteur du service auth puisse valider le token
     let bearer_token = format!("Bearer {}", payload.access_token);
-    if let Ok(header_value) = bearer_token.parse::<tonic::metadata::MetadataValue<tonic::metadata::Ascii>>() {
+    if let Ok(header_value) =
+        bearer_token.parse::<tonic::metadata::MetadataValue<tonic::metadata::Ascii>>()
+    {
         request.metadata_mut().insert("authorization", header_value);
     }
 

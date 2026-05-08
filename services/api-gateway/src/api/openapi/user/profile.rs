@@ -18,6 +18,7 @@ pub struct ThemeSchema {
     pub name: String,
     pub colors: std::collections::HashMap<String, String>,
     pub font_main: String,
+    pub font_display: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -38,6 +39,11 @@ pub struct UpdateThemeRequest {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct RoleRequest {
     pub id: String,
+    pub role_name: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct LeaveRoleRequest {
     pub role_name: String,
 }
 
@@ -67,9 +73,14 @@ pub struct RoleRequestsListResponse {
 pub struct RoleRequestEntry {
     pub request_id: String,
     pub user_id: String,
+    pub user_username: Option<String>,
+    pub user_email: Option<String>,
     pub requested_role: String,
     pub reason: String,
     pub created_at: Option<String>,
+    pub status: String,
+    pub rejection_reason: Option<String>,
+    pub updated_at: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -77,4 +88,9 @@ pub struct ReviewRoleRequest {
     pub request_id: String,
     pub approve: bool,
     pub rejection_reason: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CancelRoleRequest {
+    pub request_id: String,
 }

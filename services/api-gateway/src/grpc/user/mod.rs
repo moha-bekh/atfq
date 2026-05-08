@@ -9,7 +9,10 @@ pub use user_service_client::UserServiceClient;
 pub async fn connect() -> Result<UserServiceClient<Channel>, Box<dyn std::error::Error>> {
     let addr = std::env::var("USER_SERVICE_URL").unwrap_or_else(|_| "http://user:8080".into());
     let mut retry_count = 0;
-    let max_retries = 15;
+    let max_retries = std::env::var("STARTUP_MAX_RETRIES")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(90);
 
     loop {
         match UserServiceClient::connect(addr.clone()).await {
@@ -24,9 +27,8 @@ pub async fn connect() -> Result<UserServiceClient<Channel>, Box<dyn std::error:
                 }
 
                 println!(
-                    "User Service not ready ({}/{})... Retrying in 2s", 
-                    retry_count, 
-                    max_retries
+                    "User Service not ready ({}/{})... Retrying in 2s",
+                    retry_count, max_retries
                 );
 
                 sleep(Duration::from_secs(2)).await;

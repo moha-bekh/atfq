@@ -91,13 +91,20 @@ pub struct ModerateVersionRequest {
 // --- RESPONSES ---
 
 #[derive(Serialize, Deserialize, ToSchema)]
+pub struct ContributorResponse {
+    pub id: i32,
+    pub username: String,
+    pub profile_picture_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ArticleResponse {
     pub article_node: NodeResponse,
     pub sub_articles: Vec<NodeBreadcrumbResponse>,
     pub notions: Vec<NodeResponse>,
     pub questions: Vec<NodeResponse>,
     pub lineage: Vec<NodeBreadcrumbResponse>,
-    pub contributors: Vec<String>,
+    pub contributors: Vec<ContributorResponse>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

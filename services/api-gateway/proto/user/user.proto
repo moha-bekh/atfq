@@ -19,10 +19,14 @@ service UserService {
 
     rpc AssignRole(RoleRequest) returns (Profile);
     rpc RemoveRole(RoleRequest) returns (Profile);
+    rpc LeaveRole(LeaveRoleRequest) returns (Profile);
 
     rpc ListAvailablePermissions(google.protobuf.Empty) returns (PermissionList);
     rpc CreateRoleRequest(RoleChangeRequest) returns (RoleRequestStatus);
     rpc ListPendingRoleRequests(google.protobuf.Empty) returns (RoleRequestsList);
+    rpc ListAllRoleRequests(google.protobuf.Empty) returns (RoleRequestsList);
+    rpc ListMyRoleRequests(google.protobuf.Empty) returns (RoleRequestsList);
+    rpc CancelRoleRequest(CancelRoleRequestRequest) returns (RoleRequestStatus);
     rpc ReviewRoleRequest(ReviewRequest) returns (Profile);
     rpc UploadProfilePicture(UploadProfilePictureRequest) returns (Profile);
 }
@@ -42,6 +46,7 @@ message Theme {
     string name = 2;
     map<string, string> colors = 3;
     string font_main = 4;
+    string font_display = 5;
 }
 
 message CreateProfileRequest {
@@ -71,6 +76,10 @@ message RoleRequest {
     string role_name = 2;
 }
 
+message LeaveRoleRequest {
+    string role_name = 1;
+}
+
 message PermissionList {
     repeated string permissions = 1;
 }
@@ -93,6 +102,9 @@ message RoleRequestsList {
         string requested_role = 3;
         string reason = 4;
         google.protobuf.Timestamp created_at = 5;
+        string status = 6;
+        optional string rejection_reason = 7;
+        google.protobuf.Timestamp updated_at = 8;
     }
     repeated Entry requests = 1;
 }
@@ -101,6 +113,10 @@ message ReviewRequest {
     string request_id = 1;
     bool approve = 2;
     optional string rejection_reason = 3;
+}
+
+message CancelRoleRequestRequest {
+    string request_id = 1;
 }
 
 message HelloRequest {

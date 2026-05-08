@@ -1,10 +1,10 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
-use crate::error::AppError;
 use crate::api::openapi::auth::refresh::RefreshRequest;
 use crate::api::openapi::{AuthResponse, UserSchema};
+use crate::error::AppError;
+use crate::grpc::auth::auth_response::Result as AuthResult;
 use crate::state::AppState;
-use crate::grpc::auth::{auth_response::Result as AuthResult};
+use axum::{Json, extract::State};
+use std::sync::Arc;
 
 #[utoipa::path(
     post,
@@ -44,16 +44,14 @@ pub async fn refresh_handler(
                     mfa_enabled: user.mfa_enabled,
                 }),
             }))
-        },
-        Some(AuthResult::MfaRequired(mfa)) => {
-            Ok(Json(AuthResponse {
-                status: "MFA_REQUIRED".into(),
-                access_token: None,
-                refresh_token: None,
-                mfa_login_id: Some(mfa.login_request_id),
-                user: None,
-            }))
-        },
-        None => Err(AppError::Internal("Empty auth response".into()))
+        }
+        Some(AuthResult::MfaRequired(mfa)) => Ok(Json(AuthResponse {
+            status: "MFA_REQUIRED".into(),
+            access_token: None,
+            refresh_token: None,
+            mfa_login_id: Some(mfa.login_request_id),
+            user: None,
+        })),
+        None => Err(AppError::Internal("Empty auth response".into())),
     }
 }

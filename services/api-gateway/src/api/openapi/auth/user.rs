@@ -18,6 +18,22 @@ pub struct UpdatePasswordRequest {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+pub struct PasswordResetRequest {
+    pub identifier: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct PasswordResetResponse {
+    pub accepted: bool,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct PasswordResetConfirmRequest {
+    pub reset_token: String,
+    pub new_password: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct DeleteUserRequest {
     pub refresh_token: String,
 }

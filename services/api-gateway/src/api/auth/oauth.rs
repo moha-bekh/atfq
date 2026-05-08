@@ -1,21 +1,20 @@
+use crate::api::openapi::auth::oauth::{
+    LinkedProvider, LinkedProvidersResponse, OAuthCallbackParams,
+    OAuthProvider as ApiOAuthProvider, OAuthUrlResponse,
+};
+use crate::api::openapi::{LoginResponse, UserSchema};
+use crate::error::AppError;
+use crate::grpc::auth::{
+    GetUserRequest, OAuthCallbackRequest, OAuthProvider as GrpcOAuthProvider, OAuthUrlRequest,
+    UnlinkProviderRequest, auth_response::Result as AuthResult,
+};
+use crate::state::AppState;
 use axum::{
-    extract::{Path, Query, State},
     Json,
+    extract::{Path, Query, State},
     http::HeaderMap,
 };
 use std::sync::Arc;
-use crate::error::AppError;
-use crate::api::openapi::auth::oauth::{OAuthProvider as ApiOAuthProvider, OAuthUrlResponse, OAuthCallbackParams, LinkedProvidersResponse, LinkedProvider};
-use crate::api::openapi::{LoginResponse, UserSchema};
-use crate::state::AppState;
-use crate::grpc::auth::{
-    OAuthUrlRequest, 
-    OAuthCallbackRequest, 
-    OAuthProvider as GrpcOAuthProvider,
-    GetUserRequest,
-    UnlinkProviderRequest,
-    auth_response::Result as AuthResult
-};
 
 impl From<ApiOAuthProvider> for GrpcOAuthProvider {
     fn from(provider: ApiOAuthProvider) -> Self {
@@ -51,10 +50,14 @@ pub async fn get_linked_providers_handler(
     let response = client.get_linked_providers(request).await?.into_inner();
 
     Ok(Json(LinkedProvidersResponse {
-        providers: response.providers.into_iter().map(|p| LinkedProvider {
-            name: p.name,
-            provider_id: p.provider_id,
-        }).collect(),
+        providers: response
+            .providers
+            .into_iter()
+            .map(|p| LinkedProvider {
+                name: p.name,
+                provider_id: p.provider_id,
+            })
+            .collect(),
     }))
 }
 
@@ -118,7 +121,9 @@ pub async fn get_oauth_url_handler(
     // Check for authorization header to enable linking
     if let Some(auth_header) = headers.get("authorization") {
         if let Ok(val) = auth_header.to_str() {
-            if let Ok(metadata_val) = val.parse::<tonic::metadata::MetadataValue<tonic::metadata::Ascii>>() {
+            if let Ok(metadata_val) =
+                val.parse::<tonic::metadata::MetadataValue<tonic::metadata::Ascii>>()
+            {
                 request.metadata_mut().insert("authorization", metadata_val);
             }
         }
@@ -175,15 +180,13 @@ pub async fn oauth_callback_handler(
                 }),
             }))
         }
-        Some(AuthResult::MfaRequired(mfa)) => {
-            Ok(Json(LoginResponse {
-                status: "MFA_REQUIRED".into(),
-                access_token: None,
-                refresh_token: None,
-                mfa_login_id: Some(mfa.login_request_id),
-                user: None,
-            }))
-        }
-        None => Err(AppError::Internal("Empty auth response".into()))
+        Some(AuthResult::MfaRequired(mfa)) => Ok(Json(LoginResponse {
+            status: "MFA_REQUIRED".into(),
+            access_token: None,
+            refresh_token: None,
+            mfa_login_id: Some(mfa.login_request_id),
+            user: None,
+        })),
+        None => Err(AppError::Internal("Empty auth response".into())),
     }
 }

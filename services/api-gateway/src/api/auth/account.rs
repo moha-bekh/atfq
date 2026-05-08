@@ -1,13 +1,20 @@
-use axum::{extract::State, Json, http::HeaderMap};
-use std::sync::Arc;
+use crate::api::openapi::UserSchema;
+use crate::api::openapi::auth::user::{
+    DeleteUserRequest, PasswordResetConfirmRequest, PasswordResetRequest, PasswordResetResponse,
+    UpdateEmailRequest, UpdatePasswordRequest, UpdateUsernameRequest,
+};
 use crate::error::AppError;
-use crate::api::openapi::auth::user::{UpdateEmailRequest, UpdateUsernameRequest, UpdatePasswordRequest, DeleteUserRequest};
-use crate::api::openapi::{UserSchema};
 use crate::state::AppState;
+use axum::{Json, extract::State, http::HeaderMap};
+use std::sync::Arc;
 use tonic::metadata::MetadataValue;
 
-pub fn add_auth_header<T>(request: &mut tonic::Request<T>, headers: &HeaderMap) -> Result<String, AppError> {
-    let auth_header = headers.get("authorization")
+pub fn add_auth_header<T>(
+    request: &mut tonic::Request<T>,
+    headers: &HeaderMap,
+) -> Result<String, AppError> {
+    let auth_header = headers
+        .get("authorization")
         .and_then(|h| h.to_str().ok())
         .ok_or_else(|| AppError::Unauthorized("Missing authorization header".into()))?;
 
@@ -15,7 +22,10 @@ pub fn add_auth_header<T>(request: &mut tonic::Request<T>, headers: &HeaderMap) 
         request.metadata_mut().insert("authorization", metadata_val);
     }
 
-    Ok(auth_header.strip_prefix("Bearer ").unwrap_or(auth_header).to_string())
+    Ok(auth_header
+        .strip_prefix("Bearer ")
+        .unwrap_or(auth_header)
+        .to_string())
 }
 
 #[utoipa::path(
@@ -35,7 +45,7 @@ pub async fn get_me_handler(
     let mut request = tonic::Request::new(crate::grpc::auth::GetUserRequest {
         access_token: "".into(), // Will be populated from header if needed by service, but we pass it anyway
     });
-    
+
     let access_token = add_auth_header(&mut request, &headers)?;
     request.get_mut().access_token = access_token;
 
@@ -70,7 +80,7 @@ pub async fn update_email_handler(
         access_token: "".into(),
         new_email: payload.new_email,
     });
-    
+
     let access_token = add_auth_header(&mut request, &headers)?;
     request.get_mut().access_token = access_token;
 
@@ -98,7 +108,7 @@ pub async fn update_username_handler(
         access_token: "".into(),
         new_username: payload.new_username,
     });
-    
+
     let access_token = add_auth_header(&mut request, &headers)?;
     request.get_mut().access_token = access_token;
 
@@ -127,11 +137,56 @@ pub async fn update_password_handler(
         old_password: payload.old_password,
         new_password: payload.new_password,
     });
-    
+
     let access_token = add_auth_header(&mut request, &headers)?;
     request.get_mut().access_token = access_token;
 
     client.update_password(request).await?;
+    Ok(axum::http::StatusCode::OK)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/password-reset/request",
+    request_body = PasswordResetRequest,
+    responses(
+        (status = 200, description = "Password reset request accepted", body = PasswordResetResponse)
+    )
+)]
+pub async fn request_password_reset_handler(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<PasswordResetRequest>,
+) -> Result<Json<PasswordResetResponse>, AppError> {
+    let mut client = state.auth_client.clone();
+    let request = tonic::Request::new(crate::grpc::auth::PasswordResetRequest {
+        identifier: payload.identifier,
+    });
+
+    let response = client.request_password_reset(request).await?.into_inner();
+    Ok(Json(PasswordResetResponse {
+        accepted: response.accepted,
+    }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/password-reset/confirm",
+    request_body = PasswordResetConfirmRequest,
+    responses(
+        (status = 200, description = "Password reset confirmed")
+    )
+)]
+pub async fn confirm_password_reset_handler(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<PasswordResetConfirmRequest>,
+) -> Result<axum::http::StatusCode, AppError> {
+    let mut client = state.auth_client.clone();
+    let request = tonic::Request::new(crate::grpc::auth::PasswordResetConfirmRequest {
+        reset_token: payload.reset_token,
+        new_password: payload.new_password,
+    });
+
+    client.confirm_password_reset(request).await?;
     Ok(axum::http::StatusCode::OK)
 }
 
@@ -155,7 +210,7 @@ pub async fn delete_account_handler(
         access_token: "".into(),
         refresh_token: payload.refresh_token,
     });
-    
+
     let access_token = add_auth_header(&mut request, &headers)?;
     request.get_mut().access_token = access_token;
 

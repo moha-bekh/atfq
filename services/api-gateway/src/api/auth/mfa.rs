@@ -1,10 +1,10 @@
-use axum::{extract::State, Json, http::HeaderMap};
-use std::sync::Arc;
-use crate::error::AppError;
 use crate::api::openapi::auth::mfa::{EnableMFARequest, EnableMFAResponse, VerifyMFARequest};
 use crate::api::openapi::{AuthResponse, UserSchema};
+use crate::error::AppError;
+use crate::grpc::auth::MfaMethod as GrpcMfaMethod;
 use crate::state::AppState;
-use crate::grpc::auth::{MfaMethod as GrpcMfaMethod};
+use axum::{Json, extract::State, http::HeaderMap};
+use std::sync::Arc;
 
 #[utoipa::path(
     post,
@@ -23,11 +23,13 @@ pub async fn enable_mfa_handler(
 ) -> Result<Json<EnableMFAResponse>, AppError> {
     let mut client = state.auth_client.clone();
 
-    let auth_header = headers.get("authorization")
+    let auth_header = headers
+        .get("authorization")
         .and_then(|h| h.to_str().ok())
         .ok_or_else(|| AppError::Unauthorized("Missing authorization header".into()))?;
 
-    let access_token = auth_header.strip_prefix("Bearer ")
+    let access_token = auth_header
+        .strip_prefix("Bearer ")
         .unwrap_or(auth_header)
         .to_string();
 

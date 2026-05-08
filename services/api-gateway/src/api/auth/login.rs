@@ -1,9 +1,9 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
-use crate::error::AppError;
 use crate::api::openapi::{LoginRequest, LoginResponse, UserSchema}; // Import des types documentés
+use crate::error::AppError;
+use crate::grpc::auth::{Identifier, auth_response::Result as AuthResult, identifier::Id};
 use crate::state::AppState;
-use crate::grpc::auth::{Identifier, identifier::Id, auth_response::Result as AuthResult}; // Import corrigé du message et de son enum interne
+use axum::{Json, extract::State};
+use std::sync::Arc; // Import corrigé du message et de son enum interne
 
 #[utoipa::path(
     post,
@@ -46,7 +46,7 @@ pub async fn login_handler(
             let user = success.user.unwrap();
             Ok((
                 axum::http::StatusCode::OK,
-                Json(LoginResponse { 
+                Json(LoginResponse {
                     status: "SUCCESS".into(),
                     access_token: Some(success.access_token),
                     refresh_token: Some(success.refresh_token),
@@ -58,23 +58,20 @@ pub async fn login_handler(
                         avatar_url: Some(user.username),
                         has_password: user.has_password,
                         mfa_enabled: user.mfa_enabled,
-                    })
-
-                })
+                    }),
+                }),
             ))
-        },
-        Some(AuthResult::MfaRequired(mfa)) => {
-            Ok((
-                axum::http::StatusCode::ACCEPTED,
-                Json(LoginResponse { 
-                    status: "MFA_REQUIRED".into(),
-                    access_token: None,
-                    refresh_token: None,
-                    mfa_login_id: Some(mfa.login_request_id),
-                    user: None,
-                })
-            ))
-        },
-        None => Err(AppError::Internal("Empty auth response".into()))
+        }
+        Some(AuthResult::MfaRequired(mfa)) => Ok((
+            axum::http::StatusCode::ACCEPTED,
+            Json(LoginResponse {
+                status: "MFA_REQUIRED".into(),
+                access_token: None,
+                refresh_token: None,
+                mfa_login_id: Some(mfa.login_request_id),
+                user: None,
+            }),
+        )),
+        None => Err(AppError::Internal("Empty auth response".into())),
     }
 }

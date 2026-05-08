@@ -1,7 +1,7 @@
-use tower_http::cors::{Any, CorsLayer};
+use crate::state::AppState;
 use axum::{Router, extract::DefaultBodyLimit, http::Method};
 use std::sync::Arc;
-use crate::state::AppState;
+use tower_http::cors::{Any, CorsLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 pub mod auth;
@@ -19,7 +19,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         ]);
 
     Router::new()
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()))
+        .merge(
+            SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()),
+        )
         .nest("/api/v1", v1_routes(state))
         .layer(cors)
         .layer(DefaultBodyLimit::max(5 * 1024 * 1024))

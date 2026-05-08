@@ -1,6 +1,6 @@
 use utoipa::{
-    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
     Modify, OpenApi,
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
 };
 
 pub mod auth;
@@ -8,15 +8,15 @@ pub mod user;
 pub mod wiki;
 
 #[allow(unused_imports)]
-pub use auth::login::{LoginRequest, LoginResponse};
+pub use auth::common::{AuthResponse, UserSchema};
 #[allow(unused_imports)]
-pub use auth::register::{RegisterRequest, RegisterResponse};
+pub use auth::login::{LoginRequest, LoginResponse};
 #[allow(unused_imports)]
 pub use auth::logout::LogoutRequest;
 #[allow(unused_imports)]
-pub use auth::common::{UserSchema, AuthResponse};
+pub use auth::oauth::{OAuthCallbackParams, OAuthProvider, OAuthUrlResponse};
 #[allow(unused_imports)]
-pub use auth::oauth::{OAuthProvider, OAuthUrlResponse, OAuthCallbackParams};
+pub use auth::register::{RegisterRequest, RegisterResponse};
 #[allow(unused_imports)]
 pub use user::hello::{HelloRequest, HelloResponse};
 
@@ -38,6 +38,8 @@ pub use user::hello::{HelloRequest, HelloResponse};
         crate::api::auth::account::update_email_handler,
         crate::api::auth::account::update_username_handler,
         crate::api::auth::account::update_password_handler,
+        crate::api::auth::account::request_password_reset_handler,
+        crate::api::auth::account::confirm_password_reset_handler,
         crate::api::auth::account::delete_account_handler,
         crate::api::user::hello::say_hello_handler,
         crate::api::user::profile::create_profile_handler,
@@ -46,9 +48,13 @@ pub use user::hello::{HelloRequest, HelloResponse};
         crate::api::user::profile::update_theme_handler,
         crate::api::user::profile::assign_role_handler,
         crate::api::user::profile::remove_role_handler,
+        crate::api::user::profile::leave_role_handler,
         crate::api::user::profile::list_permissions_handler,
         crate::api::user::profile::create_role_request_handler,
         crate::api::user::profile::list_role_requests_handler,
+        crate::api::user::profile::list_all_role_requests_handler,
+        crate::api::user::profile::list_my_role_requests_handler,
+        crate::api::user::profile::cancel_role_request_handler,
         crate::api::user::profile::review_role_request_handler,
         crate::api::user::profile::upload_profile_picture_handler,
         crate::api::user::profile::delete_profile_picture_handler,
@@ -86,6 +92,9 @@ pub use user::hello::{HelloRequest, HelloResponse};
             auth::user::UpdateEmailRequest,
             auth::user::UpdateUsernameRequest,
             auth::user::UpdatePasswordRequest,
+            auth::user::PasswordResetRequest,
+            auth::user::PasswordResetResponse,
+            auth::user::PasswordResetConfirmRequest,
             auth::user::DeleteUserRequest,
             user::hello::HelloRequest,
             user::hello::HelloResponse,
@@ -97,10 +106,12 @@ pub use user::hello::{HelloRequest, HelloResponse};
             user::profile::ThemeSchema,
             user::profile::PermissionListResponse,
             user::profile::RoleChangeRequest,
+            user::profile::LeaveRoleRequest,
             user::profile::RoleRequestStatusResponse,
             user::profile::RoleRequestsListResponse,
             user::profile::RoleRequestEntry,
             user::profile::ReviewRoleRequest,
+            user::profile::CancelRoleRequest,
             wiki::articles::GetRootArticlesResponse,
             wiki::articles::NodeBreadcrumbResponse,
             wiki::articles::ArticleResponse,

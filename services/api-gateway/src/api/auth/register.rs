@@ -1,9 +1,9 @@
-use axum::{extract::State, Json};
-use std::sync::Arc;
-use crate::error::AppError;
 use crate::api::openapi::{RegisterRequest, RegisterResponse, UserSchema};
-use crate::state::AppState;
+use crate::error::AppError;
 use crate::grpc::auth::auth_response::Result as AuthResult;
+use crate::state::AppState;
+use axum::{Json, extract::State};
+use std::sync::Arc;
 
 #[utoipa::path(
     post,
@@ -35,7 +35,7 @@ pub async fn register_handler(
             let user = success.user.unwrap();
             Ok((
                 axum::http::StatusCode::CREATED,
-                Json(RegisterResponse { 
+                Json(RegisterResponse {
                     status: "SUCCESS".into(),
                     access_token: Some(success.access_token),
                     refresh_token: Some(success.refresh_token),
@@ -47,11 +47,12 @@ pub async fn register_handler(
                         avatar_url: Some(user.username),
                         has_password: true,
                         mfa_enabled: user.mfa_enabled,
-                    })
-
-                })
+                    }),
+                }),
             ))
-        },
-        _ => Err(AppError::Internal("Registration failed to return user data".into()))
+        }
+        _ => Err(AppError::Internal(
+            "Registration failed to return user data".into(),
+        )),
     }
 }
