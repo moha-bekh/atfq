@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
 import { authRoutes } from "./auth/auth.routes";
 import { Home } from "@/pages/Home";
 import ProfilePage from "@/pages/user/Profile";
+import DashboardPage from "@/pages/admin/Dashboard";
 import WikiPage from "@/features/wiki/pages/WikiPage";
 
 export function AppRouter() {
@@ -17,6 +18,7 @@ export function AppRouter() {
 
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
           </Route>
         </Route>
 

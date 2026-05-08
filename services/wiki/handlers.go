@@ -77,6 +77,11 @@ func (s *wikiServer) CreateArticle(ctx context.Context, req *pb.CreateArticleReq
 			res.Questions = append(res.Questions, child_row.ToProto())
 		}
 	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to save article: %v", err)
+	}
+
 	return res, nil
 }
 
@@ -160,10 +165,15 @@ func (s *wikiServer) GetArticle(ctx context.Context, req *pb.GetArticleRequest) 
 		return nil, err
 	}
 
+	contributors, err := s.fetchContributorsInternal(ctx, s.db, req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch contributors: %v", err)
+	}
+
 	res := &pb.Article{
-		ArticleNode: article_node.ToProto(),
+		ArticleNode:  article_node.ToProto(),
+		Contributors: contributors,
 		// Lineage: , // NO SQL METHOD FOR THAT YET will do later
-		// Contributors: , // NO SQL METHOD FOR THAT YET will do later
 	}
 
 	for _, r := range sub_articles_rows {

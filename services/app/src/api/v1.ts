@@ -311,6 +311,7 @@ export interface components {
             colors: {
                 [key: string]: string;
             };
+            font_display: string;
             font_main: string;
             is_preset: boolean;
             name: string;

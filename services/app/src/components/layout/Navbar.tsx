@@ -31,32 +31,32 @@ export function Navbar() {
   }, []);
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-bg/80 backdrop-blur-md border-b border-main/10">
-      <div className="max-w-7xl mx-auto flex items-center justify-between p-4 md:px-8">
+    <nav className="sticky top-0 z-50 w-full bg-bg/90 backdrop-blur-md">
+      <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-6 sm:px-16 lg:px-24">
 
         {/* LOGO */}
         <Link to="/" className="hover:opacity-80 transition-opacity">
-          <ATFQLogo className="text-main w-10 h-10" />
+          <ATFQLogo className="text-main w-12 h-12" />
         </Link>
 
         {/* LINKS */}
-        <div className="flex items-center gap-6">
-          <Button to="/wiki" variant="outline" className="text-xs px-6 uppercase">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <Button to="/wiki" variant="outline" className="hidden h-9 px-3 text-base normal-case sm:flex">
             Wiki
           </Button>
 
           <div className="flex items-center gap-4">
             {!isAuthenticated ? (
-              <Button to="/login" variant="primary" className="text-xs px-6 uppercase">
+              <Button to="/login" variant="primary" className="h-9 px-3 text-base normal-case">
                 Sign in
               </Button>
             ) : (
               <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="group flex items-center gap-3 p-1 rounded-2xl hover:bg-main/5 transition-all"
+                  className="group flex h-10 items-center gap-3 rounded-lg hover:bg-main/5 transition-all"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-sub-alt/20 border border-main/20 flex items-center justify-center overflow-hidden shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-sub-alt/20 border-2 border-main/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
                     {profile?.profile_picture_url ? (
                       <img 
                         src={profile.profile_picture_url} 
@@ -69,20 +69,21 @@ export function Navbar() {
                       </span>
                     )}
                   </div>
-                  <span className="hidden md:block text-xs font-bold uppercase tracking-widest text-text group-hover:text-main transition-colors">
-                    {user?.username}
-                  </span>
                 </button>
 
                 {/* DROPDOWN MENU */}
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-bg border border-main/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="absolute right-0 mt-2 w-56 overflow-hidden rounded-lg border border-main/10 bg-bg shadow-2xl shadow-black/40 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="px-4 py-3 border-b border-main/10">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-sub">Signed in as</p>
+                      <p className="mt-1 truncate text-sm font-bold text-text">{user?.username}</p>
+                    </div>
                     <div className="p-2 flex flex-col gap-1">
                       
                       <Link 
                         to="/profile" 
                         onClick={() => setIsDropdownOpen(false)}
-                        className="flex items-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-sub hover:text-main hover:bg-main/5 rounded-xl transition-all"
+                        className="flex items-center rounded-lg px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-sub transition-all hover:bg-main/5 hover:text-main"
                       >
                         Profile Settings
                       </Link>
@@ -91,9 +92,9 @@ export function Navbar() {
                         <Link 
                           to="/dashboard" 
                           onClick={() => setIsDropdownOpen(false)}
-                          className="flex items-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-main hover:bg-main/10 rounded-xl transition-all"
+                          className="flex items-center rounded-lg px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-main transition-all hover:bg-main/10"
                         >
-                          Terminal Dashboard
+                          Dashboard
                         </Link>
                       )}
 
@@ -104,9 +105,9 @@ export function Navbar() {
                           setIsDropdownOpen(false);
                           logout();
                         }}
-                        className="flex items-center px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-error/60 hover:text-error hover:bg-error/5 rounded-xl transition-all text-left"
+                        className="flex items-center rounded-lg px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-error/70 transition-all hover:bg-error/5 hover:text-error"
                       >
-                        Logout Protocol
+                        Logout
                       </button>
                     </div>
                   </div>

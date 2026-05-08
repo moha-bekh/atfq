@@ -1,5 +1,5 @@
 import { api } from "@/api/client";
-import type { Article, GetRootArticlesResponse, SearchResponse, NodeType, Node, Version, DeleteResponse } from "../types";
+import type { Article, GetRootArticlesResponse, SearchResponse, Node, Version, DeleteResponse, CreateNodeRequest, UpdateNodeRequest, CreateArticleRequest } from "../types";
 
 export const wikiApi = {
   getRootArticles: async (): Promise<GetRootArticlesResponse> => {
@@ -10,15 +10,15 @@ export const wikiApi = {
     return api.get(`wiki/articles/${id}`).json();
   },
 
-  createArticle: async (data: { article_node: any, children: any[] }): Promise<Article> => {
+  createArticle: async (data: CreateArticleRequest): Promise<Article> => {
     return api.post("wiki/articles", { json: data }).json();
   },
 
-  createNode: async (data: { parent_id?: number, node_type: NodeType, title: string, content: string, order_index: number }): Promise<Node> => {
+  createNode: async (data: CreateNodeRequest): Promise<Node> => {
     return api.post("wiki/nodes", { json: data }).json();
   },
 
-  updateNode: async (data: { node_id: number, title: string, content: string }): Promise<Version> => {
+  updateNode: async (data: UpdateNodeRequest): Promise<Version> => {
     return api.put("wiki/nodes", { json: data }).json();
   },
 

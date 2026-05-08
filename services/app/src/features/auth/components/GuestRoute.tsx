@@ -1,8 +1,9 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAppStore } from '@/stores/app.store';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
-export const ProtectedRoute = () => {
+import { useAppStore } from '@/stores/app.store';
+
+export const GuestRoute = () => {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const accessToken = useAppStore((state) => state.accessToken);
   const refreshToken = useAppStore((state) => state.refreshToken);
@@ -19,18 +20,17 @@ export const ProtectedRoute = () => {
 
   if (!isHydrated) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-bg text-main font-mono uppercase tracking-widest animate-pulse">
-        Authenticating...
+      <div className="flex min-h-screen items-center justify-center bg-bg font-mono text-main uppercase tracking-widest animate-pulse">
+        Loading...
       </div>
     );
   }
 
-  if (!isAuthenticated || !accessToken || !refreshToken) {
-    // On redirige vers /login en gardant en mémoire l'URL actuelle dans "from"
-    // Cela permettra de rediriger l'utilisateur après son login réussi.
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  if (isAuthenticated && accessToken && refreshToken) {
+    const redirectTo = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/wiki';
+
+    return <Navigate to={redirectTo} replace />;
   }
 
-  // Si authentifié, on affiche les routes enfants
   return <Outlet />;
 };

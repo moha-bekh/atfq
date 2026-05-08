@@ -37,7 +37,7 @@ export function LoginForm({ onMfaRequired }: { onMfaRequired?: (id: string) => v
       noValidate
     >
       {mutation.isError && (
-        <div className="p-3 text-[10px] bg-red-500/10 border border-red-500/20 text-red-500 uppercase tracking-tighter">
+        <div className="rounded-lg border border-error/20 bg-error/5 p-3 text-[10px] uppercase tracking-widest text-error">
           {mutation.error?.message || "Invalid credentials"}
         </div>
       )}
@@ -60,7 +60,7 @@ export function LoginForm({ onMfaRequired }: { onMfaRequired?: (id: string) => v
           to="/password-reset"
           className="self-end text-[10px] uppercase tracking-widest text-text hover:text-sub transition-colors"
         >
-          [ Forgot password? ]
+          Forgot password?
         </Link>
       </div>
 
@@ -107,7 +107,7 @@ export function LoginForm({ onMfaRequired }: { onMfaRequired?: (id: string) => v
       <div className="flex items-center justify-center gap-2 text-xs mt-6">
         <p className="text-sub">New to ATFQ?</p>
         <Link to="/register" className="text-[10px] uppercase tracking-widest text-text hover:text-sub transition-colors">
-          [ Sign_up ]
+          Sign up
         </Link>
       </div>
     </form>

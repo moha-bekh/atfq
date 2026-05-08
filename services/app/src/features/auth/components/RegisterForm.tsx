@@ -38,7 +38,7 @@ export function RegisterForm() {
       noValidate
     >
       {mutation.isError && (
-        <div className="p-3 text-[10px] bg-red-500/10 border border-red-500/20 text-red-500 uppercase tracking-tighter">
+        <div className="rounded-lg border border-error/20 bg-error/5 p-3 text-[10px] uppercase tracking-widest text-error">
           {mutation.error?.message || "Registration failed"}
         </div>
       )}
@@ -114,7 +114,7 @@ export function RegisterForm() {
       <div className="flex items-center justify-center gap-2 text-xs mt-6">
         <p className="text-sub">Already have an account?</p>
         <Link to="/login" className="text-[10px] uppercase tracking-widest text-text hover:text-sub transition-colors">
-          [ Sign_in ]
+          Sign in
         </Link>
       </div>
     </form>

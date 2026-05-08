@@ -1,96 +1,236 @@
-import { useState } from "react";
-import type { Article } from "../types";
-import { NodeType } from "../types";
+import { useEffect, useState } from "react";
+import type { Article, NodeBreadcrumb } from "../types";
+
+export type WikiContentLine = {
+  title: string;
+  content: string;
+};
 
 interface DocContentProps {
   article: Article | null;
   mode: "read" | "edit" | "create";
   onModeChange: (mode: "read" | "edit" | "create") => void;
-  onCreate: (title: string, content: string) => Promise<void>;
+  canContribute: boolean;
+  parentOptions: NodeBreadcrumb[];
+  onCreate: (data: {
+    parentId?: number;
+    title: string;
+    tldr: string;
+    notions: WikiContentLine[];
+    keyQuestions: WikiContentLine[];
+  }) => Promise<void>;
+  onEdit: (data: {
+    title: string;
+    tldr: string;
+    notions: WikiContentLine[];
+    keyQuestions: WikiContentLine[];
+  }) => Promise<void>;
 }
 
-export default function DocContent({ article, mode, onModeChange, onCreate }: DocContentProps) {
+const parseContentLines = (value: string): WikiContentLine[] => value
+  .split("\n")
+  .map((line) => line.trim())
+  .filter(Boolean)
+  .map((line) => {
+    const separatorIndex = line.indexOf(":");
+
+    if (separatorIndex === -1) {
+      return { title: line, content: line };
+    }
+
+    const parsedTitle = line.slice(0, separatorIndex).trim();
+    const parsedContent = line.slice(separatorIndex + 1).trim();
+
+    return {
+      title: parsedTitle || parsedContent || line,
+      content: parsedContent || parsedTitle || line,
+    };
+  });
+
+const formatNodeLine = ({ title, content }: { title: string; content: string }) => {
+  const trimmedTitle = title.trim();
+  const trimmedContent = content.trim();
+
+  if (!trimmedContent || trimmedTitle === trimmedContent) return trimmedTitle || trimmedContent;
+
+  return `${trimmedTitle}: ${trimmedContent}`;
+};
+
+export default function DocContent({ article, mode, onModeChange, canContribute, parentOptions, onCreate, onEdit }: DocContentProps) {
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [tldr, setTldr] = useState("");
+  const [notions, setNotions] = useState("");
+  const [keyQuestions, setKeyQuestions] = useState("");
+  const [parentId, setParentId] = useState("");
+  const [editTitle, setEditTitle] = useState("");
+  const [editTldr, setEditTldr] = useState("");
+  const [editNotions, setEditNotions] = useState("");
+  const [editKeyQuestions, setEditKeyQuestions] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (mode === "edit" && article?.article_node) {
+      setEditTitle(article.article_node.title || "");
+      setEditTldr(article.article_node.content || "");
+      setEditNotions((article.notions || []).map(formatNodeLine).join("\n"));
+      setEditKeyQuestions((article.questions || []).map(formatNodeLine).join("\n"));
+    }
+  }, [article, mode]);
 
   const sections = article ? [
     {
-      title: "CONTENT",
+      title: "TLDR",
       items: [article.article_node?.content || ""],
       indented: true,
     },
     {
       title: "NOTIONS",
-      items: (article.notions || []).map(n => n.title),
+      items: (article.notions || []).map(formatNodeLine),
       indented: true,
     },
     {
       title: "KEY QUESTIONS",
-      items: (article.questions || []).map(q => q.title),
+      items: (article.questions || []).map(formatNodeLine),
       indented: true,
     },
   ] : [];
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const parsedNotions = parseContentLines(notions);
+    const parsedKeyQuestions = parseContentLines(keyQuestions);
+
+    if (!title.trim() || !tldr.trim() || parsedNotions.length === 0 || parsedKeyQuestions.length === 0) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await onCreate(title, content);
+      await onCreate({
+        parentId: parentId ? Number(parentId) : undefined,
+        title: title.trim(),
+        tldr: tldr.trim(),
+        notions: parsedNotions,
+        keyQuestions: parsedKeyQuestions,
+      });
       setTitle("");
-      setContent("");
+      setTldr("");
+      setNotions("");
+      setKeyQuestions("");
+      setParentId("");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await onEdit({
+        title: editTitle,
+        tldr: editTldr,
+        notions: parseContentLines(editNotions),
+        keyQuestions: parseContentLines(editKeyQuestions),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const fieldClass = "rounded-lg border-2 border-sub/30 bg-sub-alt/10 px-4 py-3 font-jakarta text-text outline-none transition-all placeholder:text-text/35 focus:border-main focus:bg-main/5";
+  const labelClass = "font-bricolage font-semibold text-sm text-sub uppercase tracking-widest";
+  const panelClass = "rounded-lg border border-main/10 bg-sub-alt/5 p-5 shadow-inner";
+  const availableModes: Array<"read" | "edit" | "create"> = canContribute
+    ? ["read", "edit", "create"]
+    : ["read"];
+
   return (
-    <div className="flex flex-col gap-8 w-full">
+    <div className="flex w-full min-w-0 flex-col gap-8">
       {/* Tabs */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-4">
-          {(["read", "edit", "create"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => onModeChange(m)}
-              className={`font-bricolage font-semibold text-base transition-colors ${
-                mode === m ? "text-brand-indigo underline underline-offset-4" : "text-brand-indigo/60 hover:text-brand-indigo"
-              } uppercase`}
-            >
-              {m}
-            </button>
-          ))}
+      {canContribute && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-4">
+            {availableModes.map((m) => (
+              <button
+                key={m}
+                onClick={() => onModeChange(m)}
+                className={`font-bricolage font-semibold text-base transition-colors ${
+                  mode === m ? "text-sub underline underline-offset-4" : "text-sub/60 hover:text-sub"
+                } uppercase`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <div className="h-[1.5px] bg-sub w-full" />
         </div>
-        <div className="h-[1.5px] bg-brand-indigo w-full" />
-      </div>
+      )}
 
       {mode === "create" ? (
         <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="font-bricolage font-semibold text-sm text-brand-indigo uppercase">Title</label>
+          <div className={panelClass}>
+            <label className={labelClass}>Parent article</label>
+            <select
+              value={parentId}
+              onChange={(e) => setParentId(e.target.value)}
+              className={`${fieldClass} mt-3 w-full min-w-0`}
+            >
+              <option value="">Root article</option>
+              {parentOptions.map((parent) => (
+                <option key={parent.id} value={parent.id}>
+                  {parent.title}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Title</label>
             <input 
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Article Title..."
-              className="bg-brand-indigo/5 border-2 border-brand-indigo/20 rounded-xl px-4 py-3 font-jakarta text-brand-lavender focus:border-brand-indigo outline-none transition-all"
+              className={`${fieldClass} mt-3 w-full min-w-0`}
               required
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bricolage font-semibold text-sm text-brand-indigo uppercase">Content</label>
+          <div className={panelClass}>
+            <label className={labelClass}>TLDR</label>
             <textarea 
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Write your article content here..."
-              rows={10}
-              className="bg-brand-indigo/5 border-2 border-brand-indigo/20 rounded-xl px-4 py-3 font-jakarta text-brand-lavender focus:border-brand-indigo outline-none transition-all resize-none"
+              value={tldr}
+              onChange={(e) => setTldr(e.target.value)}
+              placeholder="Short summary for this article..."
+              rows={5}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+              required
+            />
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Notions</label>
+            <textarea
+              value={notions}
+              onChange={(e) => setNotions(e.target.value)}
+              placeholder="One required notion per line..."
+              rows={5}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+              required
+            />
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Key questions</label>
+            <textarea
+              value={keyQuestions}
+              onChange={(e) => setKeyQuestions(e.target.value)}
+              placeholder="One required question per line..."
+              rows={5}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
               required
             />
           </div>
           <button 
             type="submit"
             disabled={isSubmitting}
-            className="bg-brand-indigo text-brand-lavender font-bricolage font-bold py-4 rounded-xl hover:bg-brand-indigo/90 transition-all disabled:opacity-50 uppercase tracking-widest"
+            className="rounded-lg bg-sub px-4 py-4 font-bricolage font-bold uppercase tracking-widest text-text transition-all hover:bg-sub/90 disabled:opacity-50"
           >
             {isSubmitting ? "Creating Article..." : "Submit for Moderation"}
           </button>
@@ -98,25 +238,25 @@ export default function DocContent({ article, mode, onModeChange, onCreate }: Do
       ) : mode === "read" && article ? (
         <>
           {/* Title */}
-          <h1 className="font-bricolage font-bold text-4xl text-brand-indigo">
+          <h1 className="font-bricolage font-bold text-3xl text-sub break-words sm:text-4xl">
             {article.article_node.title}
           </h1>
 
           {/* Sections */}
           {sections.map((section) => (
             section.items.length > 0 && (
-              <div key={section.title} className="flex flex-col gap-2">
+              <div key={section.title} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
-                  <span className="font-bricolage font-semibold text-base text-brand-indigo uppercase">
+                  <span className="font-bricolage font-semibold text-base text-sub uppercase">
                     {section.title}
                   </span>
-                  <div className="h-[1.5px] bg-brand-indigo w-full" />
+                  <div className="h-[1.5px] bg-sub w-full" />
                 </div>
-                <div className={section.indented ? "px-6" : "px-2"}>
+                <div className={section.indented ? "px-3 sm:px-6" : "px-2"}>
                   {section.items.map((item, i) => (
                     <p
                       key={i}
-                      className="font-jakarta text-base font-normal text-brand-lavender leading-7 mb-4 last:mb-0"
+                      className="mb-4 break-words font-jakarta text-base font-normal leading-7 text-text last:mb-0 whitespace-pre-line"
                     >
                       {item}
                     </p>
@@ -127,14 +267,61 @@ export default function DocContent({ article, mode, onModeChange, onCreate }: Do
           ))}
         </>
       ) : mode === "edit" && article ? (
-        <div className="p-12 border-2 border-dashed border-brand-indigo/20 rounded-2xl flex items-center justify-center text-center">
-          <span className="font-jakarta text-brand-indigo/60">
-            Editor for "{article.article_node.title}" mode is coming soon...
-          </span>
-        </div>
+        <form onSubmit={handleEditSubmit} className="flex flex-col gap-6">
+          <div className={panelClass}>
+            <p className={labelClass}>Parent article</p>
+            <p className="mt-1 font-jakarta text-sm text-text">
+              {article.article_node.parent_id ? `Node ${article.article_node.parent_id}` : "Root article"}
+            </p>
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Title</label>
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className={`${fieldClass} mt-3 w-full min-w-0`}
+              required
+            />
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>TLDR</label>
+            <textarea
+              value={editTldr}
+              onChange={(e) => setEditTldr(e.target.value)}
+              rows={5}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+              required
+            />
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Notions</label>
+            <textarea
+              value={editNotions}
+              onChange={(e) => setEditNotions(e.target.value)}
+              rows={5}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+            />
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Key questions</label>
+            <textarea
+              value={editKeyQuestions}
+              onChange={(e) => setEditKeyQuestions(e.target.value)}
+              rows={5}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-lg bg-sub px-4 py-4 font-bricolage font-bold uppercase tracking-widest text-text transition-all hover:bg-sub/90 disabled:opacity-50"
+          >
+            {isSubmitting ? "Submitting Edit..." : "Submit Edit for Moderation"}
+          </button>
+        </form>
       ) : (
-        <div className="p-12 border-2 border-dashed border-brand-indigo/20 rounded-2xl flex items-center justify-center text-center">
-          <span className="font-jakarta text-brand-indigo/60">
+        <div className="p-8 sm:p-12 border-2 border-dashed border-sub/20 rounded-lg flex items-center justify-center text-center">
+          <span className="font-jakarta text-sub/60">
             Select an article or click CREATE to start.
           </span>
         </div>

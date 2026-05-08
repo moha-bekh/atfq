@@ -20,6 +20,7 @@ interface AppState {
   // Settings & Theme
   theme: string;
   font: string;
+  displayFont: string;
   customColors: Record<string, string>;
 
   // Actions
@@ -36,6 +37,10 @@ interface AppState {
   refreshProfile: () => Promise<void>;
   applyTheme: () => void;
 }
+
+type HttpLikeError = {
+  status?: number;
+};
 
 const DEFAULT_COLORS = {
   'bg': '#7766BD',
@@ -62,6 +67,7 @@ export const useAppStore = create<AppState>()(
       
       theme: 'base',
       font: 'Plus Jakarta Sans',
+      displayFont: 'Bricolage Grotesque',
       customColors: DEFAULT_COLORS,
 
       setAuth: (data) => {
@@ -89,6 +95,7 @@ export const useAppStore = create<AppState>()(
           set({
             theme: profile.theme.name,
             font: profile.theme.font_main,
+            displayFont: profile.theme.font_display || 'Bricolage Grotesque',
             customColors: profile.theme.colors || DEFAULT_COLORS
           });
           get().applyTheme();
@@ -99,6 +106,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           theme: themeUpdate.name || state.theme,
           font: themeUpdate.font_main || state.font,
+          displayFont: themeUpdate.font_display || state.displayFont,
           customColors: themeUpdate.colors ? { ...state.customColors, ...themeUpdate.colors } : state.customColors
         }));
         get().applyTheme();
@@ -117,7 +125,15 @@ export const useAppStore = create<AppState>()(
       },
 
       initApp: async () => {
-        if (get().isAuthenticated) {
+        const { isAuthenticated, accessToken, refreshToken } = get();
+
+        if (isAuthenticated && (!accessToken || !refreshToken)) {
+          await get().logout();
+          get().applyTheme();
+          return;
+        }
+
+        if (isAuthenticated) {
           await get().refreshProfile();
         }
         get().applyTheme();
@@ -133,7 +149,7 @@ export const useAppStore = create<AppState>()(
         } catch (error) {
           console.error('Failed to fetch profile:', error);
           // If profile fetch fails due to auth, we might want to logout
-          if ((error as any).status === 401) {
+          if ((error as HttpLikeError).status === 401) {
             get().logout();
           }
         }
@@ -158,6 +174,7 @@ export const useAppStore = create<AppState>()(
             permissions: [],
             theme: 'base',
             font: 'Plus Jakarta Sans',
+            displayFont: 'Bricolage Grotesque',
             customColors: DEFAULT_COLORS
           });
           get().applyTheme();
@@ -165,9 +182,10 @@ export const useAppStore = create<AppState>()(
       },
 
       applyTheme: () => {
-        const { theme, font, customColors } = get();
+        const { theme, font, displayFont, customColors } = get();
         document.documentElement.setAttribute('data-theme', theme);
         document.documentElement.style.setProperty('--font-main', font);
+        document.documentElement.style.setProperty('--font-display', displayFont);
         
         if (theme === 'custom') {
           Object.entries(customColors).forEach(([key, value]) => {

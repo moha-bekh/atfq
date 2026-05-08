@@ -35,12 +35,24 @@ export function useUpdateNode() {
   });
 }
 
+export function useCreateNode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: wikiApi.createNode,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wiki", "root"] });
+      queryClient.invalidateQueries({ queryKey: ["wiki", "article"] });
+    },
+  });
+}
+
 export function useCreateArticle() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: wikiApi.createArticle,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wiki", "root"] });
+      queryClient.invalidateQueries({ queryKey: ["wiki", "pending"] });
     },
   });
 }

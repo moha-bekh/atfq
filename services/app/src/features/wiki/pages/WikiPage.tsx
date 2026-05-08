@@ -1,107 +1,483 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import LeftSidebar from "../components/LeftSidebar";
 import DocContent from "../components/DocContent";
+import type { WikiContentLine } from "../components/DocContent";
 import RightSidebar from "../components/RightSidebar";
-import { useRootArticles, useArticle, useCreateArticle } from "../hooks/useWiki";
-import { NodeType } from "../types";
+import StaticWikiPage, { getStaticWikiPage, STATIC_WIKI_PAGES } from "../components/StaticWikiPage";
+import { useRootArticles, useArticle, useCreateArticle, useCreateNode, useUpdateNode } from "../hooks/useWiki";
+import { wikiApi } from "../api/wiki.api";
+import { useAppStore } from "@/stores/app.store";
+import type { NodeBreadcrumb } from "../types";
+
+const getErrorMessage = (error: unknown) => error instanceof Error ? error.message : "An unknown error occurred";
+
+type MobileConceptOption = {
+  id: number | string;
+  title: string;
+  depth: number;
+};
+
+const normalizeTitle = (title: string) => title.trim().toLowerCase();
 
 export default function WikiPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const staticPageId = searchParams.get("page");
+  const staticPage = getStaticWikiPage(staticPageId);
   const articleId = searchParams.get("id") ? parseInt(searchParams.get("id")!) : null;
+  const requestedTitle = searchParams.get("title");
   const [mode, setMode] = useState<"read" | "edit" | "create">("read");
+  const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const canContribute = isAuthenticated;
+  const [popup, setPopup] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   const { data: rootArticles, isLoading: isLoadingRoots, error: rootError } = useRootArticles();
   const { data: article, isLoading: isLoadingArticle, error: articleError } = useArticle(articleId);
   const { mutateAsync: createArticle } = useCreateArticle();
+  const { mutateAsync: createNode } = useCreateNode();
+  const { mutateAsync: updateNode } = useUpdateNode();
+  const rootArticleDetails = useQueries({
+    queries: (rootArticles?.articles || []).map((root) => ({
+      queryKey: ["wiki", "article", root.id, "sidebar"],
+      queryFn: () => wikiApi.getArticle(root.id),
+      enabled: Boolean(rootArticles?.articles?.length),
+    })),
+  });
+  const parentArticleId = article?.article_node?.parent_id ?? null;
+  const { data: parentArticle } = useQuery({
+    queryKey: ["wiki", "article", parentArticleId, "parent"],
+    queryFn: () => wikiApi.getArticle(parentArticleId!),
+    enabled: Boolean(parentArticleId),
+  });
 
-  // Default to first root article if none selected
+  // Resolve stable links such as /wiki?title=Getting%20Started or /wiki?page=contribute.
   useEffect(() => {
-    if (!articleId && rootArticles?.articles?.length) {
-      setSearchParams({ id: rootArticles.articles[0].id.toString() });
-    }
-  }, [articleId, rootArticles, setSearchParams]);
+    if (articleId || staticPage || !rootArticles?.articles?.length) return;
 
-  const handleItemClick = (id: number) => {
-    setSearchParams({ id: id.toString() });
+    if (requestedTitle) {
+      const targetTitle = normalizeTitle(requestedTitle);
+      const requestedStaticPage = STATIC_WIKI_PAGES.find(
+        (knownPage) => normalizeTitle(knownPage.title) === targetTitle,
+      );
+
+      if (requestedStaticPage) {
+        setSearchParams({ page: requestedStaticPage.id });
+        return;
+      }
+
+      const allKnownArticles = [
+        ...rootArticles.articles,
+        ...rootArticleDetails.flatMap((query) => query.data?.sub_articles || []),
+      ];
+      const requestedArticle = allKnownArticles.find(
+        (knownArticle) => normalizeTitle(knownArticle.title) === targetTitle,
+      );
+
+      if (requestedArticle) {
+        setSearchParams({ id: requestedArticle.id.toString() });
+        return;
+      }
+    }
+
+    if (!requestedTitle || rootArticleDetails.every((query) => !query.isLoading)) {
+      setSearchParams({ page: "getting-started" });
+    }
+  }, [articleId, requestedTitle, rootArticles, rootArticleDetails, setSearchParams, staticPage]);
+
+  useEffect(() => {
+    if (articleError && articleId) {
+      setSearchParams({ page: "getting-started" });
+      setMode("read");
+    }
+  }, [articleError, articleId, setSearchParams]);
+
+  useEffect(() => {
+    if (!popup) return;
+
+    const timer = window.setTimeout(() => setPopup(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [popup]);
+
+  useEffect(() => {
+    if (!canContribute && mode !== "read") {
+      setMode("read");
+    }
+  }, [canContribute, mode]);
+
+  const handleItemClick = (id: number | string) => {
+    if (typeof id === "string") {
+      setSearchParams({ page: id });
+    } else {
+      setSearchParams({ id: id.toString() });
+    }
     setMode("read");
   };
 
-  const handleCreate = async (title: string, content: string) => {
+  const handleCreate = async ({
+    parentId,
+    title,
+    tldr,
+    notions,
+    keyQuestions,
+  }: {
+    parentId?: number;
+    title: string;
+    tldr: string;
+    notions: WikiContentLine[];
+    keyQuestions: WikiContentLine[];
+  }) => {
     try {
-      const res = await createArticle({
+      await createArticle({
         article_node: {
-          parent_id: null,
-          node_type: NodeType.Article,
+          ...(parentId ? { parent_id: parentId } : {}),
+          node_type: "Article",
           title,
-          content,
-          order_index: (rootArticles?.articles?.length || 0) + 1,
+          content: tldr,
+          order_index: parentId ? (article?.sub_articles?.length || 0) + 1 : (rootArticles?.articles?.length || 0) + 1,
         },
-        children: [],
+        children: [
+          ...notions.map((notion, index) => ({
+            node_type: "Notion" as const,
+            title: notion.title,
+            content: notion.content,
+            order_index: index + 1,
+          })),
+          ...keyQuestions.map((question, index) => ({
+            node_type: "Question" as const,
+            title: question.title,
+            content: question.content,
+            order_index: notions.length + index + 1,
+          })),
+        ],
       });
-      // Navigate to the new article
-      setSearchParams({ id: res.article_node.id.toString() });
+      if (parentId) {
+        setSearchParams({ id: parentId.toString() });
+      }
       setMode("read");
+      setPopup({
+        type: "success",
+        message: "Article submitted for moderation. It will be readable after approval.",
+      });
     } catch (err) {
-      alert("Failed to create article. Make sure you are logged in.");
+      console.error("Failed to create article:", err);
+      setPopup({
+        type: "error",
+        message: "Failed to create article. Make sure the parent is valid and you are logged in.",
+      });
+    }
+  };
+
+  const handleEdit = async ({
+    title,
+    tldr,
+    notions,
+    keyQuestions,
+  }: {
+    title: string;
+    tldr: string;
+    notions: WikiContentLine[];
+    keyQuestions: WikiContentLine[];
+  }) => {
+    if (!article?.article_node?.id) return;
+
+    try {
+      const updates: Promise<unknown>[] = [updateNode({
+        node_id: article.article_node.id,
+        title,
+        content: tldr,
+      })];
+
+      notions.forEach((notion, index) => {
+        const existing = article.notions[index];
+        if (existing) {
+          updates.push(updateNode({
+            node_id: existing.id,
+            title: notion.title,
+            content: notion.content,
+          }));
+          return;
+        }
+
+        updates.push(createNode({
+          parent_id: article.article_node.id,
+          node_type: "Notion",
+          title: notion.title,
+          content: notion.content,
+          order_index: index + 1,
+        }));
+      });
+
+      keyQuestions.forEach((question, index) => {
+        const existing = article.questions[index];
+        if (existing) {
+          updates.push(updateNode({
+            node_id: existing.id,
+            title: question.title,
+            content: question.content,
+          }));
+          return;
+        }
+
+        updates.push(createNode({
+          parent_id: article.article_node.id,
+          node_type: "Question",
+          title: question.title,
+          content: question.content,
+          order_index: notions.length + index + 1,
+        }));
+      });
+
+      await Promise.all(updates);
+      setMode("read");
+      setPopup({
+        type: "success",
+        message: "Article submitted for moderation. It will be readable after approval.",
+      });
+    } catch (err) {
+      console.error("Failed to update article:", err);
+      setPopup({
+        type: "error",
+        message: "Failed to submit edit. Make sure you are logged in.",
+      });
     }
   };
 
   if (isLoadingRoots) {
-    return <div className="p-8 text-brand-indigo">Loading wiki...</div>;
+    return <div className="mx-auto w-full max-w-[1680px] px-4 py-8 text-sub sm:px-6 lg:px-8">Loading wiki...</div>;
   }
 
   if (rootError) {
     return (
-      <div className="p-8 text-error">
+      <div className="mx-auto w-full max-w-[1680px] px-4 py-8 text-error sm:px-6 lg:px-8">
         <h2 className="text-xl font-bold mb-2">Error loading wiki roots</h2>
-        <p>{(rootError as any).message || "An unknown error occurred"}</p>
+        <p>{getErrorMessage(rootError)}</p>
       </div>
     );
   }
 
   const sidebarSections = [
     {
-      title: "Wiki",
-      items: (rootArticles?.articles || []).map(a => ({
-        id: a.id,
-        label: a.title,
-        active: a.id === articleId,
+      title: "Documentation",
+      items: STATIC_WIKI_PAGES.map((page) => ({
+        id: page.id,
+        label: page.title,
+        active: staticPage?.id === page.id,
       })),
+    },
+    {
+      title: "Articles",
+      items: (rootArticles?.articles || []).map((root, index) => {
+        const rootDetail = rootArticleDetails[index]?.data;
+        const children = rootDetail?.sub_articles || [];
+        const childIds = children.map((child) => child.id);
+        const containsCurrentNestedArticle = Boolean(
+          article?.article_node?.parent_id && childIds.includes(article.article_node.parent_id),
+        );
+
+        return {
+          id: root.id,
+          label: root.title,
+          active: !staticPage && (root.id === articleId || containsCurrentNestedArticle),
+          children: children.map((child) => ({
+            id: child.id,
+            label: child.title,
+            active: !staticPage && (child.id === articleId || child.id === article?.article_node?.parent_id),
+          })),
+        };
+      }),
     },
   ];
 
+  const parentOptions = (() => {
+    const map = new Map<number, NodeBreadcrumb>();
+
+    (rootArticles?.articles || []).forEach((root) => map.set(root.id, root));
+
+    if (article?.article_node) {
+      map.set(article.article_node.id, {
+        id: article.article_node.id,
+        title: article.article_node.title,
+      });
+    }
+
+    (article?.sub_articles || []).forEach((subArticle) => map.set(subArticle.id, subArticle));
+
+    return Array.from(map.values());
+  })();
+
+  const rightConceptLinks = (() => {
+    if (!article?.article_node) return [];
+    if (article.sub_articles.length > 0) return article.sub_articles;
+
+    const currentParentId = article.article_node.parent_id;
+    if (currentParentId && parentArticle?.sub_articles?.length) {
+      return parentArticle.sub_articles;
+    }
+
+    const parentRootIndex = (rootArticles?.articles || []).findIndex((root) => root.id === currentParentId);
+    if (parentRootIndex >= 0) {
+      return rootArticleDetails[parentRootIndex]?.data?.sub_articles || [];
+    }
+
+    return [];
+  })();
+
+  const mobileConceptOptions = (() => {
+    const options: MobileConceptOption[] = [];
+    const seen = new Set<string>();
+
+    const addOption = (option: MobileConceptOption) => {
+      const optionKey = String(option.id);
+      if (seen.has(optionKey)) return;
+      seen.add(optionKey);
+      options.push(option);
+    };
+
+    STATIC_WIKI_PAGES.forEach((page) => {
+      addOption({ id: page.id, title: page.title, depth: 0 });
+    });
+
+    (rootArticles?.articles || []).forEach((root, index) => {
+      addOption({ id: root.id, title: root.title, depth: 0 });
+
+      const rootDetail = rootArticleDetails[index]?.data;
+      (rootDetail?.sub_articles || []).forEach((child) => {
+        addOption({ id: child.id, title: child.title, depth: 1 });
+      });
+    });
+
+    if (parentArticle?.article_node) {
+      addOption({
+        id: parentArticle.article_node.id,
+        title: parentArticle.article_node.title,
+        depth: 1,
+      });
+      (parentArticle.sub_articles || []).forEach((sibling) => {
+        addOption({ id: sibling.id, title: sibling.title, depth: 2 });
+      });
+    }
+
+    if (article?.article_node) {
+      addOption({
+        id: article.article_node.id,
+        title: article.article_node.title,
+        depth: article.article_node.parent_id ? 1 : 0,
+      });
+      (article.sub_articles || []).forEach((subArticle) => {
+        addOption({ id: subArticle.id, title: subArticle.title, depth: 2 });
+      });
+    }
+
+    return options;
+  })();
+
   return (
-    <div className="flex flex-col gap-4">
-      {articleError && (
-        <div className="mx-8 p-4 bg-error/10 border border-error/20 rounded-xl text-error text-sm">
-          Failed to load article: {(articleError as any).message}
+    <div className="mx-auto mt-6 flex w-full max-w-[1680px] flex-col gap-4 px-4 pb-6 pt-4 sm:px-6 lg:px-8 xl:h-[calc(100vh-128px)] xl:overflow-hidden">
+      {popup && (
+        <div className="fixed left-4 right-4 top-4 z-50 rounded-lg border border-main/20 bg-bg/95 p-5 shadow-2xl shadow-sub-alt/30 backdrop-blur sm:left-auto sm:right-6 sm:top-6 sm:w-[min(360px,calc(100vw-32px))]">
+          <div className="flex items-start gap-4">
+            <div className={`mt-1 h-2.5 w-2.5 rounded-full ${popup.type === "success" ? "bg-main" : "bg-error"}`} />
+            <div className="flex-1">
+              <p className="font-bricolage text-sm font-semibold uppercase tracking-widest text-sub">
+                {popup.type === "success" ? "Submitted" : "Wiki request failed"}
+              </p>
+              <p className="mt-2 font-jakarta text-sm leading-6 text-text">
+                {popup.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPopup(null)}
+              className="rounded-full border border-main/15 px-2 py-0.5 font-jakarta text-xs text-text/70 transition-colors hover:border-main/40 hover:text-main"
+              aria-label="Close notification"
+            >
+              x
+            </button>
+          </div>
         </div>
       )}
-      <div className="flex w-full min-h-screen bg-transparent p-8 gap-8">
+      {articleError && articleId && !staticPage && (
+        <div className="p-4 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
+          Failed to load article: {getErrorMessage(articleError)}
+        </div>
+      )}
+      <div className="xl:hidden">
+        <div className="flex flex-col gap-3 rounded-lg border border-sub/25 bg-sub-alt/10 p-4">
+          <label htmlFor="wiki-mobile-concepts" className="font-bricolage text-sm font-semibold uppercase tracking-widest text-sub">
+            Concept
+          </label>
+          <select
+            id="wiki-mobile-concepts"
+            value={staticPage?.id ?? articleId ?? ""}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              const nextStaticPage = getStaticWikiPage(nextValue);
+
+              if (nextStaticPage) {
+                handleItemClick(nextStaticPage.id);
+                return;
+              }
+
+              const nextId = Number(nextValue);
+              if (nextId) handleItemClick(nextId);
+            }}
+            className="min-h-12 w-full rounded-lg border-2 border-sub/30 bg-bg px-4 py-3 font-jakarta text-base text-text outline-none transition-colors focus:border-main"
+          >
+            <option value="" disabled>
+              Choose a concept
+            </option>
+            {mobileConceptOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {`${"--".repeat(option.depth)}${option.depth ? " " : ""}${option.title}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className={`grid w-full grid-cols-1 gap-8 bg-transparent xl:min-h-0 xl:flex-1 xl:items-start xl:justify-center xl:overflow-hidden ${
+        staticPage
+          ? "xl:grid-cols-[minmax(220px,280px)_minmax(0,860px)]"
+          : "xl:grid-cols-[minmax(220px,280px)_minmax(0,860px)_minmax(220px,280px)]"
+      }`}>
         {/* Left Sidebar */}
-        <div className="w-1/4 max-w-[280px] shrink-0">
+        <div className="relative hidden min-w-0 xl:block xl:h-full xl:overflow-y-auto xl:pr-8">
+          <div className="absolute right-0 top-[10%] hidden h-4/5 w-px bg-sub/45 xl:block" />
           <LeftSidebar sections={sidebarSections} onItemClick={handleItemClick} />
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 max-w-3xl">
-          {isLoadingArticle ? (
-            <div className="text-brand-indigo">Loading article...</div>
+        <div className="min-w-0 w-full xl:h-full xl:overflow-y-auto xl:px-8">
+          {staticPage ? (
+            <StaticWikiPage page={staticPage} />
+          ) : isLoadingArticle ? (
+            <div className="text-sub">Loading article...</div>
           ) : (
             <DocContent 
               article={article || null} 
               mode={mode} 
               onModeChange={setMode}
+              canContribute={canContribute}
+              parentOptions={parentOptions}
               onCreate={handleCreate}
+              onEdit={handleEdit}
             />
           )}
         </div>
 
-        {/* Right Sidebar */}
-        <div className="w-1/4 max-w-[280px] shrink-0">
-          {article && <RightSidebar article={article} onItemClick={handleItemClick} />}
-        </div>
+        {!staticPage && article && (
+          <div className="relative min-w-0 border-t border-sub/30 pt-6 xl:h-full xl:overflow-y-auto xl:border-t-0 xl:pl-8 xl:pt-0">
+            <div className="absolute left-0 top-[10%] hidden h-4/5 w-px bg-sub/45 xl:block" />
+            <RightSidebar
+              article={article}
+              conceptLinks={rightConceptLinks}
+              onItemClick={handleItemClick}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

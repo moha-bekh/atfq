@@ -5,7 +5,11 @@ import type {
   RegisterRequest, 
   OAuthProvider,
   OAuthUrlResponse,
-  OAuthCallbackParams
+  OAuthCallbackParams,
+  PasswordResetRequest,
+  PasswordResetResponse,
+  PasswordResetConfirmRequest,
+  User
 } from '../types';
 
 export const authApi = {
@@ -50,8 +54,8 @@ export const authApi = {
     return await api.post('auth/refresh', { json: payload }).json();
   },
 
-  getMe: async (): Promise<any> => {
-    return await api.get('auth/me').json();
+  getMe: async (): Promise<User> => {
+    return await api.get('auth/me').json<User>();
   },
 
   getLinkedProviders: async (): Promise<{ providers: { name: string, provider_id: string }[] }> => {
@@ -72,6 +76,14 @@ export const authApi = {
 
   updatePassword: async (payload: { old_password: string; new_password: string }): Promise<void> => {
     await api.put('auth/password', { json: payload });
+  },
+
+  requestPasswordReset: async (payload: PasswordResetRequest): Promise<PasswordResetResponse> => {
+    return await api.post('auth/password-reset/request', { json: payload }).json<PasswordResetResponse>();
+  },
+
+  confirmPasswordReset: async (payload: PasswordResetConfirmRequest): Promise<void> => {
+    await api.post('auth/password-reset/confirm', { json: payload });
   },
 
   deleteAccount: async (payload: { refresh_token: string }): Promise<void> => {

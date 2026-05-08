@@ -27,18 +27,108 @@
 [data-theme='husqy'] {
   --color-bg: #000000;
   --color-main: #972FFF;
+  --color-caret: #B66CFF;
   --color-text: #EBD7FF;
   --color-sub: #523b6b;
   --color-sub-alt: #1a0b2e;
+  --color-error: #00F5FF;
+  --color-extra-error: #31C7D5;
 }
 
 /* Light / Paper Theme */
 [data-theme='paper'] {
   --color-bg: #eeeeee;
   --color-main: #444444;
+  --color-caret: #444444;
   --color-text: #111111;
-  --color-sub: #999999;
+  --color-sub: #777777;
   --color-sub-alt: #dddddd;
+  --color-error: #C2413B;
+  --color-extra-error: #D97706;
+}
+
+/* Graphite Theme */
+[data-theme='graphite'] {
+  --color-bg: #121212;
+  --color-main: #F2F2F2;
+  --color-caret: #FFD166;
+  --color-text: #E8E6DF;
+  --color-sub: #8A8F98;
+  --color-sub-alt: #242424;
+  --color-error: #FF5D73;
+  --color-extra-error: #FFB703;
+}
+
+/* Aurora Theme */
+[data-theme='aurora'] {
+  --color-bg: #10201C;
+  --color-main: #7CE7C7;
+  --color-caret: #7CE7C7;
+  --color-text: #EAFCF6;
+  --color-sub: #5AA391;
+  --color-sub-alt: #18372F;
+  --color-error: #FF7A90;
+  --color-extra-error: #FFC857;
+}
+
+/* Lagoon Theme */
+[data-theme='lagoon'] {
+  --color-bg: #062A33;
+  --color-main: #69D2E7;
+  --color-caret: #FFD166;
+  --color-text: #EDFAFF;
+  --color-sub: #4D8F9B;
+  --color-sub-alt: #0D3B46;
+  --color-error: #FF6B6B;
+  --color-extra-error: #F4D35E;
+}
+
+/* Ember Theme */
+[data-theme='ember'] {
+  --color-bg: #251416;
+  --color-main: #FFB86C;
+  --color-caret: #FFB86C;
+  --color-text: #FFF1DF;
+  --color-sub: #B36B57;
+  --color-sub-alt: #3A2021;
+  --color-error: #8BE9FD;
+  --color-extra-error: #5EEAD4;
+}
+
+/* Orchid Theme */
+[data-theme='orchid'] {
+  --color-bg: #21162E;
+  --color-main: #F0A6FF;
+  --color-caret: #66E3D6;
+  --color-text: #FFF0FB;
+  --color-sub: #8F6CA7;
+  --color-sub-alt: #362045;
+  --color-error: #66E3D6;
+  --color-extra-error: #FFD166;
+}
+
+/* Circuit Theme */
+[data-theme='circuit'] {
+  --color-bg: #071B18;
+  --color-main: #43F0B6;
+  --color-caret: #43F0B6;
+  --color-text: #E6FFF7;
+  --color-sub: #4B9381;
+  --color-sub-alt: #10322C;
+  --color-error: #FF5C8A;
+  --color-extra-error: #FFD166;
+}
+
+/* Daybreak Theme */
+[data-theme='daybreak'] {
+  --color-bg: #F7FBFF;
+  --color-main: #2F6FEF;
+  --color-caret: #2F6FEF;
+  --color-text: #14213D;
+  --color-sub: #6D7891;
+  --color-sub-alt: #E4EEF8;
+  --color-error: #D64045;
+  --color-extra-error: #F6AE2D;
 }
 
 /* --- 4. GLOBAL ELEMENT STYLES --- */
@@ -116,4 +206,3 @@ body {
   color: var(--color-text);
   border-color: var(--color-main);
 }
-

@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw';
-import type { Profile } from '../types';
+import type { Profile, UpdateProfileRequest, UpdateThemeRequest } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -13,6 +13,7 @@ let mockProfile: Profile = {
     name: 'base',
     is_preset: true,
     font_main: 'Plus Jakarta Sans',
+    font_display: 'Bricolage Grotesque',
     colors: {
       bg: '#7766BD',
       main: '#F4EFFA',
@@ -33,7 +34,7 @@ export const userHandlers = [
 
   // Update Profile
   http.put(`${API_URL}/api/v1/user/profile`, async ({ request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as UpdateProfileRequest;
     await delay(500);
     mockProfile = { ...mockProfile, ...body, updated_at: new Date().toISOString() };
     return HttpResponse.json(mockProfile);
@@ -41,7 +42,7 @@ export const userHandlers = [
 
   // Update Theme
   http.put(`${API_URL}/api/v1/user/profile/theme`, async ({ request }) => {
-    const body = await request.json() as any;
+    const body = await request.json() as UpdateThemeRequest;
     await delay(500);
     mockProfile = { ...mockProfile, theme: body.theme, updated_at: new Date().toISOString() };
     return HttpResponse.json(mockProfile);

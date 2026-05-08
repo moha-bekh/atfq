@@ -4,7 +4,7 @@ import { ATFQLogo } from '@/assets/icons/ATFQLogo';
 
 export function Register() {
   return (
-    <div className="flex flex-col items-center justify-center gap-6 w-full max-w-[350px] mx-auto min-h-[90vh] py-10">
+    <div className="mx-auto flex min-h-[calc(100vh-96px)] w-full max-w-[350px] flex-col items-center justify-center gap-6 px-4 py-12 sm:py-16">
       <div className="text-center space-y-2">
         <Link to="/" className="flex items-center justify-center">
           <ATFQLogo className="w-12 h-12 mx-auto mb-2 text-main" />

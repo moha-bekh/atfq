@@ -2,45 +2,43 @@ import { Button } from '@/components/ui/Button';
 
 export function Home() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
-      {/* Badge subtil */}
-      <span className="text-[10px] uppercase tracking-[0.3em] text-main mb-4 px-3 py-1 border border-main/20 rounded-full bg-main/5">
-        Computer Sccience Wiki / RoadMap
-      </span>
+    <section className="mx-auto flex min-h-[calc(100vh-230px)] w-full max-w-7xl items-center px-6 py-10 sm:px-16 lg:px-24 lg:py-0">
+      <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_180px]">
+        <div className="max-w-3xl">
+          <h1 className="max-w-2xl font-display text-4xl font-semibold leading-[1.05] text-main sm:text-5xl lg:text-[64px]">
+            Let curiosity be your compass.
+          </h1>
 
-      {/* Hero Section */}
-      <h1 className="font-display text-5xl md:text-7xl font-bold text-text tracking-tight mb-6">
-        {/* Stop searching.<br /> */}
-        <span className="text-main italic">Let curiosity<br />be your compass.</span>
-      </h1>
+          <div className="my-6 h-0.5 w-full max-w-2xl bg-main" />
 
-      <p className="max-w-xl text-sub text-lg mb-10 leading-relaxed">
-        The no-bullshit wiki for Computer Science. Learn the concepts,
-        then <span className="text-text font-mono">TTFC</span> (Type The Fucking Command)
-        to build muscle memory.
-      </p>
+          <div className="max-w-[420px]">
+            <div className="flex flex-col gap-6">
+              <p className="text-base leading-7 text-text">
+                ATFQ is an open-source knowledge graph for deep computer science.
+                Beyond syntax and tools, explore the cascade of whys and learn to
+                think like an engineer.
+              </p>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-4 w-full justify-center items-center">
-        <Button to="/wiki" variant="primary" className="w-full sm:w-auto text-center">ATFQ</Button>
-        {/* <Button to="/ttfc" variant="outline" className="w-full sm:w-auto text-center">TTFC</Button> */}
-      </div>
+              <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                <Button to="/wiki?page=getting-started" variant="primary" className="px-5">
+                  Explore
+                </Button>
+                <Button to="/wiki?page=contribute" variant="outline" className="px-5">
+                  Contribute
+                </Button>
+              </div>
 
-      {/* Stats / Proof Line */}
-      <div className="mt-20 grid grid-cols-2 md:grid-cols-3 gap-8 opacity-40 grayscale hover:grayscale-0 transition-all">
-        <div className="flex flex-col">
-          <span className="font-mono text-2xl text-text">1.4m</span>
-          <span className="text-[10px] uppercase tracking-widest">Users</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="font-mono text-2xl text-text">1.2k</span>
-          <span className="text-[10px] uppercase tracking-widest">Questions</span>
-        </div>
-        <div className="flex flex-col">
-          <span className="font-mono text-2xl text-text">850</span>
-          <span className="text-[10px] uppercase tracking-widest">Commands</span>
+              <a
+                href="mailto:contact@atfq.dev"
+                className="group w-fit text-base text-main transition-colors hover:text-text"
+              >
+                Contact us
+                <span className="mt-1 block h-[1.5px] w-0 bg-main transition-all group-hover:w-full" />
+              </a>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

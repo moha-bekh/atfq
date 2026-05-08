@@ -4,8 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-
-	// "fmt"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
 	"google.golang.org/grpc/codes"
@@ -105,8 +104,7 @@ func (s *wikiServer) createNodeInternal(ctx context.Context, ext Ext, req *pb.Cr
 	}
 	uid, err := s.GetUserID(ctx)
 	if err != nil {
-		// Fallback for development/testing if no user is provided
-		uid = 1
+		return nil, err
 	}
 
 	// 2. Setup DB types
@@ -230,7 +228,10 @@ func (s *wikiServer) updateNodeInternal(ctx context.Context, ext Ext, req *pb.Up
 	if req.Metadata != nil {
 		metadataJSON, _ = json.Marshal(req.Metadata.AsMap())
 	}
-	uid, _ := s.GetUserID(ctx)
+	uid, err := s.GetUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	query := `
     WITH current_data AS (
@@ -261,7 +262,7 @@ func (s *wikiServer) updateNodeInternal(ctx context.Context, ext Ext, req *pb.Up
 
 	var res VersionRow
 
-	err := ext.GetContext(ctx, &res, query, req.NodeId, title, content, uid, metadataJSON)
+	err = ext.GetContext(ctx, &res, query, req.NodeId, title, content, uid, metadataJSON)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, status.Error(codes.NotFound, "node not found")
@@ -493,4 +494,37 @@ func (s *wikiServer) fetchVersionHistoryInternal(ctx context.Context, ext Ext, n
 
 	ext.SelectContext(ctx, &rows, query, nodeID)
 	return rows, nil
+}
+
+func (s *wikiServer) fetchContributorsInternal(ctx context.Context, ext Ext, nodeID int32) ([]string, error) {
+	query := `
+	WITH RECURSIVE tree AS (
+		SELECT id
+		FROM nodes
+		WHERE id = $1
+
+		UNION ALL
+
+		SELECT child.id
+		FROM nodes child
+		JOIN tree parent ON child.parent_id = parent.id
+	)
+	SELECT DISTINCT v.created_by
+	FROM node_versions v
+	JOIN tree ON tree.id = v.node_id
+	WHERE v.created_by IS NOT NULL
+	ORDER BY v.created_by ASC;
+	`
+
+	var authorIDs []int32
+	if err := ext.SelectContext(ctx, &authorIDs, query, nodeID); err != nil {
+		return nil, err
+	}
+
+	contributors := make([]string, 0, len(authorIDs))
+	for _, authorID := range authorIDs {
+		contributors = append(contributors, fmt.Sprintf("User %d", authorID))
+	}
+
+	return contributors, nil
 }
