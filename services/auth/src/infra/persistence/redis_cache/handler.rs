@@ -1,7 +1,7 @@
-use std::time::Duration;
-use crate::domain::ports::cache_service::CacheService;
 use crate::domain::error::DomainError;
+use crate::domain::ports::cache_service::CacheService;
 use async_trait::async_trait;
+use std::time::Duration;
 
 pub struct RedisCache {
     pub(crate) client: redis::Client,

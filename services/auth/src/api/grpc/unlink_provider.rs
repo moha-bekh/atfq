@@ -1,12 +1,17 @@
-use tonic::{Request, Response, Status};
 use crate::api::grpc::handler::{AuthHandler, map_domain_error};
 use crate::auth_proto::UnlinkProviderRequest;
+use tonic::{Request, Response, Status};
 
 impl AuthHandler {
-    pub async fn unlink_provider_handler(&self, request: Request<UnlinkProviderRequest>) -> Result<Response<()>, Status> {
+    pub async fn unlink_provider_handler(
+        &self,
+        request: Request<UnlinkProviderRequest>,
+    ) -> Result<Response<()>, Status> {
         let req = request.into_inner();
-        
-        let claims = self.token_service.decode_token(&req.access_token)
+
+        let claims = self
+            .token_service
+            .decode_token(&req.access_token)
             .map_err(|_| Status::unauthenticated("Invalid or expired token"))?;
 
         if claims.typ != "access" {

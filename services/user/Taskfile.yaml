@@ -4,11 +4,32 @@ vars:
   DATABASE_URL: "postgresql://atfq:atfq@localhost:5433/atfq_db"
   DB_CONTAINER: "db-user"
   SERVER_URL: "localhost:8083"
+  AUTH_SERVER_URL: "localhost:8082"
 
 env:
   DATABASE_URL: "{{.DATABASE_URL}}"
 
 tasks:
+  login-token:
+    desc: "Login via auth service and print shell exports (Usage: task login-token EMAIL=... PASSWORD=...)"
+    requires:
+      vars: [EMAIL, PASSWORD]
+    cmds:
+      - |
+        grpcurl -plaintext -d '{
+          "id": { "email": "{{.EMAIL}}" },
+          "password": "{{.PASSWORD}}"
+        }' {{.AUTH_SERVER_URL}} auth.v1.AuthService/Login \
+        | jq -r '
+          if .success then
+            "export ACCESS_TOKEN=\(.success.accessToken)\nexport REFRESH_TOKEN=\(.success.refreshToken)"
+          elif .mfaRequired then
+            "MFA_REQUIRED login_request_id=\(.mfaRequired.loginRequestId)"
+          else
+            "Login failed: unexpected auth response"
+          end
+        '
+
   migrate-run:
     desc: "Run pending database migrations"
     cmds:
@@ -41,83 +62,133 @@ tasks:
         {{.SERVER_URL}} user.v1.UserService/GetProfile
 
   update-profile:
-    desc: "Update a profile via gRPC (Usage: task update-profile ID=uuid PIC=url)"
+    desc: "Update current authenticated profile via gRPC (Usage: task update-profile ACCESS_TOKEN=jwt PIC=url)"
     requires:
-      vars: [ID]
+      vars: [ACCESS_TOKEN, PIC]
     cmds:
       - |
-        grpcurl -plaintext -d '{"id": "{{.ID}}", "profile_picture_url": "{{.PIC}}"}' \
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"id": "", "profile_picture_url": "{{.PIC}}"}' \
         {{.SERVER_URL}} user.v1.UserService/UpdateProfile
 
   upload-pic:
-    desc: "Upload a profile picture via gRPC (Usage: task upload-pic ID=uuid FILE=path/to/img EXT=jpg)"
+    desc: "Upload a profile picture via gRPC (Usage: task upload-pic ACCESS_TOKEN=jwt FILE=path/to/img EXT=jpg)"
     requires:
-      vars: [ID, FILE, EXT]
+      vars: [ACCESS_TOKEN, FILE, EXT]
     cmds:
       - |
         IMAGE_BASE64=$(base64 < {{.FILE}} | tr -d '\n')
-        grpcurl -plaintext -d "{
-          \"id\": \"{{.ID}}\",
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" -d "{
+          \"id\": \"\",
           \"image_data\": \"$IMAGE_BASE64\",
           \"extension\": \"{{.EXT}}\"
         }" {{.SERVER_URL}} user.v1.UserService/UploadProfilePicture
 
   assign-role:
-    desc: "Assign a role to a user (Usage: task assign-role ID=uuid ROLE=name)"
+    desc: "Assign a role to a user (Usage: task assign-role ACCESS_TOKEN=jwt ID=uuid ROLE=name)"
     requires:
-      vars: [ID, ROLE]
+      vars: [ACCESS_TOKEN, ID, ROLE]
     cmds:
       - |
-        grpcurl -plaintext -d '{"id": "{{.ID}}", "role_name": "{{.ROLE}}"}' \
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"id": "{{.ID}}", "role_name": "{{.ROLE}}"}' \
         {{.SERVER_URL}} user.v1.UserService/AssignRole
 
   list-permissions:
-    desc: "List all available permissions"
+    desc: "List all available permissions (Usage: task list-permissions ACCESS_TOKEN=jwt)"
+    requires:
+      vars: [ACCESS_TOKEN]
     cmds:
       - |
-        grpcurl -plaintext {{.SERVER_URL}} user.v1.UserService/ListAvailablePermissions
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        {{.SERVER_URL}} user.v1.UserService/ListAvailablePermissions
 
   create-role-request:
-    desc: "Request a new role (Usage: task create-role-request ID=uuid ROLE=name REASON='...')"
+    desc: "Request a new role for the authenticated user (Usage: task create-role-request ACCESS_TOKEN=jwt ROLE=name REASON='...')"
     requires:
-      vars: [ID, ROLE, REASON]
+      vars: [ACCESS_TOKEN, ROLE, REASON]
     cmds:
       - |
-        grpcurl -plaintext -d '{"id": "{{.ID}}", "requested_role": "{{.ROLE}}", "reason": "{{.REASON}}"}' \
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"id": "", "requested_role": "{{.ROLE}}", "reason": "{{.REASON}}"}' \
         {{.SERVER_URL}} user.v1.UserService/CreateRoleRequest
 
   list-requests:
-    desc: "List all pending role change requests"
+    desc: "List all pending role change requests (Usage: task list-requests ACCESS_TOKEN=jwt)"
+    requires:
+      vars: [ACCESS_TOKEN]
     cmds:
       - |
-        grpcurl -plaintext {{.SERVER_URL}} user.v1.UserService/ListPendingRoleRequests
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        {{.SERVER_URL}} user.v1.UserService/ListPendingRoleRequests
+
+  list-all-requests:
+    desc: "List all role change requests for audit (Usage: task list-all-requests ACCESS_TOKEN=jwt)"
+    requires:
+      vars: [ACCESS_TOKEN]
+    cmds:
+      - |
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        {{.SERVER_URL}} user.v1.UserService/ListAllRoleRequests
+
+  list-my-requests:
+    desc: "List authenticated user's role change requests (Usage: task list-my-requests ACCESS_TOKEN=jwt)"
+    requires:
+      vars: [ACCESS_TOKEN]
+    cmds:
+      - |
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        {{.SERVER_URL}} user.v1.UserService/ListMyRoleRequests
+
+  cancel-request:
+    desc: "Cancel one of your pending role change requests (Usage: task cancel-request ACCESS_TOKEN=jwt REQ_ID=uuid)"
+    requires:
+      vars: [ACCESS_TOKEN, REQ_ID]
+    cmds:
+      - |
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"request_id": "{{.REQ_ID}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/CancelRoleRequest
+
+  leave-role:
+    desc: "Leave one of your elevated roles (Usage: task leave-role ACCESS_TOKEN=jwt ROLE=name)"
+    requires:
+      vars: [ACCESS_TOKEN, ROLE]
+    cmds:
+      - |
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"role_name": "{{.ROLE}}"}' \
+        {{.SERVER_URL}} user.v1.UserService/LeaveRole
 
   approve-request:
-    desc: "Approve a role change request (Usage: task approve-request REQ_ID=uuid)"
+    desc: "Approve a role change request (Usage: task approve-request ACCESS_TOKEN=jwt REQ_ID=uuid)"
     requires:
-      vars: [REQ_ID]
+      vars: [ACCESS_TOKEN, REQ_ID]
     cmds:
       - |
-        grpcurl -plaintext -d '{"request_id": "{{.REQ_ID}}", "approve": true}' \
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"request_id": "{{.REQ_ID}}", "approve": true}' \
         {{.SERVER_URL}} user.v1.UserService/ReviewRoleRequest
 
   reject-request:
-    desc: "Reject a role change request (Usage: task reject-request REQ_ID=uuid REASON='...')"
+    desc: "Reject a role change request (Usage: task reject-request ACCESS_TOKEN=jwt REQ_ID=uuid REASON='...')"
     requires:
-      vars: [REQ_ID, REASON]
+      vars: [ACCESS_TOKEN, REQ_ID, REASON]
     cmds:
       - |
-        grpcurl -plaintext -d '{"request_id": "{{.REQ_ID}}", "approve": false, "rejection_reason": "{{.REASON}}"}' \
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"request_id": "{{.REQ_ID}}", "approve": false, "rejection_reason": "{{.REASON}}"}' \
         {{.SERVER_URL}} user.v1.UserService/ReviewRoleRequest
 
   update-theme-dark:
-    desc: "Quickly update to a dark theme for a user (Usage: task update-theme-dark ID=uuid)"
+    desc: "Quickly update to a dark theme for the authenticated user (Usage: task update-theme-dark ACCESS_TOKEN=jwt)"
     requires:
-      vars: [ID]
+      vars: [ACCESS_TOKEN]
     cmds:
       - |
-        grpcurl -plaintext -d '{
-          "id": "{{.ID}}",
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{
+          "id": "",
           "theme": {
             "is_preset": false,
             "name": "dark-mode",
@@ -132,12 +203,13 @@ tasks:
         {{.SERVER_URL}} user.v1.UserService/UpdateTheme
 
   delete-profile:
-    desc: "Delete a profile via gRPC (Usage: task delete-profile ID=uuid)"
+    desc: "Delete the authenticated profile via gRPC (Usage: task delete-profile ACCESS_TOKEN=jwt)"
     requires:
-      vars: [ID]
+      vars: [ACCESS_TOKEN]
     cmds:
       - |
-        grpcurl -plaintext -d '{"id": "{{.ID}}"}' \
+        grpcurl -plaintext -H "authorization: Bearer {{.ACCESS_TOKEN}}" \
+        -d '{"id": ""}' \
         {{.SERVER_URL}} user.v1.UserService/DeleteProfile
 
   db-shell:

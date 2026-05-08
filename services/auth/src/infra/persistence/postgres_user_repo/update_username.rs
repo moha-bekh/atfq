@@ -1,10 +1,14 @@
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use crate::domain::error::DomainError;
+use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 const PG_UNIQUE_VIOLATION: &str = "23505";
 
 impl PostgresUserRepository {
-    pub async fn update_username_handler(&self, id: uuid::Uuid, new_username: &str) -> Result<(), DomainError> {
+    pub async fn update_username_handler(
+        &self,
+        id: uuid::Uuid,
+        new_username: &str,
+    ) -> Result<(), DomainError> {
         let result = sqlx::query!(
             "UPDATE users SET username = $1 WHERE id = $2",
             new_username,

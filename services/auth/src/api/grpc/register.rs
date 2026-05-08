@@ -1,12 +1,18 @@
-use tonic::{Request, Response, Status};
 use crate::api::grpc::handler::{AuthHandler, map_domain_error};
-use crate::auth_proto::{AuthResponse, AuthSuccess, User as ProtoUser, auth_response, RegisterRequest};
+use crate::auth_proto::{
+    AuthResponse, AuthSuccess, RegisterRequest, User as ProtoUser, auth_response,
+};
+use tonic::{Request, Response, Status};
 
 impl AuthHandler {
-    pub async fn register_handler(&self, request: Request<RegisterRequest>) -> Result<Response<AuthResponse>, Status> {
+    pub async fn register_handler(
+        &self,
+        request: Request<RegisterRequest>,
+    ) -> Result<Response<AuthResponse>, Status> {
         let req = request.into_inner();
 
-        let result = self.register_uc
+        let result = self
+            .register_uc
             .execute(&req.username, &req.email, &req.password)
             .await
             .map_err(map_domain_error)?;

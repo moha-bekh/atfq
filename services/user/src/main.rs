@@ -1,32 +1,33 @@
-use tonic::{transport::Server, Request, Response, Status, body::BoxBody};
-use tonic_reflection::server::Builder;
-use std::env;
-use std::task::{Context, Poll};
-use dotenvy::dotenv;
-use sqlx::postgres::{PgPool, PgPoolOptions};
-use uuid::Uuid;
-use serde_json::json;
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_s3::primitives::ByteStream;
-use serde::{Serialize, Deserialize};
-use jsonwebtoken::{decode, DecodingKey, Validation};
-use tower::{Layer, Service};
+use dotenvy::dotenv;
 use futures_util::future::{BoxFuture, FutureExt};
-use http::{Request as HttpRequest, Response as HttpResponse, HeaderValue};
+use http::{HeaderValue, Request as HttpRequest, Response as HttpResponse};
+use jsonwebtoken::{DecodingKey, Validation, decode};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use sqlx::postgres::{PgPool, PgPoolOptions};
+use std::env;
+use std::task::{Context, Poll};
+use tonic::{Request, Response, Status, body::BoxBody, transport::Server};
+use tonic_reflection::server::Builder;
+use tower::{Layer, Service};
+use uuid::Uuid;
 
 pub mod user {
     pub mod v1 {
         tonic::include_proto!("user.v1");
-        pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("user_descriptor");
+        pub const FILE_DESCRIPTOR_SET: &[u8] =
+            tonic::include_file_descriptor_set!("user_descriptor");
     }
 }
 
 use user::v1::user_service_server::{UserService, UserServiceServer};
 use user::v1::{
-    HelloRequest, HelloResponse, CreateProfileRequest, Profile, DeleteProfileRequest, 
-    GetProfileRequest, UpdateProfileRequest, UpdateThemeRequest, RoleRequest, 
-    PermissionList, RoleChangeRequest, RoleRequestStatus, RoleRequestsList, ReviewRequest, Theme,
-    UploadProfilePictureRequest
+    CancelRoleRequestRequest, CreateProfileRequest, DeleteProfileRequest, GetProfileRequest,
+    HelloRequest, HelloResponse, LeaveRoleRequest, PermissionList, Profile, ReviewRequest,
+    RoleChangeRequest, RoleRequest, RoleRequestStatus, RoleRequestsList, Theme,
+    UpdateProfileRequest, UpdateThemeRequest, UploadProfilePictureRequest,
 };
 
 // --- AUTH LOGIC ---
@@ -68,7 +69,10 @@ pub struct AuthService<S> {
 
 impl<S> Service<HttpRequest<tonic::transport::Body>> for AuthService<S>
 where
-    S: Service<HttpRequest<tonic::transport::Body>, Response = HttpResponse<BoxBody>> + Clone + Send + 'static,
+    S: Service<HttpRequest<tonic::transport::Body>, Response = HttpResponse<BoxBody>>
+        + Clone
+        + Send
+        + 'static,
     S::Future: Send + 'static,
 {
     type Response = HttpResponse<BoxBody>;
@@ -85,15 +89,18 @@ where
 
         async move {
             let path = req.uri().path();
-            
+
             // Liste des méthodes publiques (sans auth)
-            let is_public = path.contains("SayHello") || path.contains("CreateProfile") || path.contains("grpc.reflection");
+            let is_public = path.contains("SayHello")
+                || path.contains("CreateProfile")
+                || path.contains("grpc.reflection");
 
             if is_public {
                 return inner.call(req).await;
             }
 
-            let auth_header = req.headers()
+            let auth_header = req
+                .headers()
                 .get("authorization")
                 .and_then(|v: &HeaderValue| v.to_str().ok());
 
@@ -109,31 +116,45 @@ where
                     ) {
                         Ok(data) => {
                             if data.claims.typ != "access" {
-                                return Ok(status_to_http(Status::unauthenticated("Invalid token type")));
+                                return Ok(status_to_http(Status::unauthenticated(
+                                    "Invalid token type",
+                                )));
                             }
                             let mut req = req;
                             req.extensions_mut().insert(data.claims);
                             return inner.call(req).await;
                         }
                         Err(_) => {
-                            return Ok(status_to_http(Status::unauthenticated("Invalid or expired token")));
+                            return Ok(status_to_http(Status::unauthenticated(
+                                "Invalid or expired token",
+                            )));
                         }
                     }
                 }
             }
-            
-            Ok(status_to_http(Status::unauthenticated("Missing or invalid authorization header")))
-        }.boxed()
+
+            Ok(status_to_http(Status::unauthenticated(
+                "Missing or invalid authorization header",
+            )))
+        }
+        .boxed()
     }
 }
 
 fn status_to_http(status: Status) -> HttpResponse<BoxBody> {
     let mut res = HttpResponse::new(tonic::body::empty_body());
-    res.headers_mut().insert("grpc-status", HeaderValue::from_str(&format!("{}", status.code() as i32)).unwrap());
+    res.headers_mut().insert(
+        "grpc-status",
+        HeaderValue::from_str(&format!("{}", status.code() as i32)).unwrap(),
+    );
     if !status.message().is_empty() {
-         res.headers_mut().insert("grpc-message", HeaderValue::from_str(status.message()).unwrap());
+        res.headers_mut().insert(
+            "grpc-message",
+            HeaderValue::from_str(status.message()).unwrap(),
+        );
     }
-    res.headers_mut().insert("content-type", HeaderValue::from_static("application/grpc"));
+    res.headers_mut()
+        .insert("content-type", HeaderValue::from_static("application/grpc"));
     res
 }
 
@@ -147,8 +168,18 @@ pub struct MyUserService {
 }
 
 impl MyUserService {
-    pub fn new(pool: PgPool, s3_client: S3Client, bucket_name: String, s3_public_url: String) -> Self {
-        Self { pool, s3_client, bucket_name, s3_public_url }
+    pub fn new(
+        pool: PgPool,
+        s3_client: S3Client,
+        bucket_name: String,
+        s3_public_url: String,
+    ) -> Self {
+        Self {
+            pool,
+            s3_client,
+            bucket_name,
+            s3_public_url,
+        }
     }
 
     async fn fetch_full_profile(&self, user_id: Uuid) -> Result<Profile, Status> {
@@ -177,13 +208,66 @@ impl MyUserService {
     }
 
     fn get_user_id<T>(&self, request: &Request<T>) -> Result<Uuid, Status> {
-        request.extensions()
+        request
+            .extensions()
             .get::<TokenClaims>()
             .ok_or_else(|| Status::unauthenticated("No valid token found in request"))
             .and_then(|claims| {
                 Uuid::parse_str(&claims.sub)
                     .map_err(|_| Status::unauthenticated("Invalid user_id in token"))
             })
+    }
+
+    async fn require_admin(&self, user_id: Uuid) -> Result<(), Status> {
+        let is_admin: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM profile_roles
+                WHERE profile_id = $1 AND role_name = 'admin'
+            )
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error checking admin role: {}", e)))?;
+
+        if !is_admin {
+            return Err(Status::permission_denied(
+                "Only admins can manage role assignments",
+            ));
+        }
+
+        Ok(())
+    }
+
+    async fn ensure_profile_exists(&self, user_id: Uuid) -> Result<(), Status> {
+        sqlx::query(
+            r#"
+            INSERT INTO profiles (id)
+            VALUES ($1)
+            ON CONFLICT (id) DO NOTHING
+            "#,
+        )
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error creating missing profile: {}", e)))?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO profile_roles (profile_id, role_name)
+            VALUES ($1, 'user')
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error assigning base role: {}", e)))?;
+
+        Ok(())
     }
 }
 
@@ -201,10 +285,22 @@ fn map_row_to_profile(row: sqlx::postgres::PgRow) -> Result<Profile, Status> {
     let theme = Theme {
         is_preset: theme_json["is_preset"].as_bool().unwrap_or(true),
         name: theme_json["name"].as_str().unwrap_or("default").to_string(),
-        colors: theme_json["colors"].as_object()
-            .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string())).collect())
+        colors: theme_json["colors"]
+            .as_object()
+            .map(|obj| {
+                obj.iter()
+                    .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                    .collect()
+            })
             .unwrap_or_default(),
-        font_main: theme_json["font_main"].as_str().unwrap_or("Plus Jakarta Sans").to_string(),
+        font_main: theme_json["font_main"]
+            .as_str()
+            .unwrap_or("Plus Jakarta Sans")
+            .to_string(),
+        font_display: theme_json["font_display"]
+            .as_str()
+            .unwrap_or("Bricolage Grotesque")
+            .to_string(),
     };
 
     Ok(Profile {
@@ -236,29 +332,25 @@ impl UserService for MyUserService {
         Ok(Response::new(reply))
     }
 
-    async fn create_profile(&self, request: Request<CreateProfileRequest>) -> Result<Response<Profile>, Status> {
+    async fn create_profile(
+        &self,
+        request: Request<CreateProfileRequest>,
+    ) -> Result<Response<Profile>, Status> {
         let req = request.into_inner();
         let user_id = Uuid::parse_str(&req.id)
             .map_err(|_| Status::invalid_argument("Invalid UUID format"))?;
-        
-        sqlx::query(
-            r#"
-            INSERT INTO profiles (id)
-            VALUES ($1)
-            ON CONFLICT (id) DO NOTHING
-            "#
-        )
-        .bind(user_id)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
+
+        self.ensure_profile_exists(user_id).await?;
 
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
 
-    async fn delete_profile(&self, request: Request<DeleteProfileRequest>) -> Result<Response<()>, Status> {
+    async fn delete_profile(
+        &self,
+        request: Request<DeleteProfileRequest>,
+    ) -> Result<Response<()>, Status> {
         let user_id = self.get_user_id(&request)?;
-        
+
         let result = sqlx::query("DELETE FROM profiles WHERE id = $1")
             .bind(user_id)
             .execute(&self.pool)
@@ -272,7 +364,10 @@ impl UserService for MyUserService {
         Ok(Response::new(()))
     }
 
-    async fn get_profile(&self, request: Request<GetProfileRequest>) -> Result<Response<Profile>, Status> {
+    async fn get_profile(
+        &self,
+        request: Request<GetProfileRequest>,
+    ) -> Result<Response<Profile>, Status> {
         let req = request.into_inner();
         let requested_id = Uuid::parse_str(&req.id)
             .map_err(|_| Status::invalid_argument("Invalid UUID format"))?;
@@ -280,9 +375,13 @@ impl UserService for MyUserService {
         Ok(Response::new(self.fetch_full_profile(requested_id).await?))
     }
 
-    async fn update_profile(&self, request: Request<UpdateProfileRequest>) -> Result<Response<Profile>, Status> {
+    async fn update_profile(
+        &self,
+        request: Request<UpdateProfileRequest>,
+    ) -> Result<Response<Profile>, Status> {
         let user_id = self.get_user_id(&request)?;
         let req = request.into_inner();
+        self.ensure_profile_exists(user_id).await?;
 
         sqlx::query(
             r#"
@@ -291,7 +390,7 @@ impl UserService for MyUserService {
                 profile_picture_url = COALESCE($2, profile_picture_url),
                 updated_at = NOW()
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(req.profile_picture_url)
@@ -302,13 +401,19 @@ impl UserService for MyUserService {
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
 
-    async fn remove_profile_picture(&self, request: Request<()>) -> Result<Response<Profile>, Status> {
+    async fn remove_profile_picture(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<Profile>, Status> {
         let user_id = self.get_user_id(&request)?;
+        self.ensure_profile_exists(user_id).await?;
 
         let old_profile = self.fetch_full_profile(user_id).await?;
         if let Some(old_url) = old_profile.profile_picture_url {
             if let Some(old_key) = old_url.split('/').last() {
-                let _ = self.s3_client.delete_object()
+                let _ = self
+                    .s3_client
+                    .delete_object()
                     .bucket(&self.bucket_name)
                     .key(old_key)
                     .send()
@@ -316,26 +421,35 @@ impl UserService for MyUserService {
             }
         }
 
-        sqlx::query("UPDATE profiles SET profile_picture_url = NULL, updated_at = NOW() WHERE id = $1")
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
+        sqlx::query(
+            "UPDATE profiles SET profile_picture_url = NULL, updated_at = NOW() WHERE id = $1",
+        )
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
 
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
 
-    async fn update_theme(&self, request: Request<UpdateThemeRequest>) -> Result<Response<Profile>, Status> {
+    async fn update_theme(
+        &self,
+        request: Request<UpdateThemeRequest>,
+    ) -> Result<Response<Profile>, Status> {
         let user_id = self.get_user_id(&request)?;
         let req = request.into_inner();
+        self.ensure_profile_exists(user_id).await?;
 
-        let theme = req.theme.ok_or_else(|| Status::invalid_argument("Theme is required"))?;
-        
+        let theme = req
+            .theme
+            .ok_or_else(|| Status::invalid_argument("Theme is required"))?;
+
         let theme_json = json!({
             "is_preset": theme.is_preset,
             "name": theme.name,
             "colors": theme.colors,
             "font_main": theme.font_main,
+            "font_display": theme.font_display,
         });
 
         sqlx::query(
@@ -345,7 +459,7 @@ impl UserService for MyUserService {
                 theme = $2,
                 updated_at = NOW()
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(user_id)
         .bind(theme_json)
@@ -356,9 +470,12 @@ impl UserService for MyUserService {
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
 
-    async fn assign_role(&self, request: Request<RoleRequest>) -> Result<Response<Profile>, Status> {
-        // Idéalement, seul un admin peut faire ça. 
-        // Pour le moment on autorise si le user_id du token est le même ou si on implémente des permissions plus tard
+    async fn assign_role(
+        &self,
+        request: Request<RoleRequest>,
+    ) -> Result<Response<Profile>, Status> {
+        let actor_id = self.get_user_id(&request)?;
+        self.require_admin(actor_id).await?;
         let req = request.into_inner();
         let target_id = Uuid::parse_str(&req.id)
             .map_err(|_| Status::invalid_argument("Invalid UUID format"))?;
@@ -375,24 +492,63 @@ impl UserService for MyUserService {
         Ok(Response::new(self.fetch_full_profile(target_id).await?))
     }
 
-    async fn remove_role(&self, request: Request<RoleRequest>) -> Result<Response<Profile>, Status> {
+    async fn remove_role(
+        &self,
+        request: Request<RoleRequest>,
+    ) -> Result<Response<Profile>, Status> {
+        let actor_id = self.get_user_id(&request)?;
+        self.require_admin(actor_id).await?;
         let req = request.into_inner();
         let target_id = Uuid::parse_str(&req.id)
             .map_err(|_| Status::invalid_argument("Invalid UUID format"))?;
 
-        sqlx::query(
-            "DELETE FROM profile_roles WHERE profile_id = $1 AND role_name = $2"
-        )
-        .bind(target_id)
-        .bind(&req.role_name)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
+        sqlx::query("DELETE FROM profile_roles WHERE profile_id = $1 AND role_name = $2")
+            .bind(target_id)
+            .bind(&req.role_name)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
 
         Ok(Response::new(self.fetch_full_profile(target_id).await?))
     }
 
-    async fn list_available_permissions(&self, _request: Request<()>) -> Result<Response<PermissionList>, Status> {
+    async fn leave_role(
+        &self,
+        request: Request<LeaveRoleRequest>,
+    ) -> Result<Response<Profile>, Status> {
+        let user_id = self.get_user_id(&request)?;
+        let req = request.into_inner();
+        let role_name = req.role_name.trim().to_lowercase();
+
+        if role_name.is_empty() {
+            return Err(Status::invalid_argument("Role name is required"));
+        }
+
+        if role_name == "user" {
+            return Err(Status::failed_precondition(
+                "The base user role cannot be left",
+            ));
+        }
+
+        let result =
+            sqlx::query("DELETE FROM profile_roles WHERE profile_id = $1 AND role_name = $2")
+                .bind(user_id)
+                .bind(&role_name)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| Status::internal(format!("Database error leaving role: {}", e)))?;
+
+        if result.rows_affected() == 0 {
+            return Err(Status::not_found("Role not assigned to this user"));
+        }
+
+        Ok(Response::new(self.fetch_full_profile(user_id).await?))
+    }
+
+    async fn list_available_permissions(
+        &self,
+        _request: Request<()>,
+    ) -> Result<Response<PermissionList>, Status> {
         let rows = sqlx::query("SELECT slug FROM permissions")
             .fetch_all(&self.pool)
             .await
@@ -400,23 +556,77 @@ impl UserService for MyUserService {
 
         use sqlx::Row;
         let permissions = rows.into_iter().map(|r| r.get("slug")).collect();
-        
+
         Ok(Response::new(PermissionList { permissions }))
     }
 
-    async fn create_role_request(&self, request: Request<RoleChangeRequest>) -> Result<Response<RoleRequestStatus>, Status> {
+    async fn create_role_request(
+        &self,
+        request: Request<RoleChangeRequest>,
+    ) -> Result<Response<RoleRequestStatus>, Status> {
         let user_id = self.get_user_id(&request)?;
         let req = request.into_inner();
+        self.ensure_profile_exists(user_id).await?;
+        let requested_role = req.requested_role.trim().to_lowercase();
+
+        if requested_role.is_empty() {
+            return Err(Status::invalid_argument("Requested role is required"));
+        }
+
+        let already_has_role: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM profile_roles
+                WHERE profile_id = $1 AND role_name = $2
+            )
+            "#,
+        )
+        .bind(user_id)
+        .bind(&requested_role)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error checking role: {}", e)))?;
+
+        if already_has_role {
+            return Err(Status::already_exists("User already has this role"));
+        }
+
+        let already_pending: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM role_change_requests
+                WHERE profile_id = $1 AND requested_role = $2 AND status = 'pending'
+            )
+            "#,
+        )
+        .bind(user_id)
+        .bind(&requested_role)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| {
+            Status::internal(format!(
+                "Database error checking pending role request: {}",
+                e
+            ))
+        })?;
+
+        if already_pending {
+            return Err(Status::already_exists(
+                "A pending request for this role already exists",
+            ));
+        }
 
         let row = sqlx::query(
             r#"
             INSERT INTO role_change_requests (profile_id, requested_role, reason)
             VALUES ($1, $2, $3)
             RETURNING request_id, status::text
-            "#
+            "#,
         )
         .bind(user_id)
-        .bind(&req.requested_role)
+        .bind(&requested_role)
         .bind(&req.reason)
         .fetch_one(&self.pool)
         .await
@@ -429,12 +639,19 @@ impl UserService for MyUserService {
         }))
     }
 
-    async fn list_pending_role_requests(&self, _request: Request<()>) -> Result<Response<RoleRequestsList>, Status> {
+    async fn list_pending_role_requests(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<RoleRequestsList>, Status> {
+        let actor_id = self.get_user_id(&request)?;
+        self.require_admin(actor_id).await?;
+
         let rows = sqlx::query(
             r#"
-            SELECT request_id, profile_id, requested_role, reason, created_at
+            SELECT request_id, profile_id, requested_role, reason, status::text, rejection_reason, created_at, updated_at
             FROM role_change_requests
             WHERE status = 'pending'
+            ORDER BY created_at DESC
             "#
         )
         .fetch_all(&self.pool)
@@ -442,32 +659,179 @@ impl UserService for MyUserService {
         .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
 
         use sqlx::Row;
-        let requests = rows.into_iter().map(|r| {
-            let created_at: chrono::DateTime<chrono::Utc> = r.get("created_at");
-            user::v1::role_requests_list::Entry {
-                request_id: r.get::<Uuid, _>("request_id").to_string(),
-                id: r.get::<Uuid, _>("profile_id").to_string(),
-                requested_role: r.get("requested_role"),
-                reason: r.get("reason"),
-                created_at: Some(prost_types::Timestamp {
-                    seconds: created_at.timestamp(),
-                    nanos: created_at.timestamp_subsec_nanos() as i32,
-                }),
-            }
-        }).collect();
+        let requests = rows
+            .into_iter()
+            .map(|r| {
+                let created_at: chrono::DateTime<chrono::Utc> = r.get("created_at");
+                let updated_at: chrono::DateTime<chrono::Utc> = r.get("updated_at");
+                user::v1::role_requests_list::Entry {
+                    request_id: r.get::<Uuid, _>("request_id").to_string(),
+                    id: r.get::<Uuid, _>("profile_id").to_string(),
+                    requested_role: r.get("requested_role"),
+                    reason: r.get("reason"),
+                    status: r.get("status"),
+                    rejection_reason: r.get("rejection_reason"),
+                    created_at: Some(prost_types::Timestamp {
+                        seconds: created_at.timestamp(),
+                        nanos: created_at.timestamp_subsec_nanos() as i32,
+                    }),
+                    updated_at: Some(prost_types::Timestamp {
+                        seconds: updated_at.timestamp(),
+                        nanos: updated_at.timestamp_subsec_nanos() as i32,
+                    }),
+                }
+            })
+            .collect();
 
         Ok(Response::new(RoleRequestsList { requests }))
     }
 
-    async fn review_role_request(&self, request: Request<ReviewRequest>) -> Result<Response<Profile>, Status> {
+    async fn list_all_role_requests(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<RoleRequestsList>, Status> {
+        let actor_id = self.get_user_id(&request)?;
+        self.require_admin(actor_id).await?;
+
+        let rows = sqlx::query(
+            r#"
+            SELECT request_id, profile_id, requested_role, reason, status::text, rejection_reason, created_at, updated_at
+            FROM role_change_requests
+            ORDER BY created_at DESC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
+
+        use sqlx::Row;
+        let requests = rows
+            .into_iter()
+            .map(|r| {
+                let created_at: chrono::DateTime<chrono::Utc> = r.get("created_at");
+                let updated_at: chrono::DateTime<chrono::Utc> = r.get("updated_at");
+                user::v1::role_requests_list::Entry {
+                    request_id: r.get::<Uuid, _>("request_id").to_string(),
+                    id: r.get::<Uuid, _>("profile_id").to_string(),
+                    requested_role: r.get("requested_role"),
+                    reason: r.get("reason"),
+                    status: r.get("status"),
+                    rejection_reason: r.get("rejection_reason"),
+                    created_at: Some(prost_types::Timestamp {
+                        seconds: created_at.timestamp(),
+                        nanos: created_at.timestamp_subsec_nanos() as i32,
+                    }),
+                    updated_at: Some(prost_types::Timestamp {
+                        seconds: updated_at.timestamp(),
+                        nanos: updated_at.timestamp_subsec_nanos() as i32,
+                    }),
+                }
+            })
+            .collect();
+
+        Ok(Response::new(RoleRequestsList { requests }))
+    }
+
+    async fn list_my_role_requests(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<RoleRequestsList>, Status> {
+        let user_id = self.get_user_id(&request)?;
+        self.ensure_profile_exists(user_id).await?;
+        let rows = sqlx::query(
+            r#"
+            SELECT request_id, profile_id, requested_role, reason, status::text, rejection_reason, created_at, updated_at
+            FROM role_change_requests
+            WHERE profile_id = $1
+            ORDER BY created_at DESC
+            "#
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
+
+        use sqlx::Row;
+        let requests = rows
+            .into_iter()
+            .map(|r| {
+                let created_at: chrono::DateTime<chrono::Utc> = r.get("created_at");
+                let updated_at: chrono::DateTime<chrono::Utc> = r.get("updated_at");
+                user::v1::role_requests_list::Entry {
+                    request_id: r.get::<Uuid, _>("request_id").to_string(),
+                    id: r.get::<Uuid, _>("profile_id").to_string(),
+                    requested_role: r.get("requested_role"),
+                    reason: r.get("reason"),
+                    status: r.get("status"),
+                    rejection_reason: r.get("rejection_reason"),
+                    created_at: Some(prost_types::Timestamp {
+                        seconds: created_at.timestamp(),
+                        nanos: created_at.timestamp_subsec_nanos() as i32,
+                    }),
+                    updated_at: Some(prost_types::Timestamp {
+                        seconds: updated_at.timestamp(),
+                        nanos: updated_at.timestamp_subsec_nanos() as i32,
+                    }),
+                }
+            })
+            .collect();
+
+        Ok(Response::new(RoleRequestsList { requests }))
+    }
+
+    async fn cancel_role_request(
+        &self,
+        request: Request<CancelRoleRequestRequest>,
+    ) -> Result<Response<RoleRequestStatus>, Status> {
+        let user_id = self.get_user_id(&request)?;
         let req = request.into_inner();
         let request_id = Uuid::parse_str(&req.request_id)
             .map_err(|_| Status::invalid_argument("Invalid UUID format"))?;
 
-        let mut tx = self.pool.begin().await
+        let row = sqlx::query(
+            r#"
+            UPDATE role_change_requests
+            SET status = 'canceled'::request_status, updated_at = NOW()
+            WHERE request_id = $1 AND profile_id = $2 AND status = 'pending'
+            RETURNING request_id, status::text
+            "#,
+        )
+        .bind(request_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error canceling role request: {}", e)))?;
+
+        use sqlx::Row;
+        match row {
+            Some(row) => Ok(Response::new(RoleRequestStatus {
+                request_id: row.get::<Uuid, _>("request_id").to_string(),
+                status: row.get("status"),
+            })),
+            None => Err(Status::failed_precondition(
+                "Only your own pending requests can be canceled",
+            )),
+        }
+    }
+
+    async fn review_role_request(
+        &self,
+        request: Request<ReviewRequest>,
+    ) -> Result<Response<Profile>, Status> {
+        let reviewer_id = self.get_user_id(&request)?;
+        let req = request.into_inner();
+        let request_id = Uuid::parse_str(&req.request_id)
+            .map_err(|_| Status::invalid_argument("Invalid UUID format"))?;
+
+        self.require_admin(reviewer_id).await?;
+
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| Status::internal(format!("Transaction error: {}", e)))?;
 
-        let row = sqlx::query("SELECT profile_id, requested_role FROM role_change_requests WHERE request_id = $1")
+        let row = sqlx::query("SELECT profile_id, requested_role FROM role_change_requests WHERE request_id = $1 AND status = 'pending'")
             .bind(request_id)
             .fetch_optional(&mut *tx)
             .await
@@ -476,13 +840,16 @@ impl UserService for MyUserService {
         let (user_id, role) = match row {
             Some(r) => {
                 use sqlx::Row;
-                (r.get::<Uuid, _>("profile_id"), r.get::<String, _>("requested_role"))
-            },
+                (
+                    r.get::<Uuid, _>("profile_id"),
+                    r.get::<String, _>("requested_role"),
+                )
+            }
             None => return Err(Status::not_found("Request not found")),
         };
 
         let status = if req.approve { "approved" } else { "rejected" };
-        
+
         sqlx::query("UPDATE role_change_requests SET status = $2::request_status, rejection_reason = $3, updated_at = NOW() WHERE request_id = $1")
             .bind(request_id)
             .bind(status)
@@ -500,23 +867,34 @@ impl UserService for MyUserService {
                 .map_err(|e| Status::internal(format!("Database error adding role: {}", e)))?;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| Status::internal(format!("Commit error: {}", e)))?;
 
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
 
-    async fn upload_profile_picture(&self, request: Request<UploadProfilePictureRequest>) -> Result<Response<Profile>, Status> {
+    async fn upload_profile_picture(
+        &self,
+        request: Request<UploadProfilePictureRequest>,
+    ) -> Result<Response<Profile>, Status> {
         let user_id = self.get_user_id(&request)?;
+        self.ensure_profile_exists(user_id).await?;
         println!("Uploading profile picture for user: {}", user_id);
         let req = request.into_inner();
-        
-        println!("Image data size: {} bytes, extension: {}", req.image_data.len(), req.extension);
+
+        println!(
+            "Image data size: {} bytes, extension: {}",
+            req.image_data.len(),
+            req.extension
+        );
 
         let old_profile = self.fetch_full_profile(user_id).await?;
         if let Some(old_url) = old_profile.profile_picture_url {
             if let Some(old_key) = old_url.split('/').last() {
-                let _ = self.s3_client.delete_object()
+                let _ = self
+                    .s3_client
+                    .delete_object()
                     .bucket(&self.bucket_name)
                     .key(old_key)
                     .send()
@@ -524,9 +902,15 @@ impl UserService for MyUserService {
             }
         }
 
-        let file_name = format!("{}-{}.{}", user_id, chrono::Utc::now().timestamp(), req.extension);
-        
-        self.s3_client.put_object()
+        let file_name = format!(
+            "{}-{}.{}",
+            user_id,
+            chrono::Utc::now().timestamp(),
+            req.extension
+        );
+
+        self.s3_client
+            .put_object()
             .bucket(&self.bucket_name)
             .key(&file_name)
             .body(ByteStream::from(req.image_data))
@@ -537,12 +921,14 @@ impl UserService for MyUserService {
 
         let public_url = format!("{}/{}/{}", self.s3_public_url, self.bucket_name, file_name);
 
-        sqlx::query("UPDATE profiles SET profile_picture_url = $2, updated_at = NOW() WHERE id = $1")
-            .bind(user_id)
-            .bind(&public_url)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
+        sqlx::query(
+            "UPDATE profiles SET profile_picture_url = $2, updated_at = NOW() WHERE id = $1",
+        )
+        .bind(user_id)
+        .bind(&public_url)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error: {}", e)))?;
 
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
@@ -551,7 +937,7 @@ impl UserService for MyUserService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
-    
+
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let addr_str = env::var("SERVER_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
     let addr = addr_str.parse()?;
@@ -559,22 +945,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
 
     // S3 Config
-    let s3_endpoint = env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://minio-user:9000".to_string());
+    let s3_endpoint =
+        env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://minio-user:9000".to_string());
     let s3_bucket = env::var("S3_BUCKET").unwrap_or_else(|_| "profiles".to_string());
-    let s3_public_url = env::var("S3_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:9000".to_string());
-    
+    let s3_public_url =
+        env::var("S3_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:9000".to_string());
+
     let config = aws_config::from_env()
         .endpoint_url(&s3_endpoint)
         .region(aws_config::Region::new("us-east-1"))
         .load()
         .await;
-    
+
     let s3_config_builder = aws_sdk_s3::config::Builder::from(&config)
         .force_path_style(true)
         .build();
-    
+
     let s3_client = S3Client::from_conf(s3_config_builder);
-        
+
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&db_url)
@@ -594,9 +982,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Server::builder()
         .layer(auth_layer)
-        .add_service(UserServiceServer::new(user_service)
-            .max_decoding_message_size(10 * 1024 * 1024)
-            .max_encoding_message_size(10 * 1024 * 1024))
+        .add_service(
+            UserServiceServer::new(user_service)
+                .max_decoding_message_size(10 * 1024 * 1024)
+                .max_encoding_message_size(10 * 1024 * 1024),
+        )
         .add_service(reflection_service)
         .serve(addr)
         .await?;

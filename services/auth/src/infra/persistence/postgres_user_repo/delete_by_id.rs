@@ -1,5 +1,5 @@
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use crate::domain::error::DomainError;
+use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 impl PostgresUserRepository {
     pub async fn delete_by_id_handler(&self, id: uuid::Uuid) -> Result<(), DomainError> {

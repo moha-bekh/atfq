@@ -1,7 +1,7 @@
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use crate::domain::entities::User;
 use crate::domain::error::DomainError;
-use crate::domain::types::{Username, Email};
+use crate::domain::types::{Email, Username};
+use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 impl PostgresUserRepository {
     pub async fn find_by_email_handler(&self, email: &str) -> Result<Option<User>, DomainError> {

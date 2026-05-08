@@ -1,7 +1,7 @@
-pub mod domain;
-pub mod app;
-pub mod infra;
 pub mod api;
+pub mod app;
+pub mod domain;
+pub mod infra;
 
 pub mod auth_proto {
     tonic::include_proto!("auth.v1");

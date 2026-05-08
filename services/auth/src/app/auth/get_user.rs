@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use uuid::Uuid;
-use crate::domain::ports::user_repository::UserRepository;
 use crate::domain::entities::User;
 use crate::domain::error::DomainError;
+use crate::domain::ports::user_repository::UserRepository;
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct GetUserUseCase {
     repo: Arc<dyn UserRepository>,

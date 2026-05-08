@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use crate::domain::error::DomainError;
+use uuid::Uuid;
 
 pub struct TokenPair {
     pub access: String,

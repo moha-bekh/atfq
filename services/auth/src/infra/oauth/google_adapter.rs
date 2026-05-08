@@ -1,12 +1,12 @@
-use crate::domain::ports::oauth_service::{OAuthProvider, OAuthUserInfo};
 use crate::domain::error::DomainError;
+use crate::domain::ports::oauth_service::{OAuthProvider, OAuthUserInfo};
 use async_trait::async_trait;
 use oauth2::basic::BasicClient;
-use oauth2::{
-    AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl,
-    AuthorizationCode, CsrfToken, Scope, TokenResponse,
-};
 use oauth2::reqwest::async_http_client;
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
+    TokenResponse, TokenUrl,
+};
 use serde::Deserialize;
 
 pub struct GoogleAdapter {
@@ -26,8 +26,12 @@ impl GoogleAdapter {
         let client = BasicClient::new(
             ClientId::new(client_id),
             Some(ClientSecret::new(client_secret)),
-            AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).expect("Invalid auth URL"),
-            Some(TokenUrl::new("https://oauth2.googleapis.com/token".to_string()).expect("Invalid token URL")),
+            AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
+                .expect("Invalid auth URL"),
+            Some(
+                TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
+                    .expect("Invalid token URL"),
+            ),
         )
         .set_redirect_uri(RedirectUrl::new(redirect_url).expect("Invalid redirect URL"));
 
@@ -38,17 +42,23 @@ impl GoogleAdapter {
 #[async_trait]
 impl OAuthProvider for GoogleAdapter {
     fn generate_auth_url(&self) -> (String, String) {
-        let (auth_url, csrf_token) = self.client
+        let (auth_url, csrf_token) = self
+            .client
             .authorize_url(CsrfToken::new_random)
-            .add_scope(Scope::new("https://www.googleapis.com/auth/userinfo.email".to_string()))
-            .add_scope(Scope::new("https://www.googleapis.com/auth/userinfo.profile".to_string()))
+            .add_scope(Scope::new(
+                "https://www.googleapis.com/auth/userinfo.email".to_string(),
+            ))
+            .add_scope(Scope::new(
+                "https://www.googleapis.com/auth/userinfo.profile".to_string(),
+            ))
             .url();
 
         (auth_url.to_string(), csrf_token.secret().to_string())
     }
 
     async fn fetch_user_info(&self, code: String) -> Result<OAuthUserInfo, DomainError> {
-        let token_result = self.client
+        let token_result = self
+            .client
             .exchange_code(AuthorizationCode::new(code))
             .request_async(async_http_client)
             .await

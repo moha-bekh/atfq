@@ -1,8 +1,8 @@
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use crate::domain::entities::User;
-use crate::domain::ports::user_repository::UserDto;
 use crate::domain::error::DomainError;
-use crate::domain::types::{Username, Email};
+use crate::domain::ports::user_repository::UserDto;
+use crate::domain::types::{Email, Username};
+use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use sqlx::Error as SqlxError;
 
 impl PostgresUserRepository {

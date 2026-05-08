@@ -1,10 +1,13 @@
-use tonic::{Request, Response, Status};
-use crate::auth_proto::{LogoutRequest};
 use crate::api::grpc::handler::{AuthHandler, map_domain_error};
+use crate::auth_proto::LogoutRequest;
 use crate::domain::ports::token_service::TokenPair;
+use tonic::{Request, Response, Status};
 
 impl AuthHandler {
-    pub async fn logout_handler(&self, request: Request<LogoutRequest>) -> Result<Response<()>, Status> {
+    pub async fn logout_handler(
+        &self,
+        request: Request<LogoutRequest>,
+    ) -> Result<Response<()>, Status> {
         let req = request.into_inner();
         let tokens = TokenPair {
             access: req.access_token.clone(),

@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use std::ops::Deref;
 use crate::domain::error::DomainError;
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, sqlx::Type)]
 #[sqlx(transparent)]
@@ -10,10 +10,14 @@ impl Username {
     pub fn new(s: &str) -> Result<Self, DomainError> {
         let s = s.trim();
         if s.is_empty() || s.contains('@') {
-            return Err(DomainError::InvalidInput("Username cannot be empty or contain '@'".into()));
+            return Err(DomainError::InvalidInput(
+                "Username cannot be empty or contain '@'".into(),
+            ));
         }
         if s.len() < 3 {
-            return Err(DomainError::InvalidInput("Username must be at least 3 characters long".into()));
+            return Err(DomainError::InvalidInput(
+                "Username must be at least 3 characters long".into(),
+            ));
         }
         Ok(Self(s.to_string()))
     }

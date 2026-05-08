@@ -28,12 +28,20 @@ services:
       - SERVER_ADDR=0.0.0.0:8080
       - JWT_SECRET=jwt_secret
       - USER_SERVICE_ADDR=http://user:8080
+      - STARTUP_MAX_RETRIES=90
+      - APP_PUBLIC_URL=http://localhost:8080
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - SMTP_TLS=false
+      - SMTP_FROM=ATFQ <noreply@atfq.dev>
       - GITHUB_REDIRECT_URL=http://localhost:8080/auth/callback/github
       - GOOGLE_REDIRECT_URL=http://localhost:8080/auth/callback/google
     depends_on:
       db-auth:
         condition: service_started
       redis-auth:
+        condition: service_started
+      mailpit:
         condition: service_started
       # vault-agent-auth:
       #   condition: service_started
@@ -91,6 +99,13 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit-auth
+    networks:
+      - backend
+    ports:
+      - "127.0.0.1:8025:8025"
   # ------------------------------
   # VAULT AGENT
   # vault-agent-auth:

@@ -1,8 +1,8 @@
-use crate::domain::ports::user_repository::UserRepository;
-use crate::domain::entities::{User};
-use crate::domain::ports::user_repository::UserDto;
-use crate::domain::ports::mfa_service::EncryptedMfaSecret;
+use crate::domain::entities::User;
 use crate::domain::error::DomainError;
+use crate::domain::ports::mfa_service::EncryptedMfaSecret;
+use crate::domain::ports::user_repository::UserDto;
+use crate::domain::ports::user_repository::UserRepository;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
@@ -42,14 +42,28 @@ impl UserRepository for PostgresUserRepository {
     async fn find_by_username(&self, username: &str) -> Result<Option<User>, DomainError> {
         self.find_by_username_handler(username).await
     }
-    async fn find_by_oauth_id(&self, provider: &str, provider_id: &str) -> Result<Option<User>, DomainError> {
+    async fn find_by_oauth_id(
+        &self,
+        provider: &str,
+        provider_id: &str,
+    ) -> Result<Option<User>, DomainError> {
         self.find_by_oauth_id_handler(provider, provider_id).await
     }
-    async fn link_oauth_account(&self, user_id: uuid::Uuid, provider: &str, provider_id: &str) -> Result<(), DomainError> {
-        self.link_oauth_account_handler(user_id, provider, provider_id).await
+    async fn link_oauth_account(
+        &self,
+        user_id: uuid::Uuid,
+        provider: &str,
+        provider_id: &str,
+    ) -> Result<(), DomainError> {
+        self.link_oauth_account_handler(user_id, provider, provider_id)
+            .await
     }
 
-    async fn unlink_oauth_account(&self, user_id: uuid::Uuid, provider: &str) -> Result<(), DomainError> {
+    async fn unlink_oauth_account(
+        &self,
+        user_id: uuid::Uuid,
+        provider: &str,
+    ) -> Result<(), DomainError> {
         self.unlink_oauth_account_handler(user_id, provider).await
     }
 
@@ -65,11 +79,18 @@ impl UserRepository for PostgresUserRepository {
         self.update_username_handler(id, new_username).await
     }
 
-    async fn update_password(&self, id: uuid::Uuid, new_password_hash: &str) -> Result<(), DomainError> {
+    async fn update_password(
+        &self,
+        id: uuid::Uuid,
+        new_password_hash: &str,
+    ) -> Result<(), DomainError> {
         self.update_password_handler(id, new_password_hash).await
     }
 
-    async fn find_oauth_accounts(&self, user_id: uuid::Uuid) -> Result<Vec<(String, String)>, DomainError> {
+    async fn find_oauth_accounts(
+        &self,
+        user_id: uuid::Uuid,
+    ) -> Result<Vec<(String, String)>, DomainError> {
         self.find_oauth_accounts_handler(user_id).await
     }
 }

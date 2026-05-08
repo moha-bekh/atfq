@@ -1,12 +1,10 @@
-use std::sync::Arc;
-use crate::domain::ports::{
-    user_repository::UserRepository,
-    encryption_service::EncryptionService,
-    token_service::TokenService,
-    mfa_service::MfaService,
-};
-use crate::domain::error::DomainError;
 use crate::app::auth::types::MfaHumanReadableSecret;
+use crate::domain::error::DomainError;
+use crate::domain::ports::{
+    encryption_service::EncryptionService, mfa_service::MfaService, token_service::TokenService,
+    user_repository::UserRepository,
+};
+use std::sync::Arc;
 
 pub struct EnableMfaUseCase {
     repo: Arc<dyn UserRepository>,
@@ -22,7 +20,12 @@ impl EnableMfaUseCase {
         mfa: Arc<dyn MfaService>,
         tokens: Arc<dyn TokenService>,
     ) -> Self {
-        Self { repo, enc, mfa, tokens }
+        Self {
+            repo,
+            enc,
+            mfa,
+            tokens,
+        }
     }
 
     pub async fn execute(&self, access_token: &str) -> Result<MfaHumanReadableSecret, DomainError> {

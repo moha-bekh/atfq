@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::domain::error::DomainError;
+use async_trait::async_trait;
 use uuid::Uuid;
 
 #[async_trait]

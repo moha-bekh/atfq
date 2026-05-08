@@ -96,6 +96,20 @@ message UpdatePasswordRequest {
   string new_password = 3;
 }
 
+message PasswordResetRequest {
+  string identifier = 1;
+}
+
+message PasswordResetResponse {
+  bool accepted = 1;
+  string reset_token = 2;
+}
+
+message PasswordResetConfirmRequest {
+  string reset_token = 1;
+  string new_password = 2;
+}
+
 message DeleteUserRequest {
   string access_token = 1;
   string refresh_token = 2;

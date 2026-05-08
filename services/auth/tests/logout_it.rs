@@ -1,23 +1,26 @@
-use auth::app::auth::register::RegisterUseCase;
+use async_trait::async_trait;
 use auth::app::auth::login::LoginUseCase;
 use auth::app::auth::logout::LogoutUseCase;
+use auth::app::auth::register::RegisterUseCase;
+use auth::domain::entities::LoginResult;
+use auth::domain::ports::cache_service::CacheService;
+use auth::domain::ports::token_service::TokenPair;
 use auth::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use auth::infra::persistence::redis_cache::handler::RedisCache;
 use auth::infra::security::jwt_adapter::JwtAdapter;
 use auth::infra::security::password_hasher::Argon2Hasher;
-use auth::domain::ports::token_service::TokenPair;
-use auth::domain::ports::cache_service::CacheService;
-use auth::domain::entities::LoginResult;
-use sqlx::PgPool;
-use std::sync::Arc;
-use std::env;
 use dotenvy::dotenv;
-use async_trait::async_trait;
+use sqlx::PgPool;
+use std::env;
+use std::sync::Arc;
 
 struct MockUserProfileService;
 #[async_trait]
 impl auth::domain::ports::user_profile_service::UserProfileService for MockUserProfileService {
-    async fn create_profile(&self, _user_id: uuid::Uuid) -> Result<(), auth::domain::error::DomainError> {
+    async fn create_profile(
+        &self,
+        _user_id: uuid::Uuid,
+    ) -> Result<(), auth::domain::error::DomainError> {
         Ok(())
     }
 }
@@ -26,8 +29,13 @@ async fn setup_pool() -> PgPool {
     dotenvy::from_path("/vault/secrets/.env").ok();
     dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests");
-    let pool = PgPool::connect(&db_url).await.expect("Failed to connect to test database");
-    sqlx::migrate!("./migrations").run(&pool).await.expect("Failed to run migrations");
+    let pool = PgPool::connect(&db_url)
+        .await
+        .expect("Failed to connect to test database");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
     pool
 }
 
@@ -35,7 +43,7 @@ async fn setup_pool() -> PgPool {
 async fn test_logout_full_flow() {
     let pool = setup_pool().await;
     let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
-    
+
     let test_email = "logout_test@example.com";
     let test_user = "logout_test_user";
     let test_pass = "Password123!";
@@ -66,9 +74,7 @@ async fn test_logout_full_flow() {
         crypto_service.clone(),
     );
 
-    let logout_uc = LogoutUseCase::new(
-        cache_service.clone(),
-    );
+    let logout_uc = LogoutUseCase::new(cache_service.clone());
 
     // 1. Register
     register_uc
@@ -91,8 +97,14 @@ async fn test_logout_full_flow() {
     let refresh_token = login_res.refresh_token.clone();
 
     // 3. Verify tokens are NOT blacklisted initially
-    let is_access_blacklisted = cache_service.exists(&format!("blacklist:{}", access_token)).await.unwrap();
-    let is_refresh_blacklisted = cache_service.exists(&format!("blacklist:{}", refresh_token)).await.unwrap();
+    let is_access_blacklisted = cache_service
+        .exists(&format!("blacklist:{}", access_token))
+        .await
+        .unwrap();
+    let is_refresh_blacklisted = cache_service
+        .exists(&format!("blacklist:{}", refresh_token))
+        .await
+        .unwrap();
     assert!(!is_access_blacklisted);
     assert!(!is_refresh_blacklisted);
 
@@ -101,11 +113,20 @@ async fn test_logout_full_flow() {
         access: access_token.clone(),
         refresh: refresh_token.clone(),
     };
-    logout_uc.execute(tokens).await.expect("Logout should succeed");
+    logout_uc
+        .execute(tokens)
+        .await
+        .expect("Logout should succeed");
 
     // 5. Verify tokens ARE blacklisted now
-    let is_access_blacklisted_after = cache_service.exists(&format!("blacklist:{}", access_token)).await.unwrap();
-    let is_refresh_blacklisted_after = cache_service.exists(&format!("blacklist:{}", refresh_token)).await.unwrap();
+    let is_access_blacklisted_after = cache_service
+        .exists(&format!("blacklist:{}", access_token))
+        .await
+        .unwrap();
+    let is_refresh_blacklisted_after = cache_service
+        .exists(&format!("blacklist:{}", refresh_token))
+        .await
+        .unwrap();
     assert!(is_access_blacklisted_after);
     assert!(is_refresh_blacklisted_after);
 

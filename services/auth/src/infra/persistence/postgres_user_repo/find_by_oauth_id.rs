@@ -1,7 +1,7 @@
 use crate::domain::entities::User;
 use crate::domain::error::DomainError;
+use crate::domain::types::{Email, Username};
 use crate::infra::persistence::postgres_user_repo::handler::PostgresUserRepository;
-use crate::domain::types::{Username, Email};
 
 impl PostgresUserRepository {
     pub async fn find_by_oauth_id_handler(

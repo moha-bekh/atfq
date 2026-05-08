@@ -1,22 +1,22 @@
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
-use async_trait::async_trait;
-use uuid::Uuid;
-use crate::domain::ports::{
-    mfa_service::EncryptedMfaSecret,
-    user_repository::{UserRepository, UserDto},
-    token_service::{TokenService, TokenPair, TokenClaims},
-    cache_service::CacheService,
-    user_profile_service::UserProfileService,
-    crypto_service::CryptoService
-};
+use crate::app::auth::login::LoginUseCase;
+use crate::app::auth::oauth::OAuthUseCase;
+use crate::app::auth::refresh::RefreshTokenUseCase;
+use crate::app::auth::register::RegisterUseCase;
 use crate::domain::entities::{LoginResult, User};
 use crate::domain::error::DomainError;
-use crate::app::auth::register::RegisterUseCase;
-use crate::app::auth::login::LoginUseCase;
-use crate::app::auth::refresh::RefreshTokenUseCase;
-use crate::app::auth::oauth::OAuthUseCase;
 use crate::domain::ports::oauth_service::{OAuthProvider, OAuthUserInfo};
+use crate::domain::ports::{
+    cache_service::CacheService,
+    crypto_service::CryptoService,
+    mfa_service::EncryptedMfaSecret,
+    token_service::{TokenClaims, TokenPair, TokenService},
+    user_profile_service::UserProfileService,
+    user_repository::{UserDto, UserRepository},
+};
+use async_trait::async_trait;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 // --- MOCKS ---
 
@@ -46,8 +46,11 @@ struct MockUserRepo {
 impl UserRepository for MockUserRepo {
     async fn save_user(&self, data: UserDto) -> Result<User, DomainError> {
         let mut users = self.users.lock().unwrap();
-        
-        if users.iter().any(|u| *u.email == *data.email || *u.username == *data.username) {
+
+        if users
+            .iter()
+            .any(|u| *u.email == *data.email || *u.username == *data.username)
+        {
             return Err(DomainError::AlreadyExists);
         }
 
@@ -84,29 +87,47 @@ impl UserRepository for MockUserRepo {
         Ok(users.iter().find(|u| u.id == id).cloned())
     }
 
-    async fn find_by_oauth_id(&self, provider: &str, provider_id: &str) -> Result<Option<User>, DomainError> {
+    async fn find_by_oauth_id(
+        &self,
+        provider: &str,
+        provider_id: &str,
+    ) -> Result<Option<User>, DomainError> {
         let user_id = {
             let oauth_accounts = self.oauth_accounts.lock().unwrap();
-            oauth_accounts.get(&(provider.to_string(), provider_id.to_string())).cloned()
+            oauth_accounts
+                .get(&(provider.to_string(), provider_id.to_string()))
+                .cloned()
         };
-        
+
         match user_id {
             Some(id) => self.find_by_id(id).await,
             None => Ok(None),
         }
     }
 
-    async fn link_oauth_account(&self, user_id: Uuid, provider: &str, provider_id: &str) -> Result<(), DomainError> {
+    async fn link_oauth_account(
+        &self,
+        user_id: Uuid,
+        provider: &str,
+        provider_id: &str,
+    ) -> Result<(), DomainError> {
         let mut oauth_accounts = self.oauth_accounts.lock().unwrap();
         oauth_accounts.insert((provider.to_string(), provider_id.to_string()), user_id);
         Ok(())
     }
 
-    async fn unlink_oauth_account(&self, _user_id: Uuid, _provider: &str) -> Result<(), DomainError> {
+    async fn unlink_oauth_account(
+        &self,
+        _user_id: Uuid,
+        _provider: &str,
+    ) -> Result<(), DomainError> {
         unimplemented!()
     }
 
-    async fn find_oauth_accounts(&self, _user_id: Uuid) -> Result<Vec<(String, String)>, DomainError> {
+    async fn find_oauth_accounts(
+        &self,
+        _user_id: Uuid,
+    ) -> Result<Vec<(String, String)>, DomainError> {
         unimplemented!()
     }
 
@@ -118,11 +139,19 @@ impl UserRepository for MockUserRepo {
         unimplemented!()
     }
 
-    async fn update_username(&self, _id: uuid::Uuid, _new_username: &str) -> Result<(), DomainError> {
+    async fn update_username(
+        &self,
+        _id: uuid::Uuid,
+        _new_username: &str,
+    ) -> Result<(), DomainError> {
         unimplemented!()
     }
 
-    async fn update_password(&self, _id: uuid::Uuid, _new_password_hash: &str) -> Result<(), DomainError> {
+    async fn update_password(
+        &self,
+        _id: uuid::Uuid,
+        _new_password_hash: &str,
+    ) -> Result<(), DomainError> {
         unimplemented!()
     }
 
@@ -154,7 +183,11 @@ impl TokenService for MockTokenService {
         Ok(TokenClaims {
             user_id: *self.next_user_id.lock().unwrap(),
             exp: 0,
-            typ: if token.contains("refresh") { "refresh".into() } else { "access".into() },
+            typ: if token.contains("refresh") {
+                "refresh".into()
+            } else {
+                "access".into()
+            },
         })
     }
 }
@@ -174,8 +207,16 @@ struct MockCacheService {
 }
 #[async_trait]
 impl CacheService for MockCacheService {
-    async fn set(&self, key: &str, value: &str, _ttl: std::time::Duration) -> Result<(), DomainError> {
-        self.storage.lock().unwrap().insert(key.to_string(), value.to_string());
+    async fn set(
+        &self,
+        key: &str,
+        value: &str,
+        _ttl: std::time::Duration,
+    ) -> Result<(), DomainError> {
+        self.storage
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), value.to_string());
         Ok(())
     }
     async fn get(&self, key: &str) -> Result<Option<String>, DomainError> {
@@ -198,18 +239,22 @@ impl CacheService for MockCacheService {
 
 #[tokio::test]
 async fn test_register_success() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::new_v4()) });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::new_v4()),
+    });
     let crypto = Arc::new(MockCryptoService);
     let profiles = Arc::new(MockUserProfileService);
-    
+
     let uc = RegisterUseCase::new(repo, tokens, crypto, profiles);
-    
-    let result = uc.execute("johndoe", "john@example.com", "password123").await;
-    
+
+    let result = uc
+        .execute("johndoe", "john@example.com", "password123")
+        .await;
+
     assert!(result.is_ok());
     let res = result.unwrap();
     assert_eq!(res.access_token, "mock_access");
@@ -218,52 +263,80 @@ async fn test_register_success() {
 
 #[tokio::test]
 async fn test_refresh_token_success() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
+    let cache = Arc::new(MockCacheService {
+        storage: Mutex::new(HashMap::new()),
+    });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
     let crypto = Arc::new(MockCryptoService);
-    
-    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone(), Arc::new(MockUserProfileService));
+
+    let register_uc = RegisterUseCase::new(
+        repo.clone(),
+        tokens.clone(),
+        crypto.clone(),
+        Arc::new(MockUserProfileService),
+    );
     let refresh_uc = RefreshTokenUseCase::new(repo.clone(), cache.clone(), tokens.clone());
-    
+
     // 1. Register a user
-    let reg_res = register_uc.execute("johndoe", "john@example.com", "password123").await.unwrap();
+    let reg_res = register_uc
+        .execute("johndoe", "john@example.com", "password123")
+        .await
+        .unwrap();
     let user_id = reg_res.user.id;
     let refresh_token = reg_res.refresh_token;
-    
+
     // Configure MockTokenService to return this user_id during decode
     *tokens.next_user_id.lock().unwrap() = user_id;
-    
+
     // 2. Refresh
     let result = refresh_uc.execute(&refresh_token).await;
-    
+
     assert!(result.is_ok());
     let res = result.unwrap();
     assert_eq!(res.user.id, user_id);
-    
+
     // 3. Verify old token is now blacklisted in mock cache
-    assert!(cache.exists(&format!("blacklist:{}", refresh_token)).await.unwrap());
+    assert!(
+        cache
+            .exists(&format!("blacklist:{}", refresh_token))
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]
 async fn test_refresh_token_fails_if_blacklisted() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
-    
+    let cache = Arc::new(MockCacheService {
+        storage: Mutex::new(HashMap::new()),
+    });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
+
     let refresh_uc = RefreshTokenUseCase::new(repo.clone(), cache.clone(), tokens.clone());
-    
+
     let token = "some_token";
-    cache.set(&format!("blacklist:{}", token), "revoked", std::time::Duration::from_secs(60)).await.unwrap();
-    
+    cache
+        .set(
+            &format!("blacklist:{}", token),
+            "revoked",
+            std::time::Duration::from_secs(60),
+        )
+        .await
+        .unwrap();
+
     let result = refresh_uc.execute(token).await;
-    
+
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::Unauthenticated => (),
@@ -273,20 +346,24 @@ async fn test_refresh_token_fails_if_blacklisted() {
 
 #[tokio::test]
 async fn test_refresh_token_fails_with_access_token() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
-    
+    let cache = Arc::new(MockCacheService {
+        storage: Mutex::new(HashMap::new()),
+    });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
+
     let refresh_uc = RefreshTokenUseCase::new(repo.clone(), cache.clone(), tokens.clone());
-    
+
     // By default MockTokenService returns "access" if token doesn't contain "refresh"
     let token = "mock_access";
-    
+
     let result = refresh_uc.execute(token).await;
-    
+
     assert!(result.is_err());
     match result.unwrap_err() {
         DomainError::Unauthenticated => (),
@@ -296,22 +373,32 @@ async fn test_refresh_token_fails_with_access_token() {
 
 #[tokio::test]
 async fn test_login_success_with_email() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
     let crypto = Arc::new(MockCryptoService);
-    
-    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto.clone(), Arc::new(MockUserProfileService));
+
+    let register_uc = RegisterUseCase::new(
+        repo.clone(),
+        tokens.clone(),
+        crypto.clone(),
+        Arc::new(MockUserProfileService),
+    );
     let login_uc = LoginUseCase::new(repo, tokens, crypto);
-    
+
     // Register first
-    register_uc.execute("johndoe", "john@example.com", "password123").await.unwrap();
-    
+    register_uc
+        .execute("johndoe", "john@example.com", "password123")
+        .await
+        .unwrap();
+
     // Login with email
     let result = login_uc.execute("john@example.com", "password123").await;
-    
+
     assert!(result.is_ok());
     assert!(matches!(result, Ok(LoginResult::Success(_))));
     let Ok(LoginResult::Success(res)) = result else {
@@ -323,42 +410,70 @@ async fn test_login_success_with_email() {
 
 #[tokio::test]
 async fn test_oauth_get_url_success() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
-    
-    let uc = OAuthUseCase::new(repo, tokens, cache.clone(), Arc::new(MockUserProfileService));
+    let cache = Arc::new(MockCacheService {
+        storage: Mutex::new(HashMap::new()),
+    });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
+
+    let uc = OAuthUseCase::new(
+        repo,
+        tokens,
+        cache.clone(),
+        Arc::new(MockUserProfileService),
+    );
     let provider = Arc::new(MockOAuthProvider {
         auth_url: "https://github.com/login/oauth/authorize?client_id=123".to_string(),
         state: "test_state".to_string(),
         user_info: Err(DomainError::Internal("Not implemented".to_string())),
     });
-    
+
     let result = uc.get_auth_url(provider, None).await;
-    
+
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), "https://github.com/login/oauth/authorize?client_id=123");
+    assert_eq!(
+        result.unwrap(),
+        "https://github.com/login/oauth/authorize?client_id=123"
+    );
     assert!(cache.exists("oauth_state:test_state").await.unwrap());
 }
 
 #[tokio::test]
 async fn test_oauth_handle_callback_new_user() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
-    
-    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone(), Arc::new(MockUserProfileService));
-    
+    let cache = Arc::new(MockCacheService {
+        storage: Mutex::new(HashMap::new()),
+    });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
+
+    let uc = OAuthUseCase::new(
+        repo.clone(),
+        tokens,
+        cache.clone(),
+        Arc::new(MockUserProfileService),
+    );
+
     let provider_name = "github";
     let state = "test_state";
-    cache.set(&format!("oauth_state:{}", state), "pending", std::time::Duration::from_secs(600)).await.unwrap();
-    
+    cache
+        .set(
+            &format!("oauth_state:{}", state),
+            "pending",
+            std::time::Duration::from_secs(600),
+        )
+        .await
+        .unwrap();
+
     let provider = Arc::new(MockOAuthProvider {
         auth_url: "".into(),
         state: "".into(),
@@ -369,43 +484,75 @@ async fn test_oauth_handle_callback_new_user() {
             avatar_url: None,
         }),
     });
-    
-    let result = uc.handle_callback(provider_name, provider, "some_code".into(), state.into()).await;
-    
+
+    let result = uc
+        .handle_callback(provider_name, provider, "some_code".into(), state.into())
+        .await;
+
     assert!(result.is_ok());
     let res = result.unwrap();
     assert_eq!(res.user.email.to_string(), "oauth_user@example.com");
     assert_eq!(res.user.username.to_string(), "oauth_user"); // normalized name
-    
+
     // Check if linked in repo
     let linked_user = repo.find_by_oauth_id(provider_name, "12345").await.unwrap();
     assert!(linked_user.is_some());
     assert_eq!(linked_user.unwrap().id, res.user.id);
-    
+
     // Check state deleted
-    assert!(!cache.exists(&format!("oauth_state:{}", state)).await.unwrap());
+    assert!(
+        !cache
+            .exists(&format!("oauth_state:{}", state))
+            .await
+            .unwrap()
+    );
 }
 
 #[tokio::test]
 async fn test_oauth_handle_callback_link_existing_email() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
+    let cache = Arc::new(MockCacheService {
+        storage: Mutex::new(HashMap::new()),
+    });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
     let crypto = Arc::new(MockCryptoService);
-    
+
     // 1. Pre-register a user with the same email
-    let register_uc = RegisterUseCase::new(repo.clone(), tokens.clone(), crypto, Arc::new(MockUserProfileService));
-    let existing_user = register_uc.execute("existing_user", "match@example.com", "pass").await.unwrap().user;
-    
-    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone(), Arc::new(MockUserProfileService));
-    
+    let register_uc = RegisterUseCase::new(
+        repo.clone(),
+        tokens.clone(),
+        crypto,
+        Arc::new(MockUserProfileService),
+    );
+    let existing_user = register_uc
+        .execute("existing_user", "match@example.com", "pass")
+        .await
+        .unwrap()
+        .user;
+
+    let uc = OAuthUseCase::new(
+        repo.clone(),
+        tokens,
+        cache.clone(),
+        Arc::new(MockUserProfileService),
+    );
+
     let provider_name = "github";
     let state = "test_state";
-    cache.set(&format!("oauth_state:{}", state), "pending", std::time::Duration::from_secs(600)).await.unwrap();
-    
+    cache
+        .set(
+            &format!("oauth_state:{}", state),
+            "pending",
+            std::time::Duration::from_secs(600),
+        )
+        .await
+        .unwrap();
+
     let provider = Arc::new(MockOAuthProvider {
         auth_url: "".into(),
         state: "".into(),
@@ -416,44 +563,70 @@ async fn test_oauth_handle_callback_link_existing_email() {
             avatar_url: None,
         }),
     });
-    
-    let result = uc.handle_callback(provider_name, provider, "some_code".into(), state.into()).await;
-    
+
+    let result = uc
+        .handle_callback(provider_name, provider, "some_code".into(), state.into())
+        .await;
+
     assert!(result.is_ok());
     let res = result.unwrap();
     assert_eq!(res.user.id, existing_user.id);
-    
+
     // Verify it is now linked
-    let linked_user = repo.find_by_oauth_id(provider_name, "gh_123").await.unwrap();
+    let linked_user = repo
+        .find_by_oauth_id(provider_name, "gh_123")
+        .await
+        .unwrap();
     assert_eq!(linked_user.unwrap().id, existing_user.id);
 }
 
 #[tokio::test]
 async fn test_oauth_handle_callback_existing_oauth_account() {
-    let repo = Arc::new(MockUserRepo { 
+    let repo = Arc::new(MockUserRepo {
         users: Mutex::new(vec![]),
         oauth_accounts: Mutex::new(HashMap::new()),
     });
-    let cache = Arc::new(MockCacheService { storage: Mutex::new(HashMap::new()) });
-    let tokens = Arc::new(MockTokenService { next_user_id: Mutex::new(Uuid::nil()) });
-    
-    let uc = OAuthUseCase::new(repo.clone(), tokens, cache.clone(), Arc::new(MockUserProfileService));
-    
+    let cache = Arc::new(MockCacheService {
+        storage: Mutex::new(HashMap::new()),
+    });
+    let tokens = Arc::new(MockTokenService {
+        next_user_id: Mutex::new(Uuid::nil()),
+    });
+
+    let uc = OAuthUseCase::new(
+        repo.clone(),
+        tokens,
+        cache.clone(),
+        Arc::new(MockUserProfileService),
+    );
+
     let provider_name = "github";
     let provider_id = "gh_789";
-    
+
     // 1. Create a user and link it
-    let user = repo.save_user(UserDto {
-        username: crate::domain::types::Username::new("already_linked").unwrap(),
-        email: crate::domain::types::Email::new("linked@example.com").unwrap(),
-        password_hash: None,
-    }).await.unwrap();
-    repo.link_oauth_account(user.id, provider_name, provider_id).await.unwrap();
-    
+    let user = repo
+        .save_user(UserDto {
+            username: crate::domain::types::Username::new("already_linked").unwrap(),
+            email: crate::domain::types::Email::new("linked@example.com").unwrap(),
+            password_hash: None,
+        })
+        .await
+        .unwrap();
+    repo.link_oauth_account(user.id, provider_name, provider_id)
+        .await
+        .unwrap();
+
     // 2. Handle callback
     let state = "test_state";
-    cache.set(&format!("oauth_state:{}", state), "pending", std::time::Duration::from_secs(600)).await.unwrap();
-    
+    cache
+        .set(
+            &format!("oauth_state:{}", state),
+            "pending",
+            std::time::Duration::from_secs(600),
+        )
+        .await
+        .unwrap();
+
     let provider = Arc::new(MockOAuthProvider {
         auth_url: "".into(),
         state: "".into(),
@@ -464,9 +637,11 @@ async fn test_oauth_handle_callback_existing_oauth_account() {
             avatar_url: None,
         }),
     });
-    
-    let result = uc.handle_callback(provider_name, provider, "some_code".into(), state.into()).await;
-    
+
+    let result = uc
+        .handle_callback(provider_name, provider, "some_code".into(), state.into())
+        .await;
+
     assert!(result.is_ok());
     let res = result.unwrap();
     assert_eq!(res.user.id, user.id);

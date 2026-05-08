@@ -1,15 +1,12 @@
-use std::sync::Arc;
-use crate::domain::ports::{
-    encryption_service::EncryptionService,
-    token_service::TokenService,
-    mfa_service::MfaService,
-    user_repository::UserRepository,
-    encryption_service::Ciphertext,
-    crypto_service::CryptoService,
-};
-use crate::domain::error::DomainError;
 use crate::domain::entities::AuthenticatedUser;
+use crate::domain::error::DomainError;
+use crate::domain::ports::{
+    crypto_service::CryptoService, encryption_service::Ciphertext,
+    encryption_service::EncryptionService, mfa_service::MfaService, token_service::TokenService,
+    user_repository::UserRepository,
+};
 use std::str::FromStr;
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct VerifyMfaUseCase {
@@ -28,14 +25,27 @@ impl VerifyMfaUseCase {
         tokens: Arc<dyn TokenService>,
         crypto: Arc<dyn CryptoService>,
     ) -> Self {
-        Self { repo, enc, mfa, tokens, crypto }
+        Self {
+            repo,
+            enc,
+            mfa,
+            tokens,
+            crypto,
+        }
     }
 
-    pub async fn execute(&self, user_id: &str, code: &str, secret_hash: &str) -> Result<AuthenticatedUser, DomainError> {
+    pub async fn execute(
+        &self,
+        user_id: &str,
+        code: &str,
+        secret_hash: &str,
+    ) -> Result<AuthenticatedUser, DomainError> {
         let uuid = Uuid::from_str(user_id)
             .map_err(|_| DomainError::Internal("uuid parse error".to_string()))?;
 
-        let user = self.repo.find_by_id(uuid)
+        let user = self
+            .repo
+            .find_by_id(uuid)
             .await?
             .ok_or(DomainError::Unauthenticated)?;
 
@@ -48,15 +58,21 @@ impl VerifyMfaUseCase {
 
         let (mfa_secret, mfa_nonce) = (user.mfa_secret.clone(), user.mfa_nonce.clone());
         let Some((secret, nonce)) = mfa_secret.zip(mfa_nonce) else {
-            return Err(DomainError::Internal("2fa secret nonce not found".to_string()));
+            return Err(DomainError::Internal(
+                "2fa secret nonce not found".to_string(),
+            ));
         };
         let ciphertext = Ciphertext::new(secret, nonce);
 
-        let mfa_secret = self.enc.decrypt(&ciphertext)?
+        let mfa_secret = self
+            .enc
+            .decrypt(&ciphertext)?
             .try_into()
             .map_err(|_| DomainError::Internal("badly sized key".to_string()))?;
 
-        let code_valid = self.mfa.code_currently_valid(&mfa_secret, code)
+        let code_valid = self
+            .mfa
+            .code_currently_valid(&mfa_secret, code)
             .map_err(|_| DomainError::Internal("could not verify 2fa code".to_string()))?;
 
         if !code_valid {

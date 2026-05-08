@@ -1,11 +1,11 @@
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use crate::domain::error::DomainError;
+use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 impl PostgresUserRepository {
     pub async fn update_password_handler(
-        &self, 
-        id: uuid::Uuid, 
-        new_password_hash: &str
+        &self,
+        id: uuid::Uuid,
+        new_password_hash: &str,
     ) -> Result<(), DomainError> {
         let result = sqlx::query!(
             "UPDATE users SET password_hash = $1 WHERE id = $2",

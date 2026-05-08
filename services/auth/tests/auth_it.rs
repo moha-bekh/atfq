@@ -1,19 +1,22 @@
-use auth::app::auth::register::RegisterUseCase;
+use async_trait::async_trait;
 use auth::app::auth::login::LoginUseCase;
+use auth::app::auth::register::RegisterUseCase;
+use auth::domain::entities::LoginResult;
 use auth::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use auth::infra::security::jwt_adapter::JwtAdapter;
 use auth::infra::security::password_hasher::Argon2Hasher;
-use auth::domain::entities::LoginResult;
-use sqlx::PgPool;
-use std::sync::Arc;
-use std::env;
 use dotenvy::dotenv;
-use async_trait::async_trait;
+use sqlx::PgPool;
+use std::env;
+use std::sync::Arc;
 
 struct MockUserProfileService;
 #[async_trait]
 impl auth::domain::ports::user_profile_service::UserProfileService for MockUserProfileService {
-    async fn create_profile(&self, _user_id: uuid::Uuid) -> Result<(), auth::domain::error::DomainError> {
+    async fn create_profile(
+        &self,
+        _user_id: uuid::Uuid,
+    ) -> Result<(), auth::domain::error::DomainError> {
         Ok(())
     }
 }
@@ -22,8 +25,13 @@ async fn setup_pool() -> PgPool {
     dotenvy::from_path("/vault/secrets/.env").ok();
     dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests");
-    let pool = PgPool::connect(&db_url).await.expect("Failed to connect to test database");
-    sqlx::migrate!("./migrations").run(&pool).await.expect("Failed to run migrations");
+    let pool = PgPool::connect(&db_url)
+        .await
+        .expect("Failed to connect to test database");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
     pool
 }
 
@@ -53,11 +61,7 @@ async fn test_auth_full_flow() {
         profiles_service,
     );
 
-    let login_uc = LoginUseCase::new(
-        user_repo.clone(),
-        jwt_service,
-        crypto_service,
-    );
+    let login_uc = LoginUseCase::new(user_repo.clone(), jwt_service, crypto_service);
 
     // 1. Register
     register_uc

@@ -1,12 +1,10 @@
-use std::sync::Arc;
-use crate::domain::ports::{
-    user_repository::UserRepository,
-    token_service::TokenService,
-    crypto_service::CryptoService
-};
-use crate::domain::types::{Username, Email};
-use crate::domain::entities::{LoginResult, AuthenticatedUser};
+use crate::domain::entities::{AuthenticatedUser, LoginResult};
 use crate::domain::error::DomainError;
+use crate::domain::ports::{
+    crypto_service::CryptoService, token_service::TokenService, user_repository::UserRepository,
+};
+use crate::domain::types::{Email, Username};
+use std::sync::Arc;
 
 pub struct LoginUseCase {
     repo: Arc<dyn UserRepository>,
@@ -18,17 +16,20 @@ impl LoginUseCase {
     pub fn new(
         repo: Arc<dyn UserRepository>,
         tokens: Arc<dyn TokenService>,
-        crypto: Arc<dyn CryptoService>
+        crypto: Arc<dyn CryptoService>,
     ) -> Self {
-        Self { repo, tokens, crypto }
+        Self {
+            repo,
+            tokens,
+            crypto,
+        }
     }
 
     pub async fn execute(
         &self,
         identifier: &str,
-        password_raw: &str
+        password_raw: &str,
     ) -> Result<LoginResult, DomainError> {
-
         let user = if identifier.contains('@') {
             let email = Email::new(identifier)?;
             self.repo.find_by_email(email.as_str()).await?
@@ -39,9 +40,10 @@ impl LoginUseCase {
 
         let user = user.ok_or(DomainError::Unauthenticated)?;
 
-        let hash = user.password_hash.as_deref().ok_or_else(|| {
-             DomainError::Internal("User has no password hash".to_string())
-        })?;
+        let hash = user
+            .password_hash
+            .as_deref()
+            .ok_or_else(|| DomainError::Internal("User has no password hash".to_string()))?;
 
         if !self.crypto.verify_password(password_raw, hash) {
             return Err(DomainError::Unauthenticated);

@@ -1,17 +1,17 @@
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use crate::domain::error::DomainError;
+use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 const PG_UNIQUE_VIOLATION: &str = "23505";
 
 impl PostgresUserRepository {
-    pub async fn update_email_handler(&self, id: uuid::Uuid, new_email: &str) -> Result<(), DomainError> {
-        let result = sqlx::query!(
-            "UPDATE users SET email = $1 WHERE id = $2",
-            new_email,
-            id
-        )
-        .execute(&self.pool)
-        .await;
+    pub async fn update_email_handler(
+        &self,
+        id: uuid::Uuid,
+        new_email: &str,
+    ) -> Result<(), DomainError> {
+        let result = sqlx::query!("UPDATE users SET email = $1 WHERE id = $2", new_email, id)
+            .execute(&self.pool)
+            .await;
 
         match result {
             Ok(res) => {

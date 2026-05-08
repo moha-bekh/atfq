@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::domain::error::DomainError;
 use crate::domain::ports::user_profile_service::UserProfileService;
-use crate::user_proto::user_service_client::UserServiceClient;
 use crate::user_proto::CreateProfileRequest;
-use uuid::Uuid;
+use crate::user_proto::user_service_client::UserServiceClient;
+use async_trait::async_trait;
 use tonic::transport::Channel;
+use uuid::Uuid;
 
 use std::time::Duration;
 use tokio::time::sleep;
@@ -16,7 +16,10 @@ pub struct GrpcUserProfileService {
 impl GrpcUserProfileService {
     pub async fn new(addr: String) -> Result<Self, Box<dyn std::error::Error>> {
         let mut retry_count = 0;
-        let max_retries = 15;
+        let max_retries = std::env::var("STARTUP_MAX_RETRIES")
+            .ok()
+            .and_then(|value| value.parse::<u32>().ok())
+            .unwrap_or(90);
 
         loop {
             match UserServiceClient::connect(addr.clone()).await {
@@ -31,10 +34,8 @@ impl GrpcUserProfileService {
                     }
 
                     println!(
-                        "User Service not ready ({}/{})... Retrying in 2s. Error: {}", 
-                        retry_count, 
-                        max_retries,
-                        e
+                        "User Service not ready ({}/{})... Retrying in 2s. Error: {}",
+                        retry_count, max_retries, e
                     );
 
                     sleep(Duration::from_secs(2)).await;
@@ -48,12 +49,13 @@ impl GrpcUserProfileService {
 impl UserProfileService for GrpcUserProfileService {
     async fn create_profile(&self, user_id: Uuid) -> Result<(), DomainError> {
         let mut client = self.client.clone();
-        
+
         let request = tonic::Request::new(CreateProfileRequest {
             id: user_id.to_string(),
         });
 
-        client.create_profile(request)
+        client
+            .create_profile(request)
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?;
 

@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use uuid::Uuid;
+use crate::domain::error::DomainError;
 use crate::domain::ports::user_repository::UserRepository;
 use crate::domain::types::Email;
-use crate::domain::error::DomainError;
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct UpdateEmailUseCase {
     repo: Arc<dyn UserRepository>,

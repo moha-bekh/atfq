@@ -1,6 +1,6 @@
-use uuid::Uuid;
+use crate::domain::types::{Email, Username};
 use chrono::{DateTime, Utc};
-use crate::domain::types::{Username, Email};
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct User {

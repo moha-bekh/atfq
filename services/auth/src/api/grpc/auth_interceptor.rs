@@ -1,13 +1,12 @@
+use futures_util::future::{BoxFuture, FutureExt};
+use http::{HeaderValue, Request as HttpRequest, Response as HttpResponse};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use futures_util::future::{BoxFuture, FutureExt};
+use tonic::{Status, body::BoxBody};
 use tower::{Layer, Service};
-use tonic::{Status, transport::Body, body::BoxBody};
-use http::{Request as HttpRequest, Response as HttpResponse, HeaderValue};
 
-use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::cache_service::CacheService;
-use crate::infra::persistence::redis_cache::handler::RedisCache;
+use crate::domain::ports::token_service::TokenService;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AuthServiceMethod {
@@ -15,6 +14,8 @@ pub enum AuthServiceMethod {
     Login,
     Logout,
     RefreshToken,
+    RequestPasswordReset,
+    ConfirmPasswordReset,
 }
 
 impl AuthServiceMethod {
@@ -24,6 +25,8 @@ impl AuthServiceMethod {
             "/auth.v1.AuthService/Login" => Some(Self::Login),
             "/auth.v1.AuthService/Logout" => Some(Self::Logout),
             "/auth.v1.AuthService/RefreshToken" => Some(Self::RefreshToken),
+            "/auth.v1.AuthService/RequestPasswordReset" => Some(Self::RequestPasswordReset),
+            "/auth.v1.AuthService/ConfirmPasswordReset" => Some(Self::ConfirmPasswordReset),
             _ => None,
         }
     }
@@ -31,7 +34,11 @@ impl AuthServiceMethod {
     pub fn requires_auth(&self) -> bool {
         match self {
             Self::Logout => true,
-            Self::Register | Self::Login | Self::RefreshToken => false,
+            Self::Register
+            | Self::Login
+            | Self::RefreshToken
+            | Self::RequestPasswordReset
+            | Self::ConfirmPasswordReset => false,
         }
     }
 }
@@ -97,8 +104,8 @@ where
                     return inner.call(req).await;
                 }
                 Some(m) => {
-
-                    let auth_header = req.headers()
+                    let auth_header = req
+                        .headers()
                         .get("authorization")
                         .and_then(|v: &HeaderValue| v.to_str().ok());
 
@@ -106,7 +113,8 @@ where
                         if auth_header_str.starts_with("Bearer ") {
                             let token = &auth_header_str[7..];
 
-                            let is_blacklisted = cache_service.exists(&format!("blacklist:{}", token))
+                            let is_blacklisted = cache_service
+                                .exists(&format!("blacklist:{}", token))
                                 .await
                                 .unwrap_or(false);
 
@@ -114,41 +122,55 @@ where
                                 if let AuthServiceMethod::Logout = m {
                                     // Proceed to allow blacklisting the refresh token
                                 } else {
-                                    return Ok(status_to_http(Status::unauthenticated("Token is revoked")));
+                                    return Ok(status_to_http(Status::unauthenticated(
+                                        "Token is revoked",
+                                    )));
                                 }
                             }
 
                             match token_service.decode_token(token) {
                                 Ok(claims) => {
                                     if claims.typ != "access" {
-                                        return Ok(status_to_http(Status::unauthenticated("Invalid token type")));
+                                        return Ok(status_to_http(Status::unauthenticated(
+                                            "Invalid token type",
+                                        )));
                                     }
                                     let mut req = req;
                                     req.extensions_mut().insert(claims);
                                     return inner.call(req).await;
                                 }
                                 Err(_) => {
-                                    return Ok(status_to_http(Status::unauthenticated("Invalid or expired token")));
+                                    return Ok(status_to_http(Status::unauthenticated(
+                                        "Invalid or expired token",
+                                    )));
                                 }
                             }
                         }
                     }
-                    return Ok(status_to_http(Status::unauthenticated("Missing or invalid authorization header")));
+                    return Ok(status_to_http(Status::unauthenticated(
+                        "Missing or invalid authorization header",
+                    )));
                 }
-                None => {
-                    inner.call(req).await
-                }
+                None => inner.call(req).await,
             }
-        }.boxed()
+        }
+        .boxed()
     }
 }
 
 fn status_to_http(status: Status) -> HttpResponse<BoxBody> {
     let mut res = HttpResponse::new(tonic::body::empty_body());
-    res.headers_mut().insert("grpc-status", HeaderValue::from_str(&format!("{}", status.code() as i32)).unwrap());
+    res.headers_mut().insert(
+        "grpc-status",
+        HeaderValue::from_str(&format!("{}", status.code() as i32)).unwrap(),
+    );
     if !status.message().is_empty() {
-         res.headers_mut().insert("grpc-message", HeaderValue::from_str(status.message()).unwrap());
+        res.headers_mut().insert(
+            "grpc-message",
+            HeaderValue::from_str(status.message()).unwrap(),
+        );
     }
-    res.headers_mut().insert("content-type", HeaderValue::from_static("application/grpc"));
+    res.headers_mut()
+        .insert("content-type", HeaderValue::from_static("application/grpc"));
     res
 }

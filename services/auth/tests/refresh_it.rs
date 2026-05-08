@@ -1,20 +1,23 @@
-use auth::app::auth::register::RegisterUseCase;
+use async_trait::async_trait;
 use auth::app::auth::refresh::RefreshTokenUseCase;
+use auth::app::auth::register::RegisterUseCase;
+use auth::domain::ports::cache_service::CacheService;
 use auth::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use auth::infra::persistence::redis_cache::handler::RedisCache;
 use auth::infra::security::jwt_adapter::JwtAdapter;
 use auth::infra::security::password_hasher::Argon2Hasher;
-use auth::domain::ports::cache_service::CacheService;
-use sqlx::PgPool;
-use std::sync::Arc;
-use std::env;
 use dotenvy::dotenv;
-use async_trait::async_trait;
+use sqlx::PgPool;
+use std::env;
+use std::sync::Arc;
 
 struct MockUserProfileService;
 #[async_trait]
 impl auth::domain::ports::user_profile_service::UserProfileService for MockUserProfileService {
-    async fn create_profile(&self, _user_id: uuid::Uuid) -> Result<(), auth::domain::error::DomainError> {
+    async fn create_profile(
+        &self,
+        _user_id: uuid::Uuid,
+    ) -> Result<(), auth::domain::error::DomainError> {
         Ok(())
     }
 }
@@ -23,8 +26,13 @@ async fn setup_pool() -> PgPool {
     dotenvy::from_path("/vault/secrets/.env").ok();
     dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set for integration tests");
-    let pool = PgPool::connect(&db_url).await.expect("Failed to connect to test database");
-    sqlx::migrate!("./migrations").run(&pool).await.expect("Failed to run migrations");
+    let pool = PgPool::connect(&db_url)
+        .await
+        .expect("Failed to connect to test database");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
     pool
 }
 
@@ -32,7 +40,7 @@ async fn setup_pool() -> PgPool {
 async fn test_refresh_token_integration() {
     let pool = setup_pool().await;
     let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
-    
+
     let test_email = "refresh_test@example.com";
     let test_user = "refresh_test_user";
     let test_pass = "Password123!";
@@ -68,7 +76,7 @@ async fn test_refresh_token_integration() {
         .execute(test_user, test_email, test_pass)
         .await
         .expect("Registration should succeed");
-    
+
     let first_refresh_token = reg_res.refresh_token.clone();
 
     // 2. Perform refresh
@@ -76,12 +84,15 @@ async fn test_refresh_token_integration() {
         .execute(&first_refresh_token)
         .await
         .expect("First refresh should succeed");
-    
+
     assert_ne!(refresh_res.refresh_token, first_refresh_token);
     assert_eq!(refresh_res.user.email.to_string(), test_email);
 
     // 3. Verify the old refresh token is now blacklisted
-    let is_blacklisted = cache_service.exists(&format!("blacklist:{}", first_refresh_token)).await.unwrap();
+    let is_blacklisted = cache_service
+        .exists(&format!("blacklist:{}", first_refresh_token))
+        .await
+        .unwrap();
     assert!(is_blacklisted);
 
     // 4. Try to refresh again with the OLD token (should fail)

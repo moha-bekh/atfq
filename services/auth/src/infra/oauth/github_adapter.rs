@@ -1,12 +1,12 @@
-use crate::domain::ports::oauth_service::{OAuthProvider, OAuthUserInfo};
 use crate::domain::error::DomainError;
+use crate::domain::ports::oauth_service::{OAuthProvider, OAuthUserInfo};
 use async_trait::async_trait;
 use oauth2::basic::BasicClient;
-use oauth2::{
-    AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl,
-    AuthorizationCode, CsrfToken, Scope, TokenResponse,
-};
 use oauth2::reqwest::async_http_client;
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
+    TokenResponse, TokenUrl,
+};
 use serde::Deserialize;
 
 pub struct GithubAdapter {
@@ -34,8 +34,12 @@ impl GithubAdapter {
         let client = BasicClient::new(
             ClientId::new(client_id),
             Some(ClientSecret::new(client_secret)),
-            AuthUrl::new("https://github.com/login/oauth/authorize".to_string()).expect("Invalid auth URL"),
-            Some(TokenUrl::new("https://github.com/login/oauth/access_token".to_string()).expect("Invalid token URL")),
+            AuthUrl::new("https://github.com/login/oauth/authorize".to_string())
+                .expect("Invalid auth URL"),
+            Some(
+                TokenUrl::new("https://github.com/login/oauth/access_token".to_string())
+                    .expect("Invalid token URL"),
+            ),
         )
         .set_redirect_uri(RedirectUrl::new(redirect_url).expect("Invalid redirect URL"));
 
@@ -46,7 +50,8 @@ impl GithubAdapter {
 #[async_trait]
 impl OAuthProvider for GithubAdapter {
     fn generate_auth_url(&self) -> (String, String) {
-        let (auth_url, csrf_token) = self.client
+        let (auth_url, csrf_token) = self
+            .client
             .authorize_url(CsrfToken::new_random)
             .add_scope(Scope::new("read:user".to_string()))
             .add_scope(Scope::new("user:email".to_string()))
@@ -56,7 +61,8 @@ impl OAuthProvider for GithubAdapter {
     }
 
     async fn fetch_user_info(&self, code: String) -> Result<OAuthUserInfo, DomainError> {
-        let token_result = self.client
+        let token_result = self
+            .client
             .exchange_code(AuthorizationCode::new(code))
             .request_async(async_http_client)
             .await
@@ -73,7 +79,12 @@ impl OAuthProvider for GithubAdapter {
             .map_err(|e| DomainError::Internal(format!("Failed to fetch user info: {}", e)))?
             .json::<GithubUserResponse>()
             .await
-            .map_err(|e| DomainError::Internal(format!("Invalid JSON response from GitHub user info: {}", e)))?;
+            .map_err(|e| {
+                DomainError::Internal(format!(
+                    "Invalid JSON response from GitHub user info: {}",
+                    e
+                ))
+            })?;
 
         let email = if let Some(e) = github_user.email {
             e
@@ -87,12 +98,22 @@ impl OAuthProvider for GithubAdapter {
                 .map_err(|e| DomainError::Internal(format!("Failed to fetch user emails: {}", e)))?
                 .json::<Vec<GithubEmailResponse>>()
                 .await
-                .map_err(|e| DomainError::Internal(format!("Invalid JSON response from GitHub user emails: {}", e)))?;
+                .map_err(|e| {
+                    DomainError::Internal(format!(
+                        "Invalid JSON response from GitHub user emails: {}",
+                        e
+                    ))
+                })?;
 
-            emails.into_iter()
+            emails
+                .into_iter()
                 .find(|e| e.primary && e.verified)
                 .map(|e| e.email)
-                .ok_or_else(|| DomainError::Internal("No verified primary email found for GitHub user".to_string()))?
+                .ok_or_else(|| {
+                    DomainError::Internal(
+                        "No verified primary email found for GitHub user".to_string(),
+                    )
+                })?
         };
 
         Ok(OAuthUserInfo {

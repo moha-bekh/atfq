@@ -1,7 +1,7 @@
+use crate::domain::error::DomainError;
+use crate::domain::ports::user_repository::UserRepository;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::domain::ports::user_repository::UserRepository;
-use crate::domain::error::DomainError;
 
 pub struct UnlinkOAuthUseCase {
     repo: Arc<dyn UserRepository>,

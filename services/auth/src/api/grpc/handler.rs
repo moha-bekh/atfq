@@ -1,39 +1,39 @@
-use std::sync::Arc;
-use tonic::{Request, Response, Status};
+use crate::app::auth::confirm_password_reset::ConfirmPasswordResetUseCase;
+use crate::app::auth::delete_user::DeleteUserUseCase;
+use crate::app::auth::disable_mfa::DisableMfaUseCase;
+use crate::app::auth::enable_mfa::EnableMfaUseCase;
+use crate::app::auth::get_linked_providers::GetLinkedProvidersUseCase;
+use crate::app::auth::get_user::GetUserUseCase;
+use crate::app::auth::login::LoginUseCase;
+use crate::app::auth::logout::LogoutUseCase;
+use crate::app::auth::oauth::OAuthUseCase;
+use crate::app::auth::refresh::RefreshTokenUseCase;
+use crate::app::auth::register::RegisterUseCase;
+use crate::app::auth::request_password_reset::RequestPasswordResetUseCase;
+use crate::app::auth::unlink_oauth::UnlinkOAuthUseCase;
+use crate::app::auth::update_email::UpdateEmailUseCase;
+use crate::app::auth::update_password::UpdatePasswordUseCase;
+use crate::app::auth::update_username::UpdateUsernameUseCase;
+use crate::app::auth::verify_mfa::VerifyMfaUseCase;
 use crate::auth_proto::auth_service_server::AuthService;
 use crate::auth_proto::{
-    AuthSuccess,
-    AuthResponse,
-    RegisterRequest,
-    LoginRequest,
-    LogoutRequest,
-    RefreshRequest,
-    EnableMfaRequest,
-    EnableMfaResponse,
-    VerifyMfaRequest
+    AuthResponse, AuthSuccess, EnableMfaRequest, EnableMfaResponse, LoginRequest, LogoutRequest,
+    RefreshRequest, RegisterRequest, VerifyMfaRequest,
 };
-use crate::app::auth::register::RegisterUseCase;
-use crate::app::auth::login::LoginUseCase;
-use crate::app::auth::enable_mfa::EnableMfaUseCase;
-use crate::app::auth::disable_mfa::DisableMfaUseCase;
-use crate::app::auth::verify_mfa::VerifyMfaUseCase;
-use crate::app::auth::logout::LogoutUseCase;
-use crate::app::auth::refresh::RefreshTokenUseCase;
-use crate::app::auth::oauth::OAuthUseCase;
-use crate::app::auth::unlink_oauth::UnlinkOAuthUseCase;
-use crate::app::auth::get_user::GetUserUseCase;
-use crate::app::auth::get_linked_providers::GetLinkedProvidersUseCase;
-use crate::app::auth::delete_user::DeleteUserUseCase;
-use crate::app::auth::update_email::UpdateEmailUseCase;
-use crate::app::auth::update_username::UpdateUsernameUseCase;
-use crate::app::auth::update_password::UpdatePasswordUseCase;
 use crate::domain::error::DomainError;
+use std::sync::Arc;
+use tonic::{Request, Response, Status};
 
+use crate::auth_proto::{
+    DeleteUserRequest, GetUserRequest, LinkedProvidersResponse, OAuthCallbackRequest,
+    OAuthUrlRequest, OAuthUrlResponse, PasswordResetConfirmRequest, PasswordResetRequest,
+    PasswordResetResponse, UnlinkProviderRequest, UpdateEmailRequest, UpdatePasswordRequest,
+    UpdateUsernameRequest, User,
+};
 use crate::domain::ports::cache_service::CacheService;
-use crate::domain::ports::token_service::TokenService;
 use crate::domain::ports::crypto_service::CryptoService;
 use crate::domain::ports::oauth_service::OAuthProvider as DomainOAuthProvider;
-use crate::auth_proto::{OAuthUrlRequest, OAuthUrlResponse, OAuthCallbackRequest, GetUserRequest, DeleteUserRequest, UpdateEmailRequest, UpdateUsernameRequest, UpdatePasswordRequest, User, LinkedProvidersResponse, UnlinkProviderRequest};
+use crate::domain::ports::token_service::TokenService;
 
 pub struct AuthHandler {
     pub register_uc: Arc<RegisterUseCase>,
@@ -51,6 +51,8 @@ pub struct AuthHandler {
     pub update_email_uc: Arc<UpdateEmailUseCase>,
     pub update_username_uc: Arc<UpdateUsernameUseCase>,
     pub update_password_uc: Arc<UpdatePasswordUseCase>,
+    pub request_password_reset_uc: Arc<RequestPasswordResetUseCase>,
+    pub confirm_password_reset_uc: Arc<ConfirmPasswordResetUseCase>,
     pub cache_service: Arc<dyn CacheService>,
     pub token_service: Arc<dyn TokenService>,
     pub crypto_service: Arc<dyn CryptoService>,
@@ -75,6 +77,8 @@ impl AuthHandler {
         update_email_uc: Arc<UpdateEmailUseCase>,
         update_username_uc: Arc<UpdateUsernameUseCase>,
         update_password_uc: Arc<UpdatePasswordUseCase>,
+        request_password_reset_uc: Arc<RequestPasswordResetUseCase>,
+        confirm_password_reset_uc: Arc<ConfirmPasswordResetUseCase>,
         cache_service: Arc<dyn CacheService>,
         token_service: Arc<dyn TokenService>,
         crypto_service: Arc<dyn CryptoService>,
@@ -97,22 +101,30 @@ impl AuthHandler {
             update_email_uc,
             update_username_uc,
             update_password_uc,
+            request_password_reset_uc,
+            confirm_password_reset_uc,
             cache_service,
             token_service,
             crypto_service,
             google_provider,
-            github_provider
+            github_provider,
         }
     }
 }
 
 #[tonic::async_trait]
 impl AuthService for AuthHandler {
-    async fn register(&self, request: Request<RegisterRequest>) -> Result<Response<AuthResponse>, Status> {
+    async fn register(
+        &self,
+        request: Request<RegisterRequest>,
+    ) -> Result<Response<AuthResponse>, Status> {
         self.register_handler(request).await
     }
 
-    async fn login(&self, request: Request<LoginRequest>) -> Result<Response<AuthResponse>, Status> {
+    async fn login(
+        &self,
+        request: Request<LoginRequest>,
+    ) -> Result<Response<AuthResponse>, Status> {
         self.login_handler(request).await
     }
 
@@ -120,11 +132,17 @@ impl AuthService for AuthHandler {
         self.logout_handler(request).await
     }
 
-    async fn refresh_token(&self, request: Request<RefreshRequest>) -> Result<Response<AuthResponse>, Status> {
+    async fn refresh_token(
+        &self,
+        request: Request<RefreshRequest>,
+    ) -> Result<Response<AuthResponse>, Status> {
         self.refresh_handler(request).await
     }
 
-    async fn enable_mfa(&self, request: Request<EnableMfaRequest>) -> Result<Response<EnableMfaResponse>, Status> {
+    async fn enable_mfa(
+        &self,
+        request: Request<EnableMfaRequest>,
+    ) -> Result<Response<EnableMfaResponse>, Status> {
         self.enable_mfa_handler(request).await
     }
 
@@ -132,7 +150,10 @@ impl AuthService for AuthHandler {
         self.disable_mfa_handler(request).await
     }
 
-    async fn verify_mfa(&self, request: Request<VerifyMfaRequest>) -> Result<Response<AuthSuccess>, Status> {
+    async fn verify_mfa(
+        &self,
+        request: Request<VerifyMfaRequest>,
+    ) -> Result<Response<AuthSuccess>, Status> {
         self.verify_mfa_handler(request).await
     }
 
@@ -140,46 +161,88 @@ impl AuthService for AuthHandler {
         self.get_user_handler(request).await
     }
 
-    async fn get_linked_providers(&self, request: Request<GetUserRequest>) -> Result<Response<LinkedProvidersResponse>, Status> {
+    async fn get_linked_providers(
+        &self,
+        request: Request<GetUserRequest>,
+    ) -> Result<Response<LinkedProvidersResponse>, Status> {
         self.get_linked_providers_handler(request).await
     }
 
-    async fn unlink_provider(&self, request: Request<UnlinkProviderRequest>) -> Result<Response<()>, Status> {
+    async fn unlink_provider(
+        &self,
+        request: Request<UnlinkProviderRequest>,
+    ) -> Result<Response<()>, Status> {
         self.unlink_provider_handler(request).await
     }
 
-    async fn update_email(&self, request: Request<UpdateEmailRequest>) -> Result<Response<()>, Status> {
+    async fn update_email(
+        &self,
+        request: Request<UpdateEmailRequest>,
+    ) -> Result<Response<()>, Status> {
         self.update_email_handler(request).await
     }
 
-    async fn update_username(&self, request: Request<UpdateUsernameRequest>) -> Result<Response<()>, Status> {
+    async fn update_username(
+        &self,
+        request: Request<UpdateUsernameRequest>,
+    ) -> Result<Response<()>, Status> {
         self.update_username_handler(request).await
     }
 
-    async fn update_password(&self, request: Request<UpdatePasswordRequest>) -> Result<Response<()>, Status> {
+    async fn update_password(
+        &self,
+        request: Request<UpdatePasswordRequest>,
+    ) -> Result<Response<()>, Status> {
         self.update_password_handler(request).await
     }
 
-    async fn delete_user(&self, request: Request<DeleteUserRequest>) -> Result<Response<()>, Status> {
+    async fn request_password_reset(
+        &self,
+        request: Request<PasswordResetRequest>,
+    ) -> Result<Response<PasswordResetResponse>, Status> {
+        self.request_password_reset_handler(request).await
+    }
+
+    async fn confirm_password_reset(
+        &self,
+        request: Request<PasswordResetConfirmRequest>,
+    ) -> Result<Response<()>, Status> {
+        self.confirm_password_reset_handler(request).await
+    }
+
+    async fn delete_user(
+        &self,
+        request: Request<DeleteUserRequest>,
+    ) -> Result<Response<()>, Status> {
         self.delete_user_handler(request).await
     }
 
-    async fn get_o_auth_url(&self, request: Request<OAuthUrlRequest>) -> Result<Response<OAuthUrlResponse>, Status> {
+    async fn get_o_auth_url(
+        &self,
+        request: Request<OAuthUrlRequest>,
+    ) -> Result<Response<OAuthUrlResponse>, Status> {
         self.get_oauth_url_handler(request).await
     }
 
-    async fn o_auth_callback(&self, request: Request<OAuthCallbackRequest>) -> Result<Response<AuthResponse>, Status> {
+    async fn o_auth_callback(
+        &self,
+        request: Request<OAuthCallbackRequest>,
+    ) -> Result<Response<AuthResponse>, Status> {
         self.oauth_callback_handler(request).await
     }
 }
 
 pub fn map_domain_error(err: DomainError) -> Status {
     match err {
-        DomainError::AlreadyExists => Status::already_exists("The external account is already linked to another user"),
+        DomainError::AlreadyExists => {
+            Status::already_exists("The external account is already linked to another user")
+        }
         DomainError::MfaAlreadyEnabled => Status::already_exists("2FA already enabled"),
         DomainError::InvalidInput(msg) => Status::invalid_argument(msg),
         DomainError::Unauthenticated => Status::unauthenticated("Invalid identifier or password"),
-        DomainError::Unauthorized => Status::permission_denied("You do not have permission to perform this action"),
+        DomainError::Unauthorized => {
+            Status::permission_denied("You do not have permission to perform this action")
+        }
         DomainError::NotFound => Status::not_found("The requested resource was not found"),
         DomainError::Internal(msg) => Status::internal(msg),
     }

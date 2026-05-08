@@ -1,12 +1,17 @@
-use tonic::{Request, Response, Status};
 use crate::api::grpc::handler::{AuthHandler, map_domain_error};
 use crate::auth_proto::{GetUserRequest, User as ProtoUser};
+use tonic::{Request, Response, Status};
 
 impl AuthHandler {
-    pub async fn get_user_handler(&self, request: Request<GetUserRequest>) -> Result<Response<ProtoUser>, Status> {
+    pub async fn get_user_handler(
+        &self,
+        request: Request<GetUserRequest>,
+    ) -> Result<Response<ProtoUser>, Status> {
         let req = request.into_inner();
-        
-        let claims = self.token_service.decode_token(&req.access_token)
+
+        let claims = self
+            .token_service
+            .decode_token(&req.access_token)
             .map_err(|_| Status::unauthenticated("Invalid or expired token"))?;
 
         if claims.typ != "access" {
@@ -15,7 +20,8 @@ impl AuthHandler {
 
         let id = claims.user_id;
 
-        let user = self.get_user_uc
+        let user = self
+            .get_user_uc
             .execute(id)
             .await
             .map_err(map_domain_error)?;
@@ -24,7 +30,11 @@ impl AuthHandler {
             id: user.id.to_string(),
             username: user.username.to_string(),
             email: user.email.to_string(),
-            has_password: user.password_hash.as_ref().map(|h| !h.is_empty()).unwrap_or(false),
+            has_password: user
+                .password_hash
+                .as_ref()
+                .map(|h| !h.is_empty())
+                .unwrap_or(false),
             mfa_enabled: user.mfa_secret.is_some(),
         };
 

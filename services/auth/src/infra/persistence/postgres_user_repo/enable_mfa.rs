@@ -1,9 +1,13 @@
-use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
-use crate::domain::ports::mfa_service::EncryptedMfaSecret;
 use crate::domain::error::DomainError;
+use crate::domain::ports::mfa_service::EncryptedMfaSecret;
+use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 impl PostgresUserRepository {
-    pub async fn enable_mfa_handler(&self, id: uuid::Uuid, mfa: EncryptedMfaSecret) -> Result<(), DomainError> {
+    pub async fn enable_mfa_handler(
+        &self,
+        id: uuid::Uuid,
+        mfa: EncryptedMfaSecret,
+    ) -> Result<(), DomainError> {
         let result = sqlx::query!(
             r#"
             UPDATE users
