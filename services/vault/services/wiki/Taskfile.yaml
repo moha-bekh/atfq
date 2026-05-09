@@ -1,0 +1,17 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: "Provision Vault for Wiki service"
+    cmds:
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault policy write wiki-service - < ./policy.hcl
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault write auth/approle/role/wiki-service - < ./role.json
+      - |
+        docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault kv put secret/wiki \
+          db_name="$WIKI_DB_NAME" \
+          db_user="$WIKI_DB_USER" \
+          db_password="$WIKI_DB_PASSWORD" \
+          metrics_addr="$WIKI_METRICS_ADDR"
+      - mkdir -p ../../../wiki/vault/agent_ids/
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/wiki-service/role-id > ../../../wiki/vault/agent_ids/role-id
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/wiki-service/secret-id > ../../../wiki/vault/agent_ids/secret-id

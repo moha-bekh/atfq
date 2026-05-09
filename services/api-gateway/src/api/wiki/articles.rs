@@ -290,6 +290,7 @@ async fn resolve_contributors(
             user_id: None,
             username: contributor.clone(),
             profile_picture_url: None,
+            friendship_status: None,
             is_friend: false,
             is_online: false,
         };
@@ -330,23 +331,23 @@ async fn resolve_contributors(
 
                     if let Some(current_user_id) = current_user_id {
                         if current_user_id != user_id {
-                            entry.is_friend = sqlx::query_scalar::<_, bool>(
+                            entry.friendship_status = sqlx::query_scalar::<_, String>(
                                 r#"
-                                SELECT EXISTS (
-                                    SELECT 1 FROM friendships
-                                    WHERE status = 'accepted'
-                                    AND (
-                                        (requester_id = $1::uuid AND addressee_id = $2::uuid)
-                                        OR (requester_id = $2::uuid AND addressee_id = $1::uuid)
-                                    )
+                                SELECT status FROM friendships
+                                WHERE (
+                                    (requester_id = $1::uuid AND addressee_id = $2::uuid)
+                                    OR (requester_id = $2::uuid AND addressee_id = $1::uuid)
                                 )
+                                LIMIT 1
                                 "#,
                             )
                             .bind(current_user_id)
                             .bind(&user_id)
-                            .fetch_one(user_db)
+                            .fetch_optional(user_db)
                             .await
-                            .unwrap_or(false);
+                            .ok()
+                            .flatten();
+                            entry.is_friend = entry.friendship_status.as_deref() == Some("accepted");
                         }
                     }
                 }

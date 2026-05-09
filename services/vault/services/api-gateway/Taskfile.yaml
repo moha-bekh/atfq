@@ -1,0 +1,21 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: "Provision Vault for API Gateway service"
+    cmds:
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault policy write api-gateway-service - < ./policy.hcl
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault write auth/approle/role/api-gateway-service - < ./role.json
+      - |
+        docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault kv put secret/api-gateway \
+          server_addr="$API_GATEWAY_SERVER_ADDR" \
+          jwt_secret="$API_GATEWAY_JWT" \
+          auth_db_name="$API_GATEWAY_AUTH_DB_NAME" \
+          auth_db_user="$API_GATEWAY_AUTH_DB_USER" \
+          auth_db_password="$API_GATEWAY_AUTH_DB_PASSWORD" \
+          user_db_name="$API_GATEWAY_USER_DB_NAME" \
+          user_db_user="$API_GATEWAY_USER_DB_USER" \
+          user_db_password="$API_GATEWAY_USER_DB_PASSWORD"
+      - mkdir -p ../../../api-gateway/vault/agent_ids/
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/api-gateway-service/role-id > ../../../api-gateway/vault/agent_ids/role-id
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/api-gateway-service/secret-id > ../../../api-gateway/vault/agent_ids/secret-id

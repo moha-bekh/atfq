@@ -104,6 +104,7 @@ pub struct ContributorResponse {
     pub user_id: Option<String>,
     pub username: String,
     pub profile_picture_url: Option<String>,
+    pub friendship_status: Option<String>,
     pub is_friend: bool,
     pub is_online: bool,
 }

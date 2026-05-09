@@ -1,6 +1,6 @@
 {
   "token_policies": [
-    "net-gateway-policy"
+    "net-gateway-service"
   ],
   "token_ttl": "1h",
   "token_max_ttl": "4h"

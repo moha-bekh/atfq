@@ -513,6 +513,7 @@ func (s *wikiServer) fetchContributorsInternal(ctx context.Context, ext Ext, nod
 	FROM node_versions v
 	JOIN tree ON tree.id = v.node_id
 	WHERE v.created_by IS NOT NULL
+	AND v.status = 'approved'
 	ORDER BY v.created_by ASC;
 	`
 

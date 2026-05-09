@@ -18,7 +18,16 @@ tasks:
           db_user="$AUTH_DB_USER" \
           db_password="$AUTH_DB_PASSWORD" \
           server_addr="$AUTH_SERVER_ADDR" \
-          jwt_secret="$AUTH_JWT"
+          jwt_secret="$AUTH_JWT" \
+          cha_cha_key="$AUTH_CHA_CHA_KEY" \
+          google_client_id="$AUTH_GOOGLE_CLIENT_ID" \
+          google_client_secret="$AUTH_GOOGLE_CLIENT_SECRET" \
+          google_redirect_url="$AUTH_GOOGLE_REDIRECT_URL" \
+          github_client_id="$AUTH_GITHUB_CLIENT_ID" \
+          github_client_secret="$AUTH_GITHUB_CLIENT_SECRET" \
+          github_redirect_url="$AUTH_GITHUB_REDIRECT_URL" \
+          smtp_username="$AUTH_SMTP_USERNAME" \
+          smtp_password="$AUTH_SMTP_PASSWORD"
           
       # 4. Generate IDs for the app
       - mkdir -p ../../../auth/vault/agent_ids/

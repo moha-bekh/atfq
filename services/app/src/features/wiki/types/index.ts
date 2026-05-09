@@ -77,6 +77,7 @@ export interface Contributor {
   user_id?: string | null;
   username: string;
   profile_picture_url?: string | null;
+  friendship_status?: string | null;
   is_friend?: boolean;
   is_online?: boolean;
 }

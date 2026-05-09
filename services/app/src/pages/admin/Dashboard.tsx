@@ -19,6 +19,18 @@ type WikiReviewGroup = {
   versions: Version[];
 };
 
+const getApiErrorMessage = async (error: unknown, fallback: string) => {
+  const response = (error as { response?: Response }).response;
+  if (!response) return fallback;
+
+  try {
+    const body = await response.clone().json() as { error?: string };
+    return body.error || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 const parseDateValue = (value?: string | null) => {
   if (!value) return 0;
 
@@ -223,6 +235,9 @@ function WikiReviewGroupRow({
 }) {
   const [primaryVersion] = group.versions;
   const versionIds = group.versions.map((version) => version.version_id);
+  const approvalVersionIds = [...group.versions]
+    .sort((a, b) => a.node_id - b.node_id || a.version_id - b.version_id)
+    .map((version) => version.version_id);
   const isGrouped = group.versions.length > 1;
   const preview = primaryVersion?.content?.trim() || 'No content provided.';
 
@@ -276,7 +291,7 @@ function WikiReviewGroupRow({
               type="button"
               variant="primary"
               disabled={isReviewing}
-              onClick={() => onApprove(versionIds)}
+              onClick={() => onApprove(approvalVersionIds)}
               className="text-[10px] uppercase tracking-widest"
             >
               Approve
@@ -378,8 +393,11 @@ export default function DashboardPage() {
       });
       await queryClient.invalidateQueries({ queryKey: ['wiki', 'pending'] });
     },
-    onError: () => {
-      setStatus({ type: 'error', message: 'Unable to approve this wiki change set' });
+    onError: async (error) => {
+      setStatus({
+        type: 'error',
+        message: await getApiErrorMessage(error, 'Unable to approve this wiki change set'),
+      });
     },
   });
 
@@ -396,8 +414,11 @@ export default function DashboardPage() {
       });
       await queryClient.invalidateQueries({ queryKey: ['wiki', 'pending'] });
     },
-    onError: () => {
-      setStatus({ type: 'error', message: 'Unable to reject this wiki change set' });
+    onError: async (error) => {
+      setStatus({
+        type: 'error',
+        message: await getApiErrorMessage(error, 'Unable to reject this wiki change set'),
+      });
     },
   });
 

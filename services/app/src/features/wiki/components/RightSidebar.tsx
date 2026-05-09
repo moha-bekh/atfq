@@ -32,6 +32,7 @@ export default function RightSidebar({ article, conceptLinks, onItemClick, mode,
     userId: contributor.user_id,
     username: contributor.username,
     src: contributor.profile_picture_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(contributor.username || String(contributor.id))}`,
+    friendshipStatus: contributor.friendship_status,
     isFriend: Boolean(contributor.is_friend),
     isOnline: Boolean(contributor.is_online),
   }));
@@ -153,7 +154,7 @@ export default function RightSidebar({ article, conceptLinks, onItemClick, mode,
                   title={contributor.isOnline ? "Friend online" : "Friend offline"}
                 />
               )}
-              {currentUser && contributor.userId && contributor.userId !== currentUser.id && !contributor.isFriend && (
+              {currentUser && contributor.userId && contributor.userId !== currentUser.id && !contributor.friendshipStatus && (
                 <button
                   type="button"
                   disabled={addFriendMutation.isPending}

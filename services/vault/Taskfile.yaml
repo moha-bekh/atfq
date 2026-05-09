@@ -8,9 +8,18 @@ includes:
   auth:
     taskfile: ./services/auth/Taskfile.yaml
     dir: ./services/auth
+  api-gateway:
+    taskfile: ./services/api-gateway/Taskfile.yaml
+    dir: ./services/api-gateway
   net-gateway:
     taskfile: ./services/net-gateway/Taskfile.yaml
     dir: ./services/net-gateway
+  user:
+    taskfile: ./services/user/Taskfile.yaml
+    dir: ./services/user
+  wiki:
+    taskfile: ./services/wiki/Taskfile.yaml
+    dir: ./services/wiki
 
 tasks:
   # --- Core Infrastructure ---
@@ -54,7 +63,7 @@ tasks:
     cmds:
       - task: bootstrap
       # sops exec-env injects secrets into the sub-tasks without leaking to the parent shell
-      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops exec-env {{.SECRETS_FILE}} 'task auth:setup net-gateway:setup'
+      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops exec-env {{.SECRETS_FILE}} 'task auth:setup api-gateway:setup net-gateway:setup user:setup wiki:setup'
     silent: true
 
   # --- Secret Management (SOPS) ---

@@ -8,6 +8,7 @@ import ProfilePage from "@/pages/user/Profile";
 import DashboardPage from "@/pages/admin/Dashboard";
 import WikiPage from "@/features/wiki/pages/WikiPage";
 import { PrivacyPage, TermsPage } from "@/pages/legal/LegalPages";
+import { NotFound } from "@/pages/NotFound";
 
 export function AppRouter() {
   return (
@@ -23,13 +24,13 @@ export function AppRouter() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
           </Route>
+
+          <Route path="*" element={<NotFound />} />
         </Route>
 
         <Route element={<AuthLayout />}>
           {authRoutes}
         </Route>
-
-        <Route path="*" element={<div>404</div>} />
       </Routes>
     </BrowserRouter >
   );

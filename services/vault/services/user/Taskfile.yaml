@@ -1,0 +1,25 @@
+version: "3"
+
+tasks:
+  setup:
+    desc: "Provision Vault for User service"
+    cmds:
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault policy write user-service - < ./policy.hcl
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN -i vault vault write auth/approle/role/user-service - < ./role.json
+      - |
+        docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault kv put secret/user \
+          db_name="$USER_DB_NAME" \
+          db_user="$USER_DB_USER" \
+          db_password="$USER_DB_PASSWORD" \
+          server_addr="$USER_SERVER_ADDR" \
+          jwt_secret="$USER_JWT" \
+          s3_endpoint="$USER_S3_ENDPOINT" \
+          s3_public_url="$USER_S3_PUBLIC_URL" \
+          s3_bucket="$USER_S3_BUCKET" \
+          aws_access_key_id="$USER_AWS_ACCESS_KEY_ID" \
+          aws_secret_access_key="$USER_AWS_SECRET_ACCESS_KEY" \
+          minio_root_user="$USER_MINIO_ROOT_USER" \
+          minio_root_password="$USER_MINIO_ROOT_PASSWORD"
+      - mkdir -p ../../../user/vault/agent_ids/
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/user-service/role-id > ../../../user/vault/agent_ids/role-id
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/user-service/secret-id > ../../../user/vault/agent_ids/secret-id

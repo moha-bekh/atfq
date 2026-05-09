@@ -133,6 +133,7 @@ const StatusDisplay = ({ type, message }: { type: 'success' | 'error', message: 
 export const ProfileView = () => {
   const [activeSection, setActiveSection] = useState<Section>('auth');
   const photoMenuRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   
   const { 
@@ -415,8 +416,16 @@ export const ProfileView = () => {
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    e.target.value = '';
+
+    if (!file) return;
+
+    try {
       await uploadPicture(file);
+      setStatus({ type: 'success', message: 'Profile photo updated', target: 'account' });
+    } catch (error) {
+      const message = await getApiErrorMessage(error, 'Profile photo upload failed');
+      setStatus({ type: 'error', message, target: 'account' });
     }
   };
 
@@ -548,16 +557,19 @@ export const ProfileView = () => {
               </div>
             )}
           </button>
-          <input id="profile-photo-input" type="file" className="hidden" onChange={onFileChange} accept="image/*" />
+          <input ref={photoInputRef} type="file" className="hidden" onChange={onFileChange} accept="image/*" />
           {isPhotoMenuOpen && !isUploading && (
             <div className="absolute left-0 top-full z-40 mt-2 w-40 overflow-hidden rounded-lg border border-main/10 bg-bg shadow-2xl shadow-black/30">
-              <label
-                htmlFor="profile-photo-input"
-                onClick={() => setIsPhotoMenuOpen(false)}
-                className="block cursor-pointer px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-sub transition-colors hover:bg-main/5 hover:text-main"
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPhotoMenuOpen(false);
+                  window.requestAnimationFrame(() => photoInputRef.current?.click());
+                }}
+                className="block w-full px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-sub transition-colors hover:bg-main/5 hover:text-main"
               >
                 Upload
-              </label>
+              </button>
               {profile?.profile_picture_url && (
                 <button
                   type="button"
