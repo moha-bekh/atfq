@@ -2,15 +2,10 @@
 .DS_Store
 Thumbs.db
 .vscode/
-*.env*
 *.log
 *.pem
 *.pub
 
-# utils
-ignored
-
 # Tools
 .devbox/
 .task/
-bakup

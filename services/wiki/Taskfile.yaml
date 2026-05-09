@@ -130,6 +130,11 @@ tasks:
     cmds:
       - ./scripts/seed.sh
 
+  seed-demo:
+    desc: "Reset and seed the wiki database with the full demo documentation tree"
+    cmds:
+      - ./scripts/seed_demo.sh
+
   db-shell:
     desc: "Open an interactive Postgres shell inside the container"
     interactive: true

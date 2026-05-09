@@ -1,3 +1,4 @@
+*.env
 # services
 api-gateway/target
 

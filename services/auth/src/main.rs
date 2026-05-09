@@ -269,6 +269,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Auth Service starting on {}", server_addr);
 
+    let metrics_addr = env::var("METRICS_ADDR").unwrap_or_else(|_| "0.0.0.0:9091".to_string());
+    tokio::spawn(async move {
+        if let Err(error) = auth::metrics::serve("auth", metrics_addr).await {
+            eprintln!("Metrics endpoint failed: {error}");
+        }
+    });
+
     Server::builder()
         .layer(auth_layer)
         .add_service(reflection_service)

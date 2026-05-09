@@ -57,6 +57,7 @@ type wikiServer struct {
 }
 
 func main() {
+	startedAt := time.Now()
 	flag.Parse()
 
 	_ = &pb.Node{}
@@ -73,6 +74,7 @@ func main() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 
 	log.Println("Database connection established")
+	startMetricsServer("wiki", startedAt)
 
 	// Run Migrations
 	if err := runMigrations(db); err != nil {
