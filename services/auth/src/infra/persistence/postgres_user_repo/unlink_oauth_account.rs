@@ -8,14 +8,14 @@ impl PostgresUserRepository {
         user_id: Uuid,
         provider: &str,
     ) -> Result<(), DomainError> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             DELETE FROM user_oauth
             WHERE user_id = $1 AND provider = $2
             "#,
-            user_id,
-            provider
         )
+        .bind(user_id)
+        .bind(provider)
         .execute(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;

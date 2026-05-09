@@ -1,15 +1,14 @@
 volumes:
   wiki-postgres_data:
-  # wiki-shared-secrets:
-  #   name: vault-wiki-shared-secrets
-  #   driver: local
-  #   driver_opts:
-  #     type: tmpfs
-  #     device: tmpfs
-  #     o: "size=64m,mode=770"
+  wiki-shared-secrets:
+    name: vault-wiki-shared-secrets
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=64m,mode=770"
 
 services:
-  # SERVICE
   wiki:
     build:
       context: .
@@ -17,79 +16,91 @@ services:
     init: true
     networks:
       - backend
-    # volumes:
-    #   - type: volume
-    #     source: wiki-shared-secrets
-    #     target: /vault/secrets
-    #     read_only: true
+    volumes:
+      - type: volume
+        source: wiki-shared-secrets
+        target: /vault/secrets
+        read_only: true
     environment:
-      - DATABASE_URL=postgresql://atfq:atfq@db-wiki:5432/atfq_db
       - METRICS_ADDR=0.0.0.0:9091
-    # ports:
-    #   - "$PORT:8080"
     depends_on:
       db-wiki:
         condition: service_healthy
-      # vault-agent-wiki:
-      #   condition: service_started
+      vault-agent-wiki:
+        condition: service_healthy
     restart: unless-stopped
-  # ------------------------------
-  # DATABASE
   db-wiki:
     image: postgres:16-alpine
     networks:
       - backend
+    depends_on:
+      vault-agent-wiki:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://atfq:atfq@db-wiki:5432/atfq_db
-      - POSTGRES_DB=atfq_db
-      - POSTGRES_USER=atfq
-      - POSTGRES_PASSWORD=atfq
-      # - POSTGRES_USER_FILE=/vault/secrets/POSTGRES_USER
-      # - POSTGRES_PASSWORD_FILE=/vault/secrets/POSTGRES_PASSWORD
-      # - POSTGRES_DB_FILE=/vault/secrets/POSTGRES_DB
+      - POSTGRES_USER_FILE=/vault/secrets/POSTGRES_USER
+      - POSTGRES_PASSWORD_FILE=/vault/secrets/POSTGRES_PASSWORD
+      - POSTGRES_DB_FILE=/vault/secrets/POSTGRES_DB
     volumes:
       - type: volume
         source: wiki-postgres_data
         target: /var/lib/postgresql/data
-      # - type: volume
-      #   source: wiki-shared-secrets
-      #   target: /vault/secrets
-      #   read_only: true
+      - type: volume
+        source: wiki-shared-secrets
+        target: /vault/secrets
+        read_only: true
     ports:
       - "127.0.0.1:5434:5432"
+    command: >
+      sh -c "
+      until [ -s /vault/secrets/POSTGRES_PASSWORD ]; do
+        echo 'Waiting for Vault Agent to write secrets...';
+        sleep 1;
+      done;
+      echo 'Secrets found, starting Postgres...';
+      exec docker-entrypoint.sh postgres"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $(cat /vault/secrets/POSTGRES_USER) -d $(cat /vault/secrets/POSTGRES_DB)",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
-  # ------------------------------
-  # VAULT AGENT
-  # vault-agent-wiki:
-  #   image: hashicorp/vault:1.13.3
-  #   container_name: vault-agent-wiki
-  #   init: true
-  #   networks:
-  #     - backend
-  #   environment:
-  #     - VAULT_ADDR=http://vault:8200
-  #   volumes:
-  #     - type: bind
-  #       source: ./vault/agent-wiki.hcl
-  #       target: /etc/vault/agent-config.hcl
-  #     - type: bind
-  #       source: ./vault/agent_ids/role-id
-  #       target: /etc/vault/role-id
-  #       read_only: true
-  #     - type: bind
-  #       source: ./vault/agent_ids/secret-id
-  #       target: /etc/vault/secret-id
-  #       read_only: true
-  #     - type: volume
-  #       source: wiki-shared-secrets
-  #       target: /vault/secrets
-  #   cap_add:
-  #     - IPC_LOCK
-  #   restart: unless-stopped
-  #   user: "root"
-  #   command: >
-  #     sh -c "chown -R vault:vault /vault/secrets && exec su-exec vault vault agent -config=/etc/vault/agent-config.hcl"
+  vault-agent-wiki:
+    image: hashicorp/vault:1.13.3
+    container_name: vault-agent-wiki
+    init: true
+    networks:
+      - backend
+    environment:
+      - VAULT_ADDR=http://vault:8200
+    depends_on:
+      vault:
+        condition: service_started
+    volumes:
+      - type: bind
+        source: ./vault/agent-wiki.hcl
+        target: /etc/vault/agent-config.hcl
+      - type: bind
+        source: ./vault/agent_ids
+        target: /etc/vault/agent_ids
+        read_only: true
+      - type: volume
+        source: wiki-shared-secrets
+        target: /vault/secrets
+    cap_add:
+      - IPC_LOCK
+    restart: unless-stopped
+    user: "root"
+    command: >
+      sh -c "chown -R vault:vault /vault/secrets && chmod 755 /vault/secrets && exec su-exec vault vault agent -config=/etc/vault/agent-config.hcl"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "test -s /vault/secrets/.env && test -s /vault/secrets/POSTGRES_USER && test -s /vault/secrets/POSTGRES_PASSWORD && test -s /vault/secrets/POSTGRES_DB",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12

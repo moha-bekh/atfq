@@ -20,16 +20,8 @@ async function enableMocking() {
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 
 enableMocking()
-  .then(() => {
-    root.render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    )
-  })
-  .catch((err) => {
-    console.error('Failed to enable mocking:', err);
-    // Even if mocking fails, we still want to render the app
+  .catch(() => undefined)
+  .finally(() => {
     root.render(
       <React.StrictMode>
         <App />

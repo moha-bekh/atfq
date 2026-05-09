@@ -14,7 +14,10 @@ tasks:
   prod:
     desc: "Run services in production mode"
     cmds:
-      - docker compose {{.COMPOSE_PROD}} up {{.CLI_ARGS}} -d
+      - docker compose {{.COMPOSE_PROD}} up --build -d vault
+      - task vault:up
+      - docker compose {{.COMPOSE_PROD}} up -d --force-recreate vault-agent-auth vault-agent-api-gateway vault-agent-user vault-agent-wiki vault-agent-net-gateway
+      - docker compose {{.COMPOSE_PROD}} up {{.CLI_ARGS}} -d --no-recreate
 
   logs:
     desc: "Stream logs"

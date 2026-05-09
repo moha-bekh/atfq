@@ -3,13 +3,13 @@ use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 impl PostgresUserRepository {
     pub async fn delete_by_id_handler(&self, id: uuid::Uuid) -> Result<(), DomainError> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             DELETE FROM users
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .execute(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;

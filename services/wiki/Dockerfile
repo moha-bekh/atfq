@@ -20,15 +20,10 @@ RUN --mount=type=cache,target=/go/pkg/mod \
   -o /app/api-user .
 
 FROM scratch AS prod
-# RUN go build \
-#   -ldflags="-linkmode external -extldflags -static" \
-#   -tags netgo \
-#   -o healthcheck \
-#   ./healthcheck/healthcheck.go
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 WORKDIR /app
 COPY --from=builder /app/api-user /api-user
 USER 65532:65532
 ENV PORT=8080
 EXPOSE 8080
-ENTRYPOINT ["./api-user"]
+ENTRYPOINT ["/api-user"]

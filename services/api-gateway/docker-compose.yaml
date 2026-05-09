@@ -1,3 +1,12 @@
+volumes:
+  api-gateway-shared-secrets:
+    name: vault-api-gateway-shared-secrets
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=64m,mode=770"
+
 services:
   api-gateway:
     build:
@@ -7,9 +16,48 @@ services:
     networks:
       - backend
       - frontend
+    volumes:
+      - type: volume
+        source: api-gateway-shared-secrets
+        target: /vault/secrets
+        read_only: true
     environment:
       - STARTUP_MAX_RETRIES=90
-      - JWT_SECRET=jwt_secret
-      - AUTH_DATABASE_URL=postgresql://atfq:atfq@db-auth:5432/atfq_db
-      - USER_DATABASE_URL=postgresql://atfq:atfq@db-user:5432/atfq_db
+    depends_on:
+      vault-agent-api-gateway:
+        condition: service_healthy
     restart: unless-stopped
+
+  vault-agent-api-gateway:
+    image: hashicorp/vault:1.13.3
+    container_name: vault-agent-api-gateway
+    init: true
+    networks:
+      - backend
+    environment:
+      - VAULT_ADDR=http://vault:8200
+    depends_on:
+      vault:
+        condition: service_started
+    volumes:
+      - type: bind
+        source: ./vault/agent-api-gateway.hcl
+        target: /etc/vault/agent-config.hcl
+      - type: bind
+        source: ./vault/agent_ids
+        target: /etc/vault/agent_ids
+        read_only: true
+      - type: volume
+        source: api-gateway-shared-secrets
+        target: /vault/secrets
+    cap_add:
+      - IPC_LOCK
+    restart: unless-stopped
+    user: "root"
+    command: >
+      sh -c "chown -R vault:vault /vault/secrets && chmod 755 /vault/secrets && exec su-exec vault vault agent -config=/etc/vault/agent-config.hcl"
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /vault/secrets/.env"]
+      interval: 5s
+      timeout: 5s
+      retries: 12

@@ -1,17 +1,15 @@
 use crate::domain::entities::User;
 use crate::domain::error::DomainError;
-use crate::domain::types::{Email, Username};
 use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 
 impl PostgresUserRepository {
     pub async fn find_by_id_handler(&self, id: uuid::Uuid) -> Result<Option<User>, DomainError> {
-        let user = sqlx::query_as!(
-            User,
+        let user = sqlx::query_as::<_, User>(
             r#"
             SELECT 
                 id, 
-                username as "username: Username", 
-                email as "email: Email", 
+                username, 
+                email, 
                 password_hash, 
                 mfa_secret,
                 mfa_nonce,
@@ -19,8 +17,8 @@ impl PostgresUserRepository {
             FROM users 
             WHERE id = $1
             "#,
-            id
         )
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;

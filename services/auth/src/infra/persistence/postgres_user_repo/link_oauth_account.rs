@@ -9,15 +9,15 @@ impl PostgresUserRepository {
         provider: &str,
         provider_id: &str,
     ) -> Result<(), DomainError> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             INSERT INTO user_oauth (user_id, provider, provider_id)
             VALUES ($1, $2, $3)
             "#,
-            user_id,
-            provider,
-            provider_id
         )
+        .bind(user_id)
+        .bind(provider)
+        .bind(provider_id)
         .execute(&self.pool)
         .await;
 

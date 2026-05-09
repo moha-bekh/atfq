@@ -31,5 +31,6 @@ tasks:
           
       # 4. Generate IDs for the app
       - mkdir -p ../../../auth/vault/agent_ids/
+      - rm -rf ../../../auth/vault/agent_ids/role-id ../../../auth/vault/agent_ids/secret-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/auth-service/role-id > ../../../auth/vault/agent_ids/role-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/auth-service/secret-id > ../../../auth/vault/agent_ids/secret-id

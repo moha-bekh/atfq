@@ -24,11 +24,11 @@ pub mod user {
 
 use user::v1::user_service_server::{UserService, UserServiceServer};
 use user::v1::{
-    CancelRoleRequestRequest, CreateProfileRequest, DeleteProfileRequest, GetProfileRequest,
-    FriendList, FriendTargetRequest, Friendship, HelloRequest, HelloResponse, LeaveRoleRequest,
-    PermissionList, Presence, Profile, ReviewRequest, RoleChangeRequest, RoleRequest,
-    RoleRequestStatus, RoleRequestsList, Theme, UpdateProfileRequest, UpdateThemeRequest,
-    UploadProfilePictureRequest,
+    CancelRoleRequestRequest, CreateProfileRequest, DeleteProfileRequest, FriendList,
+    FriendTargetRequest, Friendship, GetProfileRequest, HelloRequest, HelloResponse,
+    LeaveRoleRequest, PermissionList, Presence, Profile, ReviewRequest, RoleChangeRequest,
+    RoleRequest, RoleRequestStatus, RoleRequestsList, Theme, UpdateProfileRequest,
+    UpdateThemeRequest, UploadProfilePictureRequest,
 };
 
 mod metrics;
@@ -333,7 +333,8 @@ impl MyUserService {
         .await
         .map_err(|e| Status::internal(format!("Database error fetching friendship: {}", e)))?;
 
-        row.map(|row| map_row_to_friendship(row, user_id)).transpose()
+        row.map(|row| map_row_to_friendship(row, user_id))
+            .transpose()
     }
 }
 
@@ -1004,7 +1005,9 @@ impl UserService for MyUserService {
             .map_err(|_| Status::invalid_argument("Invalid target UUID format"))?;
 
         if user_id == target_id {
-            return Err(Status::invalid_argument("You cannot add yourself as a friend"));
+            return Err(Status::invalid_argument(
+                "You cannot add yourself as a friend",
+            ));
         }
 
         self.ensure_profile_exists(user_id).await?;
@@ -1199,6 +1202,7 @@ impl UserService for MyUserService {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::from_path("/vault/secrets/.env").ok();
     dotenv().ok();
 
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");

@@ -24,8 +24,7 @@ export function OAuthCallbackPage() {
         params: { code, state } 
       });
     } else if (!code || !state) {
-      console.error("Missing OAuth parameters");
-      navigate('/login');
+      navigate('/login', { state: { error: "Missing OAuth parameters" } });
     }
   }, [provider, searchParams, handleCallback, navigate]);
 

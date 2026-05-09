@@ -147,7 +147,6 @@ export const useAppStore = create<AppState>()(
           const profile = await userApi.getProfile(user.id);
           get().setProfile(profile);
         } catch (error) {
-          console.error('Failed to fetch profile:', error);
           // If profile fetch fails due to auth, we might want to logout
           if ((error as HttpLikeError).status === 401) {
             get().logout();
@@ -161,8 +160,7 @@ export const useAppStore = create<AppState>()(
           if (accessToken && refreshToken) {
             await authApi.logout(accessToken, refreshToken);
           }
-        } catch (error) {
-          console.error('Failed to logout on server:', error);
+        } catch {
         } finally {
           set({ 
             user: null, 

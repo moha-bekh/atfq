@@ -23,7 +23,7 @@ includes:
 
 tasks:
   # --- Core Infrastructure ---
-  
+
   up:
     desc: "Full Vault Stack: Infrastructure + Provisioning"
     cmds:
@@ -53,17 +53,16 @@ tasks:
   bootstrap:
     desc: "Enable Vault engines and auth methods"
     cmds:
-      - docker exec vault vault secrets enable -path=secret kv-v2 2>/dev/null || true
-      - docker exec vault vault auth enable approle 2>/dev/null || true
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault secrets enable -path=secret kv-v2 2>/dev/null || true
+      - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault auth enable approle 2>/dev/null || true
 
   # --- Provisioning ---
 
   provision:
     desc: "Provision all services (Secure isolation)"
     cmds:
-      - task: bootstrap
       # sops exec-env injects secrets into the sub-tasks without leaking to the parent shell
-      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops exec-env {{.SECRETS_FILE}} 'task auth:setup api-gateway:setup net-gateway:setup user:setup wiki:setup'
+      - SOPS_AGE_KEY_FILE={{.AGE_KEY}} sops exec-env {{.SECRETS_FILE}} 'task bootstrap auth:setup api-gateway:setup net-gateway:setup user:setup wiki:setup'
     silent: true
 
   # --- Secret Management (SOPS) ---

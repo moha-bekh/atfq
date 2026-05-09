@@ -6,6 +6,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM rust:1.94-bookworm AS builder
 WORKDIR /app
+RUN apt-get update && apt-get install -y protobuf-compiler libprotobuf-dev && rm -rf /var/lib/apt/lists/*
 RUN cargo install cargo-chef
 COPY --from=planner /app/recipe.json recipe.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -17,7 +18,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
   RUSTFLAGS="-C link-arg=-Wl,-z,relro -C link-arg=-Wl,-z,now" \
   cargo build --release && \
   cp target/release/api-gateway /app/gateway
-# RUSTFLAGS="-C relro=full -C bind_now=yes" \
 
 FROM rust:1.94-bookworm AS dev
 WORKDIR /app

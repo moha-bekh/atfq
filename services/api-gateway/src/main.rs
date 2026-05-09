@@ -25,6 +25,7 @@ async fn optional_pg_pool(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::from_path("/vault/secrets/.env").ok();
     metrics::init();
 
     let addr = std::env::var("SERVER_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into());

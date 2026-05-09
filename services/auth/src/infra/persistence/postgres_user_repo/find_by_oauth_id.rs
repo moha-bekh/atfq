@@ -1,6 +1,5 @@
 use crate::domain::entities::User;
 use crate::domain::error::DomainError;
-use crate::domain::types::{Email, Username};
 use crate::infra::persistence::postgres_user_repo::handler::PostgresUserRepository;
 
 impl PostgresUserRepository {
@@ -9,13 +8,12 @@ impl PostgresUserRepository {
         provider: &str,
         provider_id: &str,
     ) -> Result<Option<User>, DomainError> {
-        let user = sqlx::query_as!(
-            User,
+        let user = sqlx::query_as::<_, User>(
             r#"
             SELECT 
                 u.id, 
-                u.username as "username: Username", 
-                u.email as "email: Email", 
+                u.username as username, 
+                u.email as email, 
                 u.password_hash, 
                 u.mfa_secret,
                 u.mfa_nonce,
@@ -24,9 +22,9 @@ impl PostgresUserRepository {
             JOIN user_oauth uo ON u.id = uo.user_id
             WHERE uo.provider = $1 AND uo.provider_id = $2
             "#,
-            provider,
-            provider_id
         )
+        .bind(provider)
+        .bind(provider_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;

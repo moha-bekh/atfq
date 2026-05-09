@@ -37,7 +37,10 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/friends/:target_id/accept",
             put(profile::accept_friend_request_handler),
         )
-        .route("/friends/:target_id", delete(profile::remove_friend_handler))
+        .route(
+            "/friends/:target_id",
+            delete(profile::remove_friend_handler),
+        )
         .route("/permissions", get(profile::list_permissions_handler))
         .route("/role-requests", post(profile::create_role_request_handler))
         .route("/role-requests", get(profile::list_role_requests_handler))

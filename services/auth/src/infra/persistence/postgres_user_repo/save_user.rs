@@ -1,31 +1,29 @@
 use crate::domain::entities::User;
 use crate::domain::error::DomainError;
 use crate::domain::ports::user_repository::UserDto;
-use crate::domain::types::{Email, Username};
 use crate::infra::persistence::postgres_user_repo::PostgresUserRepository;
 use sqlx::Error as SqlxError;
 
 impl PostgresUserRepository {
     pub async fn save_user_handler(&self, data: UserDto) -> Result<User, DomainError> {
-        let row = sqlx::query_as!(
-            User,
+        let row = sqlx::query_as::<_, User>(
             r#"
             INSERT INTO users (id, username, email, password_hash)
             VALUES ($1, $2, $3, $4)
             RETURNING 
                 id, 
-                username as "username: Username", 
-                email as "email: Email", 
+                username, 
+                email, 
                 password_hash, 
                 mfa_secret,
                 mfa_nonce,
                 created_at
             "#,
-            uuid::Uuid::new_v4(),
-            data.username as _,
-            data.email as _,
-            data.password_hash
         )
+        .bind(uuid::Uuid::new_v4())
+        .bind(data.username)
+        .bind(data.email)
+        .bind(data.password_hash)
         .fetch_one(&self.pool)
         .await;
 

@@ -181,8 +181,7 @@ export default function WikiPage() {
         type: "success",
         message: "Article submitted for moderation. It will be readable after approval.",
       });
-    } catch (err) {
-      console.error("Failed to create article:", err);
+    } catch {
       setPopup({
         type: "error",
         message: "Failed to create article. Make sure the parent is valid and you are logged in.",
@@ -259,8 +258,7 @@ export default function WikiPage() {
         type: "success",
         message: "Article submitted for moderation. It will be readable after approval.",
       });
-    } catch (err) {
-      console.error("Failed to update article:", err);
+    } catch {
       setPopup({
         type: "error",
         message: "Failed to submit edit. Make sure you are logged in.",

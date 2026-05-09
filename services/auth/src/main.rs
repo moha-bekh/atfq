@@ -104,7 +104,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // INFRA
     let user_repo = Arc::new(PostgresUserRepository::new(pool));
 
-    let cha_cha_key_bytes = cha_cha_key.as_str().as_bytes().try_into().expect("CHA_CHA_KEY must be 32 bytes long");
+    let cha_cha_key_bytes = cha_cha_key
+        .as_str()
+        .as_bytes()
+        .try_into()
+        .expect("CHA_CHA_KEY must be 32 bytes long");
     let encryption_service = Arc::new(ChaChaEncryption::from_key(cha_cha_key_bytes));
 
     let mfa_service = Arc::new(TotpMfa);

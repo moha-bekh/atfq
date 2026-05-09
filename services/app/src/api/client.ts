@@ -14,7 +14,10 @@ type RefreshResponse = {
   };
 };
 
-const API_URL = import.meta.env.VITE_API_URL;
+const configuredApiUrl = import.meta.env.VITE_API_URL || "/api/v1";
+const API_URL = configuredApiUrl.startsWith("http")
+  ? configuredApiUrl
+  : new URL(configuredApiUrl, window.location.origin).toString();
 const REFRESH_MARGIN_SECONDS = 30;
 
 let refreshPromise: Promise<string | null> | null = null;

@@ -46,6 +46,8 @@ init_vault() {
   K1=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[0]')
   K2=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[1]')
   K3=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[2]')
+  K4=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[3]')
+  K5=$(echo "$JSON_INIT" | jq -r '.unseal_keys_b64[4]')
   TK=$(echo "$JSON_INIT" | jq -r '.root_token')
 
   # --- Step 4: Secrets Management (SOPS) ---
@@ -58,16 +60,20 @@ init_vault() {
   fi
 
   echo "--- Merging Vault keys into $SECRETS_FILE ---"
-  
+
+  if ! command -v yq >/dev/null 2>&1; then
+    echo "Error: yq is required to merge YAML secrets."
+    exit 1
+  fi
+
   # Merge new Vault metadata (Unseal keys + Root Token) into the YAML structure.
-  # We use 'jq' to perform the merge safely.
-  FINAL_YAML=$(echo "$EXISTING_YAML" | jq --arg k1 "$K1" --arg k2 "$K2" --arg k3 "$K3" --arg tk "$TK" \
-    '. + {KEY1: $k1, KEY2: $k2, KEY3: $k3, VAULT_TOKEN: $tk}')
+  FINAL_YAML=$(echo "$EXISTING_YAML" | K1="$K1" K2="$K2" K3="$K3" K4="$K4" K5="$K5" TK="$TK" yq eval \
+    '.KEY1 = strenv(K1) | .KEY2 = strenv(K2) | .KEY3 = strenv(K3) | .KEY4 = strenv(K4) | .KEY5 = strenv(K5) | .VAULT_TOKEN = strenv(TK)' -)
 
   # --- Step 5: Secure Encryption ---
   # Write to a temporary file, encrypt it with SOPS, then replace the target file.
   # The extension .enc.yaml ensures SOPS finds the correct rules in .sops.yaml.
-  TMP_FILE=$(mktemp --suffix=.enc.yaml)
+  TMP_FILE=$(mktemp "${TMPDIR:-/tmp}/vault-secrets.XXXXXX.enc.yaml")
   echo "$FINAL_YAML" > "$TMP_FILE"
   
   SOPS_AGE_KEY_FILE="$AGE_KEY_PATH" sops --encrypt --age "$AGE_PK" "$TMP_FILE" > "$SECRETS_FILE"

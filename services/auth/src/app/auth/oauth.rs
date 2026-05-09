@@ -129,9 +129,10 @@ impl OAuthUseCase {
                                     .unwrap_or("user")
                                     .to_string();
                             }
+                            let username = self.unique_oauth_username(&username_base).await?;
 
                             let dto = UserDto {
-                                username: crate::domain::types::Username::new(&username_base)?,
+                                username,
                                 email: crate::domain::types::Email::new(&oauth_user.email)?,
                                 password_hash: None,
                             };
@@ -166,5 +167,30 @@ impl OAuthUseCase {
             access_token: tokens.access,
             refresh_token: tokens.refresh,
         })
+    }
+
+    async fn unique_oauth_username(
+        &self,
+        username_base: &str,
+    ) -> Result<crate::domain::types::Username, DomainError> {
+        let mut candidate = username_base.to_string();
+
+        for suffix in 1..=100 {
+            let username = crate::domain::types::Username::new(&candidate)?;
+            if self
+                .repo
+                .find_by_username(username.as_str())
+                .await?
+                .is_none()
+            {
+                return Ok(username);
+            }
+
+            candidate = format!("{}_{}", username_base, suffix + 1);
+        }
+
+        Err(DomainError::Internal(
+            "Could not generate a unique username".into(),
+        ))
     }
 }

@@ -9,13 +9,11 @@ impl PostgresUserRepository {
         id: uuid::Uuid,
         new_username: &str,
     ) -> Result<(), DomainError> {
-        let result = sqlx::query!(
-            "UPDATE users SET username = $1 WHERE id = $2",
-            new_username,
-            id
-        )
-        .execute(&self.pool)
-        .await;
+        let result = sqlx::query("UPDATE users SET username = $1 WHERE id = $2")
+            .bind(new_username)
+            .bind(id)
+            .execute(&self.pool)
+            .await;
 
         match result {
             Ok(res) => {

@@ -27,8 +27,10 @@ export function useOAuth() {
     try {
       const { url } = await authApi.getOAuthUrl(provider);
       window.location.href = url;
-    } catch (error) {
-      console.error(`Failed to get ${provider} OAuth URL:`, error);
+    } catch {
+      navigate('/login', {
+        state: { error: `Unable to start ${provider} authentication` },
+      });
     }
   };
 
@@ -53,8 +55,6 @@ export function useOAuth() {
       }
     },
     onError: async (error: any) => {
-      console.error("OAuth Callback Failed:", error);
-      
       let message = "Authentication failed";
       try {
         const errData = await error.response.json();

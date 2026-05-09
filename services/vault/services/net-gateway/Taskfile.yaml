@@ -11,5 +11,6 @@ tasks:
           ssl_crt="$NET_GATEWAY_SSL_CRT" \
           ssl_key="$NET_GATEWAY_SSL_KEY"
       - mkdir -p ../../../net-gateway/vault/agent_ids/
+      - rm -rf ../../../net-gateway/vault/agent_ids/role-id ../../../net-gateway/vault/agent_ids/secret-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/net-gateway-service/role-id > ../../../net-gateway/vault/agent_ids/role-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/net-gateway-service/secret-id > ../../../net-gateway/vault/agent_ids/secret-id

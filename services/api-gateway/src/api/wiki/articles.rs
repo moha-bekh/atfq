@@ -146,7 +146,11 @@ fn clean_resources(resources: &[ResourceEntry]) -> Vec<ResourceEntry> {
         .iter()
         .filter_map(|resource| {
             let label = resource.label.trim();
-            let url = resource.url.as_deref().map(str::trim).filter(|value| !value.is_empty());
+            let url = resource
+                .url
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
 
             if label.is_empty() {
                 return None;
@@ -201,7 +205,9 @@ fn split_resources_marker(content: &str) -> (String, Vec<ResourceEntry>) {
     (visible_content, clean_resources(&resources))
 }
 
-fn map_article_node_with_resources(node: crate::grpc::wiki::Node) -> (NodeResponse, Vec<ResourceEntry>) {
+fn map_article_node_with_resources(
+    node: crate::grpc::wiki::Node,
+) -> (NodeResponse, Vec<ResourceEntry>) {
     let mut node_response = map_node(node);
     let (content, resources) = split_resources_marker(&node_response.content);
     node_response.content = content;
@@ -347,7 +353,8 @@ async fn resolve_contributors(
                             .await
                             .ok()
                             .flatten();
-                            entry.is_friend = entry.friendship_status.as_deref() == Some("accepted");
+                            entry.is_friend =
+                                entry.friendship_status.as_deref() == Some("accepted");
                         }
                     }
                 }
@@ -410,7 +417,8 @@ pub async fn create_article_handler(
     validate_create_article_payload(&payload)?;
 
     let mut client = state.wiki_client.clone();
-    let article_content = append_resources_marker(&payload.article_node.content, &payload.resources)?;
+    let article_content =
+        append_resources_marker(&payload.article_node.content, &payload.resources)?;
 
     let article_node = Some(crate::grpc::wiki::CreateNodeRequest {
         parent_id: payload.article_node.parent_id,

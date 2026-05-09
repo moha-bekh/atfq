@@ -4,8 +4,8 @@ pid_file = "/tmp/vault-agent-pid"
 auto_auth {
   method "approle" {
     config = {
-      role_id_file_path = "/etc/vault/role-id"
-      secret_id_file_path = "/etc/vault/secret-id"
+      role_id_file_path = "/etc/vault/agent_ids/role-id"
+      secret_id_file_path = "/etc/vault/agent_ids/secret-id"
       remove_secret_id_file_after_reading = false
     }
   }

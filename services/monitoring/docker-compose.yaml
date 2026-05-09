@@ -74,8 +74,6 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.8.2
     container_name: monitoring-node-exporter
-    # On macOS, node-exporter is limited as it runs inside the Docker Desktop VM.
-    # We remove host-specific mounts that don't exist on macOS.
     networks:
       - backend
     restart: unless-stopped

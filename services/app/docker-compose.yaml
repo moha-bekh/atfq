@@ -9,4 +9,4 @@ services:
     restart: unless-stopped
     environment:
       - VITE_ENABLE_MOCKS=false
-      - VITE_API_URL=http://localhost:8081/api/v1
+      - VITE_API_URL=/api/v1

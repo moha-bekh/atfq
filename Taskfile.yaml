@@ -1,0 +1,17 @@
+version: "3"
+
+includes:
+  services:
+    taskfile: ./services/Taskfile.yaml
+    dir: ./services
+
+tasks:
+  prod-up:
+    desc: "Build, initialize Vault, provision secrets and start the production stack"
+    cmds:
+      - task: services:prod-up
+
+  up:
+    desc: "Alias for prod-up"
+    cmds:
+      - task: prod-up

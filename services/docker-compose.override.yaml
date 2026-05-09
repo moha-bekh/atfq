@@ -5,13 +5,21 @@ volumes:
 
 services:
   api-gateway:
-    # profiles: ["dev"]
     build:
       target: dev
+    command: >
+      sh -c "
+      until [ -s /vault/secrets/.env ]; do
+        echo 'Waiting for Vault Agent to write secrets...';
+        sleep 1;
+      done;
+      set -a;
+      . /vault/secrets/.env;
+      set +a;
+      exec cargo run"
     ports:
       - "8081:8080"
     volumes:
-      # Hot Reload
       - type: bind
         source: ./api-gateway
         target: /app
@@ -22,18 +30,13 @@ services:
       - type: bind
         source: ./user/proto/user
         target: /app/proto/user
-      # Cargo cache
       - type: volume
         source: cargo-cache
         target: /usr/local/cargo/registry
-      # Prevent re-compilation
       - type: volume
         source: api-gateway-target-cache
         target: /app/target
-    # depends_on:
-    #   - auth
   app:
-    # profiles: ["dev"]
     build:
       target: dev
     ports:
@@ -44,12 +47,19 @@ services:
         target: /app
       - type: volume
         target: /app/node_modules
-    # depends_on:
-    #   - api-gateway
   auth:
-    # profiles: ["dev"]
     build:
       target: dev
+    command: >
+      sh -c "
+      until [ -s /vault/secrets/.env ]; do
+        echo 'Waiting for Vault Agent to write secrets...';
+        sleep 1;
+      done;
+      set -a;
+      . /vault/secrets/.env;
+      set +a;
+      exec cargo-watch -x run"
     ports:
       - "8082:8080"
     volumes:
@@ -63,12 +73,19 @@ services:
       - type: volume
         source: auth-target-cache
         target: /app/target
-  # net-gateway:
-  # profiles: ["dev"]
   user:
-    # profiles: ["full"]
     build:
       target: dev
+    command: >
+      sh -c "
+      until [ -s /vault/secrets/.env ]; do
+        echo 'Waiting for Vault Agent to write secrets...';
+        sleep 1;
+      done;
+      set -a;
+      . /vault/secrets/.env;
+      set +a;
+      exec cargo-watch -x run"
     ports:
       - "8083:8080"
     volumes:
@@ -78,10 +95,7 @@ services:
         consistency: cached
       - type: volume
         target: /app/node_modules
-  # db-user:
-  # profiles: ["full"]
   wiki:
-    # profiles: ["full"]
     build:
       target: dev
     ports:
@@ -91,7 +105,3 @@ services:
         source: ./wiki
         target: /app
         consistency: cached
-  # db-wiki:
-  # profiles: ["full"]
-  # vault:
-  # profiles: ["dev"]

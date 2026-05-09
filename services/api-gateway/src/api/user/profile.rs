@@ -767,11 +767,12 @@ pub async fn search_users_handler(
         };
 
         if let Some(user_db) = &state.user_db {
-            if let Ok(profile) =
-                sqlx::query("SELECT profile_picture_url, last_seen_at FROM profiles WHERE id = $1::uuid")
-                    .bind(&id)
-                    .fetch_optional(user_db)
-                    .await
+            if let Ok(profile) = sqlx::query(
+                "SELECT profile_picture_url, last_seen_at FROM profiles WHERE id = $1::uuid",
+            )
+            .bind(&id)
+            .fetch_optional(user_db)
+            .await
             {
                 if let Some(profile) = profile {
                     result.profile_picture_url = profile.get("profile_picture_url");

@@ -21,5 +21,6 @@ tasks:
           minio_root_user="$USER_MINIO_ROOT_USER" \
           minio_root_password="$USER_MINIO_ROOT_PASSWORD"
       - mkdir -p ../../../user/vault/agent_ids/
+      - rm -rf ../../../user/vault/agent_ids/role-id ../../../user/vault/agent_ids/secret-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/user-service/role-id > ../../../user/vault/agent_ids/role-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/user-service/secret-id > ../../../user/vault/agent_ids/secret-id

@@ -17,5 +17,6 @@ tasks:
           user_db_user="$API_GATEWAY_USER_DB_USER" \
           user_db_password="$API_GATEWAY_USER_DB_PASSWORD"
       - mkdir -p ../../../api-gateway/vault/agent_ids/
+      - rm -rf ../../../api-gateway/vault/agent_ids/role-id ../../../api-gateway/vault/agent_ids/secret-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault read -field=role_id auth/approle/role/api-gateway-service/role-id > ../../../api-gateway/vault/agent_ids/role-id
       - docker exec -e VAULT_TOKEN=$VAULT_TOKEN vault vault write -f -field=secret_id auth/approle/role/api-gateway-service/secret-id > ../../../api-gateway/vault/agent_ids/secret-id

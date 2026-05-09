@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"embed"
 	"flag"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,10 +30,32 @@ var migrationsFS embed.FS
 var (
 	bypass_moderation = flag.Bool("bypass", false, "bypass moderation")
 	portFlag          = flag.Int("port", 0, "The port to serve gRPC on")
-	// Update these credentials to match your local Postgres setup
-	envURL = os.Getenv("DATABASE_URL")
-	dbURL  = envURL + "?sslmode=disable"
 )
+
+func loadEnvFile(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.Trim(strings.TrimSpace(value), `"`)
+		if _, exists := os.LookupEnv(key); !exists {
+			_ = os.Setenv(key, value)
+		}
+	}
+}
 
 func getPort() int {
 	// 1. Check flag
@@ -58,10 +82,12 @@ type wikiServer struct {
 
 func main() {
 	startedAt := time.Now()
+	loadEnvFile("/vault/secrets/.env")
 	flag.Parse()
 
 	_ = &pb.Node{}
 
+	dbURL := os.Getenv("DATABASE_URL") + "?sslmode=disable"
 	db, err := sqlx.Connect("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Could not connect to database: %v", err)
