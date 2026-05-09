@@ -47,10 +47,15 @@ tasks:
       - task auth:offline-prepare
       - task dc:up -- api-gateway app net-gateway -d
 
-  prod-up:
-    desc: "Build, initialize Vault, provision secrets and start the production stack"
+  prod-build:
+    desc: "Build production images"
     cmds:
-      - task dc:prod -- --build
+      - task dc:prod-build
+
+  prod-up:
+    desc: "Initialize Vault, provision secrets and start the production stack"
+    cmds:
+      - task dc:prod
 
   first-up:
     desc: "Clean all local infra data, then start the production stack"

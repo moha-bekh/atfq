@@ -6,8 +6,13 @@ includes:
     dir: ./services
 
 tasks:
+  prod-build:
+    desc: "Build production images"
+    cmds:
+      - task: services:prod-build
+
   prod-up:
-    desc: "Build, initialize Vault, provision secrets and start the production stack"
+    desc: "Initialize Vault, provision secrets and start the production stack"
     cmds:
       - task: services:prod-up
 
