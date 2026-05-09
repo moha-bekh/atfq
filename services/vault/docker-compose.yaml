@@ -22,8 +22,8 @@ services:
         source: ./config
         target: /vault/config
         read_only: true
-      - type: bind
-        source: ./vault-data
+      - type: volume
+        source: vault-data
         target: /vault/data
     cap_add:
       - IPC_LOCK
