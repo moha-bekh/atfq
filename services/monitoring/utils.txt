@@ -8,10 +8,12 @@ Prometheus:
 
 cAdvisor:
   URL: http://localhost:8085
+  Disabled by default on Docker Desktop macOS.
+  Enable only on Linux with: docker compose --profile linux-containers up -d cadvisor
 
 Dashboard provisioned automatically:
   ATFQ Overview
 
 Note:
-  On Docker Desktop for macOS, cAdvisor may expose Docker VM level metrics instead of
-  detailed per-container metrics because Docker's internal storage path is hidden.
+  On Docker Desktop for macOS, cAdvisor cannot reliably read Docker's internal
+  storage path, so the default stack uses Prometheus, Grafana, and node-exporter.

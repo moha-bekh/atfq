@@ -164,13 +164,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (id) (rate(container_cpu_usage_seconds_total{id!=\"\"}[5m]))",
-          "legendFormat": "{{id}}",
+          "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
+          "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "cAdvisor CPU usage",
+      "title": "Node CPU usage",
       "type": "timeseries"
     },
     {
@@ -225,7 +225,7 @@
               }
             ]
           },
-          "unit": "bytes"
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -251,13 +251,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "container_memory_working_set_bytes{id!=\"\"}",
-          "legendFormat": "{{id}}",
+          "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+          "legendFormat": "{{instance}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "cAdvisor memory",
+      "title": "Node memory usage",
       "type": "timeseries"
     },
     {
