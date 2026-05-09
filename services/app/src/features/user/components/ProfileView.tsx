@@ -9,6 +9,7 @@ import { useOAuth } from '@/features/auth/hooks/useOAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { userApi } from '@/features/user/api';
+import { getProfilePictureUrl } from '@/features/user/utils/profilePicture';
 import type { UserSearchResult } from '@/features/user/types';
 import { GoogleCircle } from '@/assets/icons/GoogleCircle';
 import { GithubCircle } from '@/assets/icons/GithubCircle';
@@ -201,6 +202,7 @@ export const ProfileView = () => {
   } = useOAuth();
 
   const profile = fetchedProfile ?? storedProfile;
+  const profilePictureUrl = getProfilePictureUrl(profile?.profile_picture_url);
 
   // Forms
   const { register: regUsername, handleSubmit: handleUsernameSubmit, reset: resetUsername } = useForm<UsernameForm>({
@@ -543,8 +545,8 @@ export const ProfileView = () => {
               </div>
             ) : null}
             
-            {profile?.profile_picture_url ? (
-              <img src={profile.profile_picture_url} alt="Profile" className="w-full h-full object-cover z-10" />
+            {profilePictureUrl ? (
+              <img src={profilePictureUrl} alt="Profile" className="w-full h-full object-cover z-10" />
             ) : (
               <div className="w-full h-full bg-main/10 flex items-center justify-center text-main font-bold">
                 {user?.username?.[0]?.toUpperCase()}
@@ -570,7 +572,7 @@ export const ProfileView = () => {
               >
                 Upload
               </button>
-              {profile?.profile_picture_url && (
+              {profilePictureUrl && (
                 <button
                   type="button"
                   onClick={async () => {
@@ -1124,12 +1126,13 @@ export const ProfileView = () => {
                         {friendSearchResults.map((result) => {
                           const alreadyPending = result.friendship_status === 'pending';
                           const alreadyAccepted = result.friendship_status === 'accepted';
+                          const resultPictureUrl = getProfilePictureUrl(result.profile_picture_url);
 
                           return (
                             <div key={result.id} className="flex flex-col gap-3 rounded-lg border border-main/10 bg-bg/40 p-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="flex min-w-0 items-center gap-3">
-                                {result.profile_picture_url ? (
-                                  <img src={result.profile_picture_url} alt={result.username} className="h-9 w-9 rounded-lg border border-sub/30 object-cover" />
+                                {resultPictureUrl ? (
+                                  <img src={resultPictureUrl} alt={result.username} className="h-9 w-9 rounded-lg border border-sub/30 object-cover" />
                                 ) : (
                                   <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-sub/30 bg-main/10 text-sm font-bold text-main">
                                     {result.username[0]?.toUpperCase()}
@@ -1182,12 +1185,13 @@ export const ProfileView = () => {
                       friends.map((friend) => {
                         const label = friend.friend_username || friend.friend_email || friend.friend_id;
                         const isAccepted = friend.status.toLowerCase() === 'accepted';
+                        const friendPictureUrl = getProfilePictureUrl(friend.profile_picture_url);
 
                         return (
                           <article key={friend.friend_id} className="flex flex-col gap-4 rounded-lg border border-main/10 bg-sub-alt/5 p-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex min-w-0 items-center gap-3">
-                              {friend.profile_picture_url ? (
-                                <img src={friend.profile_picture_url} alt={label} className="h-10 w-10 rounded-lg border border-sub/30 object-cover" />
+                              {friendPictureUrl ? (
+                                <img src={friendPictureUrl} alt={label} className="h-10 w-10 rounded-lg border border-sub/30 object-cover" />
                               ) : (
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-sub/30 bg-main/10 text-sm font-bold text-main">
                                   {label[0]?.toUpperCase()}

@@ -1,6 +1,7 @@
 import type { Article, NodeBreadcrumb } from "../types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "@/features/user/api";
+import { getProfilePictureUrl } from "@/features/user/utils/profilePicture";
 import { useAppStore } from "@/stores/app.store";
 
 interface RightSidebarProps {
@@ -31,7 +32,7 @@ export default function RightSidebar({ article, conceptLinks, onItemClick, mode,
     id: contributor.id,
     userId: contributor.user_id,
     username: contributor.username,
-    src: contributor.profile_picture_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(contributor.username || String(contributor.id))}`,
+    src: getProfilePictureUrl(contributor.profile_picture_url) || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(contributor.username || String(contributor.id))}`,
     friendshipStatus: contributor.friendship_status,
     isFriend: Boolean(contributor.is_friend),
     isOnline: Boolean(contributor.is_online),

@@ -1,8 +1,45 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '../api';
 import { useAppStore } from '@/stores/app.store';
-import type { UpdateProfileRequest, UpdateThemeRequest, RoleChangeRequest } from '../types';
+import type {
+  Friendship,
+  RoleChangeRequest,
+  UpdateProfileRequest,
+  UpdateThemeRequest,
+} from '../types';
+
+const ONLINE_WINDOW_MS = 120_000;
+
+const parseTimestampMillis = (value?: string | null) => {
+  if (!value) return null;
+
+  if (/^\d+(\.\d+)?$/.test(value)) {
+    const [secondsPart, nanosPart = '0'] = value.split('.');
+    const seconds = Number(secondsPart);
+    const nanos = Number(nanosPart.padEnd(9, '0').slice(0, 9));
+
+    if (Number.isFinite(seconds) && Number.isFinite(nanos)) {
+      return seconds * 1000 + Math.floor(nanos / 1_000_000);
+    }
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const withCurrentPresence = (friend: Friendship): Friendship => {
+  const lastSeenAt = parseTimestampMillis(friend.last_seen_at);
+
+  if (lastSeenAt === null) {
+    return friend;
+  }
+
+  return {
+    ...friend,
+    is_online: Date.now() - lastSeenAt <= ONLINE_WINDOW_MS,
+  };
+};
 
 export const useProfile = () => {
   const user = useAppStore((state) => state.user);
@@ -31,6 +68,8 @@ export const useProfile = () => {
     queryKey: ['friends', user?.id],
     queryFn: () => userApi.listFriends(),
     enabled: !!user?.id && !!accessToken,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 
   useEffect(() => {
@@ -49,6 +88,11 @@ export const useProfile = () => {
       useAppStore.getState().setProfile(profileQuery.data);
     }
   }, [profileQuery.data]);
+
+  const friends = useMemo(
+    () => friendsQuery.data?.friends.map(withCurrentPresence) ?? [],
+    [friendsQuery.data?.friends],
+  );
 
   const updateProfileMutation = useMutation({
     mutationFn: (data: UpdateProfileRequest) => userApi.updateProfile(data),
@@ -145,7 +189,7 @@ export const useProfile = () => {
     isPermissionsError: availablePermissionsQuery.isError,
     permissionsError: availablePermissionsQuery.error,
     roleRequests: roleRequestsQuery.data?.requests ?? [],
-    friends: friendsQuery.data?.friends ?? [],
+    friends,
     isRoleRequestsLoading: roleRequestsQuery.isLoading,
     isRoleRequestsError: roleRequestsQuery.isError,
     isFriendsLoading: friendsQuery.isLoading,

@@ -1,0 +1,82 @@
+version: "3"
+
+vars:
+  API_BASE: '{{.API_BASE | default "https://localhost"}}'
+  ADMIN_USERNAME: '{{.ADMIN_USERNAME | default "admin"}}'
+  ADMIN_EMAIL: '{{.ADMIN_EMAIL | default "admin@atfq.demo"}}'
+  ADMIN_PASSWORD: '{{.ADMIN_PASSWORD | default "Admin0000"}}'
+  DOCKER_NETWORK: '{{.DOCKER_NETWORK | default "atfq_backend"}}'
+
+tasks:
+  wiki-seed-demo:
+    desc: "Seed the production wiki database with the full demo documentation tree"
+    cmds:
+      - |
+        set -eu
+
+        wiki_db_container=$(docker compose -f docker-compose.yaml -f docker-compose.prod.yaml ps -q db-wiki)
+        if [ -z "$wiki_db_container" ]; then
+          wiki_db_container=$(docker compose -f docker-compose.yaml ps -q db-wiki)
+        fi
+        if [ -z "$wiki_db_container" ]; then
+          echo "Unable to find the db-wiki container. Start the stack first with: task prod-up"
+          exit 1
+        fi
+
+        wiki_db_user=$(docker exec "$wiki_db_container" sh -c 'cat /vault/secrets/POSTGRES_USER')
+        wiki_db_password=$(docker exec "$wiki_db_container" sh -c 'cat /vault/secrets/POSTGRES_PASSWORD')
+        wiki_db_name=$(docker exec "$wiki_db_container" sh -c 'cat /vault/secrets/POSTGRES_DB')
+        wiki_demo_database_url="postgresql://${wiki_db_user}:${wiki_db_password}@db-wiki:5432/${wiki_db_name}"
+
+        docker run --rm \
+          --network {{.DOCKER_NETWORK}} \
+          -v "$PWD/wiki/scripts:/scripts:ro" \
+          -e WIKI_DEMO_DATABASE_URL="$wiki_demo_database_url" \
+          postgres:16-alpine \
+          sh -ec '
+            cp /scripts/seed_demo.sh /tmp/seed_demo.sh
+            sed -i "1s|.*|#!/bin/sh|; 2s|set -euo pipefail|set -eu|" /tmp/seed_demo.sh
+            sh /tmp/seed_demo.sh
+          '
+
+  create-admin-user:
+    desc: "Create or promote the demo admin user (override ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD, API_BASE)"
+    cmds:
+      - |
+        set -eu
+
+        payload=$(printf '{"username":"%s","email":"%s","password":"%s"}' "{{.ADMIN_USERNAME}}" "{{.ADMIN_EMAIL}}" "{{.ADMIN_PASSWORD}}")
+        status=$(curl -skL -o /tmp/atfq-admin-register.json -w "%{http_code}" \
+          -H "content-type: application/json" \
+          -d "$payload" \
+          "{{.API_BASE}}/api/v1/auth/register" || true)
+
+        if [ "$status" != "201" ] && [ "$status" != "409" ]; then
+          echo "Unable to register admin user through {{.API_BASE}}/api/v1/auth/register (HTTP $status)"
+          cat /tmp/atfq-admin-register.json 2>/dev/null || true
+          exit 1
+        fi
+
+        admin_id=$(docker exec -e ADMIN_EMAIL="{{.ADMIN_EMAIL}}" db-auth sh -c 'psql -U "$(cat /vault/secrets/POSTGRES_USER)" -d "$(cat /vault/secrets/POSTGRES_DB)" -qAt -c "SELECT id FROM users WHERE email = '\''$ADMIN_EMAIL'\'' LIMIT 1;"')
+
+        if [ -z "$admin_id" ]; then
+          echo "Admin user {{.ADMIN_EMAIL}} was not found in auth database."
+          exit 1
+        fi
+
+        docker exec -e ADMIN_ID="$admin_id" db-user sh -c 'psql -U "$(cat /vault/secrets/POSTGRES_USER)" -d "$(cat /vault/secrets/POSTGRES_DB)" -v ON_ERROR_STOP=1 -c "
+          INSERT INTO profiles (id) VALUES ('\''$ADMIN_ID'\'') ON CONFLICT DO NOTHING;
+          INSERT INTO profile_roles (profile_id, role_name)
+          VALUES ('\''$ADMIN_ID'\'', '\''user'\''), ('\''$ADMIN_ID'\'', '\''admin'\'')
+          ON CONFLICT DO NOTHING;
+        "'
+
+        echo "Demo admin ready:"
+        echo "  email: {{.ADMIN_EMAIL}}"
+        echo "  password: {{.ADMIN_PASSWORD}}"
+
+  demo-bootstrap:
+    desc: "Prepare demo data: create/promote admin user and seed the wiki demo tree"
+    cmds:
+      - task: create-admin-user
+      - task: wiki-seed-demo

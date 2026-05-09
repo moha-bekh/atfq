@@ -95,8 +95,5 @@ services:
   prometheus:
     ports: !reset []
 
-  grafana:
-    ports: !reset []
-
   cadvisor:
     ports: !reset []

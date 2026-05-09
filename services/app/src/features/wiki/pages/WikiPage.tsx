@@ -586,6 +586,7 @@ export default function WikiPage() {
             <DocContent 
               article={article || null} 
               mode={mode} 
+              canContribute={canContribute}
               parentOptions={parentOptions}
               onCreate={handleCreate}
               onEdit={handleEdit}

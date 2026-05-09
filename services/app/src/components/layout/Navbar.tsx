@@ -4,6 +4,7 @@ import { Button } from "../ui/Button"
 import { ATFQLogo } from '@/assets/icons/ATFQLogo'
 import { useAppStore } from '@/stores/app.store'
 import { useLogout } from '@/features/auth/hooks/useLogout'
+import { getProfilePictureUrl } from '@/features/user/utils/profilePicture'
 
 export function Navbar() {
   const { 
@@ -18,6 +19,7 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isAdminOrMod = roles?.some(role => ['admin', 'moderator'].includes(role.toLowerCase()));
+  const profilePictureUrl = getProfilePictureUrl(profile?.profile_picture_url);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -57,9 +59,9 @@ export function Navbar() {
                   className="group flex h-10 items-center gap-3 rounded-lg hover:bg-main/5 transition-all"
                 >
                   <div className="w-10 h-10 rounded-lg bg-sub-alt/20 border-2 border-main/20 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                    {profile?.profile_picture_url ? (
+                    {profilePictureUrl ? (
                       <img 
-                        src={profile.profile_picture_url} 
+                        src={profilePictureUrl} 
                         alt={user?.username} 
                         className="w-full h-full object-cover"
                       />

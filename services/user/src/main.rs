@@ -1216,7 +1216,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://minio-user:9000".to_string());
     let s3_bucket = env::var("S3_BUCKET").unwrap_or_else(|_| "profiles".to_string());
     let s3_public_url =
-        env::var("S3_PUBLIC_URL").unwrap_or_else(|_| "http://localhost:9000".to_string());
+        env::var("S3_PUBLIC_URL").unwrap_or_else(|_| "http://localhost".to_string());
 
     let config = aws_config::from_env()
         .endpoint_url(&s3_endpoint)

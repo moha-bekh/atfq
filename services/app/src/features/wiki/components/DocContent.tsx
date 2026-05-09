@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Article, NodeBreadcrumb, ResourceEntry } from "../types";
 
 export type WikiContentLine = {
@@ -9,6 +10,7 @@ export type WikiContentLine = {
 interface DocContentProps {
   article: Article | null;
   mode: "read" | "edit" | "create";
+  canContribute: boolean;
   parentOptions: NodeBreadcrumb[];
   onCreate: (data: {
     parentId?: number;
@@ -84,7 +86,7 @@ const formatResourceLine = (resource: ResourceEntry) => {
   return url ? `${label} | ${url}` : label;
 };
 
-export default function DocContent({ article, mode, parentOptions, onCreate, onEdit }: DocContentProps) {
+export default function DocContent({ article, mode, canContribute, parentOptions, onCreate, onEdit }: DocContentProps) {
   const [title, setTitle] = useState("");
   const [tldr, setTldr] = useState("");
   const [notions, setNotions] = useState("");
@@ -354,10 +356,20 @@ export default function DocContent({ article, mode, parentOptions, onCreate, onE
           </button>
         </form>
       ) : (
-        <div className="p-8 sm:p-12 border-2 border-dashed border-sub/20 rounded-lg flex items-center justify-center text-center">
+        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-sub/20 p-8 text-center sm:p-12">
           <span className="font-jakarta text-sub/60">
-            Select an article or click CREATE to start.
+            {canContribute
+              ? "Select an article or click CREATE to start."
+              : "Select an article, or sign in to create one."}
           </span>
+          {!canContribute && (
+            <Link
+              to="/login"
+              className="rounded-lg border border-main/30 px-4 py-3 font-bricolage text-[10px] font-bold uppercase tracking-widest text-main transition-colors hover:bg-main/10"
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       )}
     </div>
