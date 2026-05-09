@@ -31,8 +31,6 @@ use auth::infra::security::password_hasher::Argon2Hasher;
 use auth::infra::security::totp::TotpMfa;
 use auth::infra::user_profile::GrpcUserProfileService;
 
-const CHA_CHA_KEY: &[u8; 32] = &[42; 32];
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CONFIG
@@ -47,6 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let jwt_secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let user_service_addr =
         env::var("USER_SERVICE_ADDR").unwrap_or_else(|_| "http://user:8080".to_string());
+
+    let cha_cha_key = env::var("CHA_CHA_KEY").expect("CHA_CHA_KEY must be set");
 
     let google_client_id = env::var("GOOGLE_CLIENT_ID").ok();
     let google_client_secret = env::var("GOOGLE_CLIENT_SECRET").ok();
@@ -104,7 +104,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // INFRA
     let user_repo = Arc::new(PostgresUserRepository::new(pool));
 
-    let encryption_service = Arc::new(ChaChaEncryption::from_key(CHA_CHA_KEY));
+    let cha_cha_key_bytes = cha_cha_key.as_str().as_bytes().try_into().expect("CHA_CHA_KEY must be 32 bytes long");
+    let encryption_service = Arc::new(ChaChaEncryption::from_key(cha_cha_key_bytes));
 
     let mfa_service = Arc::new(TotpMfa);
 

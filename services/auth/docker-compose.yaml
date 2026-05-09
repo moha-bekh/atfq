@@ -37,6 +37,7 @@ services:
       - SMTP_FROM=ATFQ <noreply@atfq.dev>
       - GITHUB_REDIRECT_URL=http://localhost:8080/auth/callback/github
       - GOOGLE_REDIRECT_URL=http://localhost:8080/auth/callback/google
+      - CHA_CHA_KEY=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     depends_on:
       db-auth:
         condition: service_started
