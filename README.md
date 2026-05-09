@@ -1,20 +1,20 @@
-*This project has been created as part of the 42 curriculum by acaetano, bitquence, jsommet, moha-bekh, sdeutsch.*
+*This project has been created as part of the 42 curriculum by mbekheir, acaetano, jamar, jsommet, sdeutsch.*
 
 # ATFQ
 
 ## Description
 
-ATFQ, short for "Ask The Fundamental Question", is a collaborative web platform for learning deep computer science concepts through a structured knowledge graph.
+ATFQ, short for "Ask The Fucking Question", is a collaborative web platform for learning computer science concepts through a structured knowledge wiki.
 
-The goal of the project is to provide more than a classic wiki: users can explore articles, notions, key questions, and resources; authenticated contributors can propose new content or edits; moderators can review pending changes; and administrators can manage access through roles and permissions.
+The goal of the project is to provide more than a classic wiki: users can explore articles honing down on a single computer science subject and its relevant notions as well as key questions and resources. Authenticated contributors can propose new content or edits; moderators can review pending changes; and administrators can manage access through roles and permissions.
 
 Key features:
 
 - Public knowledge graph with articles, sub-articles, notions, questions, and resources.
 - Secure account creation, login, logout, password reset, token refresh, and account deletion.
 - OAuth login with Google and GitHub.
-- Optional TOTP multi-factor authentication.
-- User profiles with avatar upload, theme customization, roles, permissions, and friendship management.
+- Optional 2FA authentication.
+- User profiles with avatar upload, persistent theme customization, roles, permissions, and friendship management.
 - Moderated contribution workflow for wiki content.
 - Administration dashboard for role requests and wiki version reviews.
 - Legal pages: Privacy Policy and Terms of Service.
@@ -26,59 +26,33 @@ Key features:
 
 Install the following tools before running the project:
 
-- Docker or Podman with Compose support.
-- Go Task, used by the repository task files.
+- Docker.
+- Task, used by the repository task files.
 - SOPS, age, yq, and jq for encrypted secret management.
-- A modern browser. The project is primarily tested with the latest stable Google Chrome.
-
-Optional development tools:
-
-- Node.js 24+ and npm for frontend-only work.
-- Rust stable toolchain for backend Rust services.
-- Go 1.26+ for the wiki service.
 
 ### Environment and secrets
 
 The project does not commit runtime `.env` files. Service secrets are managed through Vault and SOPS.
 
-1. Copy the secret template:
+1. Run `EDITOR=vim task vault:secrets:edit`
+
+2. A vim buffer should open up, allowing you to edit the secrets
+
+### Run the website
 
 ```bash
-cp services/vault/secret.example services/vault/secrets.local.yaml
-```
-
-2. Fill the required values locally.
-
-3. Encrypt or update `services/vault/secrets.enc.yaml` using the team SOPS/age key.
-
-4. Keep local `.env` files and unencrypted secret files out of Git.
-
-The repository also contains `services/.env.example` as a Compose-level placeholder. Real secrets are injected into services by Vault agents at runtime.
-
-### Run the full application
-
-From the repository root:
-
-```bash
-cd services
-docker compose up --build
+task dc:up -- vault
+task vault:up
+task dc:up
 ```
 
 This is the single-command containerized deployment expected by the subject. It starts the frontend, API gateway, auth service, user service, wiki service, databases, object storage, Vault, WAF gateway, and monitoring stack.
 
-If Vault is not initialized yet, start Vault first and provision secrets:
-
-```bash
-cd services
-docker compose up vault -d
-task vault:up
-docker compose up --build
-```
+After running this command once, you may run all containers using just `task dc:up`.
 
 Main local URLs:
 
 - Frontend through Vite/dev container: `http://localhost:8080`
-- API gateway: `http://localhost:8081/api/v1`
 - Swagger/OpenAPI: `http://localhost:8081/swagger-ui`
 - Net gateway HTTPS entrypoint: `https://atfq.org` when local DNS/hosts and certificates are configured.
 - Grafana: `http://localhost:3000`
@@ -142,9 +116,9 @@ go test ./...
 | Member | Role(s) | Responsibilities |
 | --- | --- | --- |
 | acaetano | Product Owner, Developer | Product direction, feature prioritization, wiki experience, content workflow validation. |
-| bitquence | Project Manager, Developer | Planning, task coordination, review flow, delivery tracking, frontend integration. |
+| jamar | Project Manager, Developer | Planning, task coordination, review flow, delivery tracking, frontend integration. |
 | jsommet | Technical Lead, Developer | Architecture decisions, backend contracts, service boundaries, code quality. |
-| moha-bekh | Developer, DevOps/Security | Containerization, Vault, WAF, monitoring, authentication and API integration. |
+| mbekheir | Developer, DevOps/Security | Containerization, Vault, WAF, monitoring, authentication and API integration. |
 | sdeutsch | Developer | User-facing features, profile management, accessibility checks, documentation support. |
 
 All team members are expected to understand the global architecture, explain their own work, and demonstrate at least one implemented feature during evaluation.
@@ -361,19 +335,19 @@ erDiagram
 
 | Feature | Description | Main contributors |
 | --- | --- | --- |
-| Public wiki browsing | Users can browse root articles, nested articles, notions, questions, and resources. | acaetano, bitquence |
+| Public wiki browsing | Users can browse root articles, nested articles, notions, questions, and resources. | acaetano, jamar |
 | Wiki creation and editing | Authenticated users can submit new articles and edits as pending versions. | acaetano, jsommet |
-| Wiki moderation | Moderators/admins can approve or reject pending wiki versions. | jsommet, bitquence |
-| Authentication | Signup, login, logout, refresh tokens, password reset, account deletion. | moha-bekh, jsommet |
-| OAuth | Google and GitHub authentication and provider unlinking. | moha-bekh |
-| MFA | TOTP-based MFA enable, verify, and disable flow. | moha-bekh, sdeutsch |
-| Profile management | Username/email/password update, avatar upload/removal, theme customization. | sdeutsch, bitquence |
-| Friends and presence | User search, friend requests, accepted friends, online/last-seen status. | sdeutsch, moha-bekh |
-| Roles and permissions | Admin, moderator, user roles with permission-based UI and backend checks. | jsommet, moha-bekh |
-| Admin dashboard | Role request history/review and wiki moderation review surface. | bitquence, jsommet |
+| Wiki moderation | Moderators/admins can approve or reject pending wiki versions. | jsommet, jamar |
+| Authentication | Signup, login, logout, refresh tokens, password reset, account deletion. | mbekheir, jsommet |
+| OAuth | Google and GitHub authentication and provider unlinking. | mbekheir |
+| MFA | TOTP-based MFA enable, verify, and disable flow. | mbekheir, sdeutsch |
+| Profile management | Username/email/password update, avatar upload/removal, theme customization. | sdeutsch, jamar |
+| Friends and presence | User search, friend requests, accepted friends, online/last-seen status. | sdeutsch, mbekheir |
+| Roles and permissions | Admin, moderator, user roles with permission-based UI and backend checks. | jsommet, mbekheir |
+| Admin dashboard | Role request history/review and wiki moderation review surface. | jamar, jsommet |
 | Legal pages | Privacy Policy and Terms of Service available from the application. | acaetano, sdeutsch |
-| Monitoring | Prometheus metrics and Grafana dashboard. | moha-bekh |
-| WAF and secret management | ModSecurity gateway and Vault-managed service secrets. | moha-bekh, jsommet |
+| Monitoring | Prometheus metrics and Grafana dashboard. | mbekheir |
+| WAF and secret management | ModSecurity gateway and Vault-managed service secrets. | mbekheir, jsommet |
 
 ## Chosen Modules
 
@@ -381,15 +355,15 @@ The project claims 15 module points. Only fully functional modules should be cou
 
 | Category | Module | Type | Points | Implementation | Contributors |
 | --- | --- | --- | ---: | --- | --- |
-| Web | Use a framework for both frontend and backend | Major | 2 | React/Vite frontend and Axum/Tonic backend services. | bitquence, jsommet, moha-bekh |
-| Web | Advanced search with filters, sorting, and pagination | Minor | 1 | Wiki search UI includes query, type filtering, title sorting, and paginated results. | acaetano, bitquence |
-| User Management | Standard user management and authentication | Major | 2 | Profile updates, avatar support, friends, online presence, and profile page. | sdeutsch, moha-bekh |
-| User Management | OAuth 2.0 remote authentication | Minor | 1 | Google and GitHub OAuth login/link/unlink flows. | moha-bekh |
-| User Management | Advanced permissions system | Major | 2 | Roles, permissions, role requests, admin review, and permission-gated actions. | jsommet, bitquence |
-| User Management | Complete 2FA system | Minor | 1 | TOTP MFA enable, verify, and disable with encrypted stored material. | moha-bekh, sdeutsch |
-| Cybersecurity | WAF/ModSecurity + HashiCorp Vault | Major | 2 | OWASP ModSecurity CRS gateway and Vault agents for isolated secret injection. | moha-bekh, jsommet |
-| DevOps | Monitoring with Prometheus and Grafana | Major | 2 | Metrics endpoints for services, Prometheus scrape config, Grafana provisioning. | moha-bekh |
-| DevOps | Backend as microservices | Major | 2 | API gateway, auth, user, and wiki services with separate databases and gRPC contracts. | jsommet, moha-bekh |
+| Web | Use a framework for both frontend and backend | Major | 2 | React/Vite frontend and Axum/Tonic backend services. | jamar, jsommet, mbekheir |
+| Web | Advanced search with filters, sorting, and pagination | Minor | 1 | Wiki search UI includes query, type filtering, title sorting, and paginated results. | acaetano, jamar |
+| User Management | Standard user management and authentication | Major | 2 | Profile updates, avatar support, friends, online presence, and profile page. | sdeutsch, mbekheir |
+| User Management | OAuth 2.0 remote authentication | Minor | 1 | Google and GitHub OAuth login/link/unlink flows. | mbekheir |
+| User Management | Advanced permissions system | Major | 2 | Roles, permissions, role requests, admin review, and permission-gated actions. | jsommet, jamar |
+| User Management | Complete 2FA system | Minor | 1 | TOTP MFA enable, verify, and disable with encrypted stored material. | mbekheir, sdeutsch |
+| Cybersecurity | WAF/ModSecurity + HashiCorp Vault | Major | 2 | OWASP ModSecurity CRS gateway and Vault agents for isolated secret injection. | mbekheir, jsommet |
+| DevOps | Monitoring with Prometheus and Grafana | Major | 2 | Metrics endpoints for services, Prometheus scrape config, Grafana provisioning. | mbekheir |
+| DevOps | Backend as microservices | Major | 2 | API gateway, auth, user, and wiki services with separate databases and gRPC contracts. | jsommet, mbekheir |
 
 Total: 15 points.
 
@@ -416,7 +390,7 @@ Total: 15 points.
 
 Main challenge: making the wiki feel structured enough for learning while keeping contribution forms understandable.
 
-### bitquence
+### jamar
 
 - Coordinated planning, task breakdown, and frontend integration.
 - Built or integrated React screens for wiki browsing, search, moderation, and navigation.
@@ -434,7 +408,7 @@ Main challenge: keeping frontend state consistent while content versions, roles,
 
 Main challenge: keeping domain services independent while still exposing a simple API to the frontend.
 
-### moha-bekh
+### mbekheir
 
 - Implemented DevOps and security infrastructure: Docker Compose, Vault, ModSecurity, monitoring.
 - Worked on authentication, OAuth, MFA, API gateway integration, and service secrets.
