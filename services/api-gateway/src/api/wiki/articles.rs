@@ -12,6 +12,9 @@ use sqlx::Row;
 use std::sync::Arc;
 use tonic::metadata::MetadataValue;
 
+const RESOURCES_MARKER: &str = "\n\n<!-- ATFQ_RESOURCES:";
+const RESOURCES_MARKER_END: &str = " -->";
+
 #[derive(Deserialize)]
 pub struct SearchQuery {
     pub q: String,
@@ -30,6 +33,31 @@ fn legacy_wiki_user_id(user_id: &str) -> i32 {
         .take(7)
         .collect();
     i32::from_str_radix(&hex, 16).unwrap_or(1).max(1)
+}
+
+fn current_user_id_from_headers(headers: &HeaderMap) -> Option<String> {
+    let auth_header = headers.get("authorization")?.to_str().ok()?;
+    let token = auth_header.strip_prefix("Bearer ")?;
+    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "jwt_secret".to_string());
+    let data = decode::<TokenClaims>(
+        token,
+        &DecodingKey::from_secret(secret.as_ref()),
+        &Validation::default(),
+    )
+    .ok()?;
+
+    (data.claims.typ == "access").then_some(data.claims.sub)
+}
+
+async fn touch_user_presence(state: &Arc<AppState>, user_id: &str) {
+    if let Some(user_db) = &state.user_db {
+        let _ = sqlx::query(
+            "UPDATE profiles SET last_seen_at = NOW(), updated_at = NOW() WHERE id = $1::uuid",
+        )
+        .bind(user_id)
+        .execute(user_db)
+        .await;
+    }
 }
 
 fn add_auth_header<T>(request: &mut tonic::Request<T>, headers: &HeaderMap) {
@@ -113,6 +141,73 @@ fn map_node(n: crate::grpc::wiki::Node) -> NodeResponse {
     }
 }
 
+fn clean_resources(resources: &[ResourceEntry]) -> Vec<ResourceEntry> {
+    resources
+        .iter()
+        .filter_map(|resource| {
+            let label = resource.label.trim();
+            let url = resource.url.as_deref().map(str::trim).filter(|value| !value.is_empty());
+
+            if label.is_empty() {
+                return None;
+            }
+
+            Some(ResourceEntry {
+                label: label.to_string(),
+                url: url.map(ToOwned::to_owned),
+            })
+        })
+        .collect()
+}
+
+fn append_resources_marker(content: &str, resources: &[ResourceEntry]) -> Result<String, AppError> {
+    let resources = clean_resources(resources);
+
+    if resources.is_empty() {
+        return Err(AppError::Grpc(tonic::Status::invalid_argument(
+            "at least one resource is required",
+        )));
+    }
+
+    let json = serde_json::to_string(&resources)
+        .map_err(|e| AppError::Internal(format!("Failed to serialize resources: {}", e)))?;
+    Ok(format!(
+        "{}{}{}{}",
+        content.trim_end(),
+        RESOURCES_MARKER,
+        json,
+        RESOURCES_MARKER_END
+    ))
+}
+
+fn split_resources_marker(content: &str) -> (String, Vec<ResourceEntry>) {
+    let Some(marker_start) = content.rfind(RESOURCES_MARKER) else {
+        return (content.to_string(), Vec::new());
+    };
+    let marker_body_start = marker_start + RESOURCES_MARKER.len();
+    let Some(relative_end) = content[marker_body_start..].find(RESOURCES_MARKER_END) else {
+        return (content.to_string(), Vec::new());
+    };
+    let marker_end = marker_body_start + relative_end + RESOURCES_MARKER_END.len();
+
+    if marker_end != content.len() {
+        return (content.to_string(), Vec::new());
+    }
+
+    let json = &content[marker_body_start..marker_body_start + relative_end];
+    let resources = serde_json::from_str::<Vec<ResourceEntry>>(json).unwrap_or_default();
+    let visible_content = content[..marker_start].trim_end().to_string();
+
+    (visible_content, clean_resources(&resources))
+}
+
+fn map_article_node_with_resources(node: crate::grpc::wiki::Node) -> (NodeResponse, Vec<ResourceEntry>) {
+    let mut node_response = map_node(node);
+    let (content, resources) = split_resources_marker(&node_response.content);
+    node_response.content = content;
+    (node_response, resources)
+}
+
 fn validate_create_node_payload(payload: &CreateNodeRequest) -> Result<(), AppError> {
     if payload.title.trim().is_empty() {
         return Err(AppError::Grpc(tonic::Status::invalid_argument(
@@ -131,6 +226,13 @@ fn validate_create_node_payload(payload: &CreateNodeRequest) -> Result<(), AppEr
 
 fn validate_create_article_payload(payload: &CreateArticleRequest) -> Result<(), AppError> {
     validate_create_node_payload(&payload.article_node)?;
+    let resources = clean_resources(&payload.resources);
+
+    if resources.is_empty() {
+        return Err(AppError::Grpc(tonic::Status::invalid_argument(
+            "at least one resource is required",
+        )));
+    }
 
     let has_notion = payload
         .children
@@ -177,6 +279,7 @@ fn parse_contributor_id(label: &str) -> Option<i32> {
 async fn resolve_contributors(
     state: &Arc<AppState>,
     contributors: Vec<String>,
+    current_user_id: Option<&str>,
 ) -> Vec<ContributorResponse> {
     let mut resolved = Vec::with_capacity(contributors.len());
 
@@ -184,8 +287,11 @@ async fn resolve_contributors(
         let contributor_id = parse_contributor_id(&contributor).unwrap_or_default();
         let mut entry = ContributorResponse {
             id: contributor_id,
+            user_id: None,
             username: contributor.clone(),
             profile_picture_url: None,
+            is_friend: false,
+            is_online: false,
         };
 
         if let (Some(auth_db), Some(user_db)) = (&state.auth_db, &state.user_db) {
@@ -199,15 +305,48 @@ async fn resolve_contributors(
                 }) {
                     let user_id: String = user.get("id");
                     entry.username = user.get("username");
+                    entry.user_id = Some(user_id.clone());
 
                     if let Ok(profile) =
-                        sqlx::query("SELECT profile_picture_url FROM profiles WHERE id = $1::uuid")
+                        sqlx::query("SELECT profile_picture_url, last_seen_at FROM profiles WHERE id = $1::uuid")
                             .bind(&user_id)
                             .fetch_optional(user_db)
                             .await
                     {
                         if let Some(profile) = profile {
                             entry.profile_picture_url = profile.get("profile_picture_url");
+                            let last_seen_at: Option<chrono::DateTime<chrono::Utc>> =
+                                profile.get("last_seen_at");
+                            entry.is_online = last_seen_at
+                                .map(|seen_at| {
+                                    chrono::Utc::now()
+                                        .signed_duration_since(seen_at)
+                                        .num_seconds()
+                                        <= 120
+                                })
+                                .unwrap_or(false);
+                        }
+                    }
+
+                    if let Some(current_user_id) = current_user_id {
+                        if current_user_id != user_id {
+                            entry.is_friend = sqlx::query_scalar::<_, bool>(
+                                r#"
+                                SELECT EXISTS (
+                                    SELECT 1 FROM friendships
+                                    WHERE status = 'accepted'
+                                    AND (
+                                        (requester_id = $1::uuid AND addressee_id = $2::uuid)
+                                        OR (requester_id = $2::uuid AND addressee_id = $1::uuid)
+                                    )
+                                )
+                                "#,
+                            )
+                            .bind(current_user_id)
+                            .bind(&user_id)
+                            .fetch_one(user_db)
+                            .await
+                            .unwrap_or(false);
                         }
                     }
                 }
@@ -270,12 +409,13 @@ pub async fn create_article_handler(
     validate_create_article_payload(&payload)?;
 
     let mut client = state.wiki_client.clone();
+    let article_content = append_resources_marker(&payload.article_node.content, &payload.resources)?;
 
     let article_node = Some(crate::grpc::wiki::CreateNodeRequest {
         parent_id: payload.article_node.parent_id,
         r#type: payload.article_node.node_type as i32,
         title: payload.article_node.title,
-        content: payload.article_node.content,
+        content: article_content,
         order_index: payload.article_node.order_index,
         metadata: None,
     });
@@ -298,14 +438,20 @@ pub async fn create_article_handler(
         children,
     });
     add_required_auth_header(&mut request, &headers)?;
+    let current_user_id = current_user_id_from_headers(&headers);
+    if let Some(user_id) = current_user_id.as_deref() {
+        touch_user_presence(&state, user_id).await;
+    }
 
     let response = client.create_article(request).await?.into_inner();
-    let contributors = resolve_contributors(&state, response.contributors).await;
+    let contributors =
+        resolve_contributors(&state, response.contributors, current_user_id.as_deref()).await;
+    let (article_node, resources) = map_article_node_with_resources(response.article_node.unwrap());
 
     Ok((
         axum::http::StatusCode::CREATED,
         Json(ArticleResponse {
-            article_node: map_node(response.article_node.unwrap()),
+            article_node,
             sub_articles: response
                 .sub_articles
                 .into_iter()
@@ -325,6 +471,7 @@ pub async fn create_article_handler(
                 })
                 .collect(),
             contributors,
+            resources,
         }),
     ))
 }
@@ -385,11 +532,17 @@ pub async fn get_article_handler(
     let mut client = state.wiki_client.clone();
     let mut request = tonic::Request::new(crate::grpc::wiki::GetArticleRequest { id });
     add_auth_header(&mut request, &headers);
+    let current_user_id = current_user_id_from_headers(&headers);
+    if let Some(user_id) = current_user_id.as_deref() {
+        touch_user_presence(&state, user_id).await;
+    }
 
     let response = client.get_article(request).await?.into_inner();
-    let contributors = resolve_contributors(&state, response.contributors).await;
+    let contributors =
+        resolve_contributors(&state, response.contributors, current_user_id.as_deref()).await;
+    let (article_node, resources) = map_article_node_with_resources(response.article_node.unwrap());
     Ok(Json(ArticleResponse {
-        article_node: map_node(response.article_node.unwrap()),
+        article_node,
         sub_articles: response
             .sub_articles
             .into_iter()
@@ -409,6 +562,7 @@ pub async fn get_article_handler(
             })
             .collect(),
         contributors,
+        resources,
     }))
 }
 
@@ -430,10 +584,15 @@ pub async fn update_node_handler(
     Json(payload): Json<UpdateNodeRequest>,
 ) -> Result<Json<VersionResponse>, AppError> {
     let mut client = state.wiki_client.clone();
+    let content = if let Some(resources) = &payload.resources {
+        append_resources_marker(&payload.content, resources)?
+    } else {
+        payload.content
+    };
     let mut request = tonic::Request::new(crate::grpc::wiki::UpdateNodeRequest {
         node_id: payload.node_id,
         title: payload.title,
-        content: payload.content,
+        content,
         metadata: None,
     });
     add_required_auth_header(&mut request, &headers)?;

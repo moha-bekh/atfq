@@ -1,17 +1,19 @@
 use crate::api::openapi::user::profile::{
-    CreateProfileRequest, PermissionListResponse, ProfileResponse, ReviewRoleRequest,
+    CreateProfileRequest, FriendListResponse, FriendTargetRequest, FriendshipResponse,
+    PermissionListResponse, PresenceResponse, ProfileResponse, ReviewRoleRequest,
     RoleChangeRequest, RoleRequest, RoleRequestEntry, RoleRequestStatusResponse,
     RoleRequestsListResponse, ThemeSchema, UpdateProfileRequest, UpdateThemeRequest,
+    UserSearchResponse, UserSearchResult,
 };
 use crate::error::AppError;
 use crate::state::AppState;
 use axum::{
     Json,
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::HeaderMap,
 };
-use jsonwebtoken::{EncodingKey, Header, encode};
-use serde::Serialize;
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tonic::metadata::MetadataValue;
@@ -23,6 +25,17 @@ struct InternalTokenClaims {
     exp: usize,
     jti: String,
     typ: String,
+}
+
+#[derive(Deserialize)]
+struct AccessTokenClaims {
+    sub: String,
+    typ: String,
+}
+
+#[derive(Deserialize)]
+pub struct UserSearchQuery {
+    q: String,
 }
 
 fn add_auth_header<T>(request: &mut tonic::Request<T>, headers: &HeaderMap) {
@@ -50,6 +63,8 @@ fn map_grpc_profile(p: crate::grpc::user::Profile) -> ProfileResponse {
         }),
         created_at: p.created_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
         updated_at: p.updated_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
+        is_online: p.is_online,
+        last_seen_at: p.last_seen_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
     }
 }
 
@@ -72,6 +87,29 @@ fn make_internal_access_token(user_id: &str) -> Result<String, AppError> {
         &EncodingKey::from_secret(secret.as_ref()),
     )
     .map_err(|e| AppError::Internal(format!("Failed to build internal auth token: {}", e)))
+}
+
+fn current_user_id_from_headers(headers: &HeaderMap) -> Result<String, AppError> {
+    let auth_header = headers
+        .get("authorization")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| AppError::Unauthorized("Missing authorization header".into()))?;
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| AppError::Unauthorized("Expected bearer token".into()))?;
+    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "jwt_secret".to_string());
+    let data = decode::<AccessTokenClaims>(
+        token,
+        &DecodingKey::from_secret(secret.as_ref()),
+        &Validation::default(),
+    )
+    .map_err(|_| AppError::Unauthorized("Invalid or expired access token".into()))?;
+
+    if data.claims.typ != "access" {
+        return Err(AppError::Unauthorized("Expected access token".into()));
+    }
+
+    Ok(data.claims.sub)
 }
 
 async fn resolve_user_identity(
@@ -112,6 +150,35 @@ async fn map_role_request_entry(
         status: e.status,
         rejection_reason: e.rejection_reason,
         updated_at: e.updated_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
+    }
+}
+
+async fn map_friendship_response(
+    state: &Arc<AppState>,
+    friendship: crate::grpc::user::Friendship,
+) -> FriendshipResponse {
+    let (friend_username, friend_email) = resolve_user_identity(state, &friendship.friend_id).await;
+
+    FriendshipResponse {
+        can_accept: friendship.status == "pending" && friendship.addressee_id == friendship.user_id,
+        user_id: friendship.user_id,
+        friend_id: friendship.friend_id,
+        requester_id: friendship.requester_id,
+        addressee_id: friendship.addressee_id,
+        friend_username,
+        friend_email,
+        profile_picture_url: friendship.profile_picture_url,
+        status: friendship.status,
+        is_online: friendship.is_online,
+        last_seen_at: friendship
+            .last_seen_at
+            .map(|t| format!("{}.{}", t.seconds, t.nanos)),
+        created_at: friendship
+            .created_at
+            .map(|t| format!("{}.{}", t.seconds, t.nanos)),
+        accepted_at: friendship
+            .accepted_at
+            .map(|t| format!("{}.{}", t.seconds, t.nanos)),
     }
 }
 
@@ -608,6 +675,255 @@ pub async fn delete_profile_picture_handler(
 
     let response = client.remove_profile_picture(request).await?.into_inner();
     Ok(Json(map_grpc_profile(response)))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/user/presence",
+    operation_id = "touch_presence",
+    responses(
+        (status = 200, description = "Presence updated", body = PresenceResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn touch_presence_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<PresenceResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(());
+    add_auth_header(&mut request, &headers);
+
+    let response = client.touch_presence(request).await?.into_inner();
+    Ok(Json(PresenceResponse {
+        id: response.id,
+        is_online: response.is_online,
+        last_seen_at: response
+            .last_seen_at
+            .map(|t| format!("{}.{}", t.seconds, t.nanos)),
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/user/search",
+    operation_id = "search_users",
+    params(
+        ("q" = String, Query, description = "Username or email search")
+    ),
+    responses(
+        (status = 200, description = "Matching users", body = UserSearchResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn search_users_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<UserSearchQuery>,
+) -> Result<Json<UserSearchResponse>, AppError> {
+    let current_user_id = current_user_id_from_headers(&headers)?;
+    let search = query.q.trim();
+
+    if search.len() < 2 {
+        return Ok(Json(UserSearchResponse { users: Vec::new() }));
+    }
+
+    let Some(auth_db) = &state.auth_db else {
+        return Ok(Json(UserSearchResponse { users: Vec::new() }));
+    };
+
+    let rows = sqlx::query(
+        r#"
+        SELECT id::text AS id, username, email
+        FROM users
+        WHERE id::text <> $1
+        AND (username ILIKE $2 OR email ILIKE $2)
+        ORDER BY username ASC
+        LIMIT 10
+        "#,
+    )
+    .bind(&current_user_id)
+    .bind(format!("%{}%", search))
+    .fetch_all(auth_db)
+    .await
+    .map_err(|e| AppError::Internal(format!("Database error searching users: {}", e)))?;
+
+    use sqlx::Row;
+    let mut users = Vec::with_capacity(rows.len());
+    for row in rows {
+        let id: String = row.get("id");
+        let mut result = UserSearchResult {
+            id: id.clone(),
+            username: row.get("username"),
+            email: row.get("email"),
+            profile_picture_url: None,
+            friendship_status: None,
+            is_friend: false,
+            is_online: false,
+        };
+
+        if let Some(user_db) = &state.user_db {
+            if let Ok(profile) =
+                sqlx::query("SELECT profile_picture_url, last_seen_at FROM profiles WHERE id = $1::uuid")
+                    .bind(&id)
+                    .fetch_optional(user_db)
+                    .await
+            {
+                if let Some(profile) = profile {
+                    result.profile_picture_url = profile.get("profile_picture_url");
+                    let last_seen_at: Option<chrono::DateTime<chrono::Utc>> =
+                        profile.get("last_seen_at");
+                    result.is_online = last_seen_at
+                        .map(|seen_at| {
+                            chrono::Utc::now()
+                                .signed_duration_since(seen_at)
+                                .num_seconds()
+                                <= 120
+                        })
+                        .unwrap_or(false);
+                }
+            }
+
+            if let Ok(friendship) = sqlx::query(
+                r#"
+                SELECT status
+                FROM friendships
+                WHERE
+                    (requester_id = $1::uuid AND addressee_id = $2::uuid)
+                    OR (requester_id = $2::uuid AND addressee_id = $1::uuid)
+                LIMIT 1
+                "#,
+            )
+            .bind(&current_user_id)
+            .bind(&id)
+            .fetch_optional(user_db)
+            .await
+            {
+                if let Some(friendship) = friendship {
+                    let status: String = friendship.get("status");
+                    result.is_friend = status == "accepted";
+                    result.friendship_status = Some(status);
+                }
+            }
+        }
+
+        users.push(result);
+    }
+
+    Ok(Json(UserSearchResponse { users }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/user/friends",
+    operation_id = "list_friends",
+    responses(
+        (status = 200, description = "Friend list", body = FriendListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_friends_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Json<FriendListResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(());
+    add_auth_header(&mut request, &headers);
+
+    let response = client.list_friends(request).await?.into_inner();
+    let mut friends = Vec::with_capacity(response.friends.len());
+    for friendship in response.friends {
+        friends.push(map_friendship_response(&state, friendship).await);
+    }
+
+    Ok(Json(FriendListResponse { friends }))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/user/friends",
+    operation_id = "send_friend_request",
+    request_body = FriendTargetRequest,
+    responses(
+        (status = 200, description = "Friend request created", body = FriendshipResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn send_friend_request_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<FriendTargetRequest>,
+) -> Result<Json<FriendshipResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(crate::grpc::user::FriendTargetRequest {
+        target_id: payload.target_id,
+    });
+    add_auth_header(&mut request, &headers);
+
+    let response = client.send_friend_request(request).await?.into_inner();
+    Ok(Json(map_friendship_response(&state, response).await))
+}
+
+#[utoipa::path(
+    put,
+    path = "/api/v1/user/friends/{target_id}/accept",
+    operation_id = "accept_friend_request",
+    params(
+        ("target_id" = String, Path, description = "Requester user ID")
+    ),
+    responses(
+        (status = 200, description = "Friend request accepted", body = FriendshipResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn accept_friend_request_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(target_id): Path<String>,
+) -> Result<Json<FriendshipResponse>, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(crate::grpc::user::FriendTargetRequest { target_id });
+    add_auth_header(&mut request, &headers);
+
+    let response = client.accept_friend_request(request).await?.into_inner();
+    Ok(Json(map_friendship_response(&state, response).await))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/user/friends/{target_id}",
+    operation_id = "remove_friend",
+    params(
+        ("target_id" = String, Path, description = "Friend user ID")
+    ),
+    responses(
+        (status = 204, description = "Friend removed"),
+        (status = 401, description = "Unauthorized"),
+        (status = 502, description = "Downstream service error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn remove_friend_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(target_id): Path<String>,
+) -> Result<axum::http::StatusCode, AppError> {
+    let mut client = state.user_client.clone();
+    let mut request = tonic::Request::new(crate::grpc::user::FriendTargetRequest { target_id });
+    add_auth_header(&mut request, &headers);
+
+    client.remove_friend(request).await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(

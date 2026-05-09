@@ -29,6 +29,12 @@ service UserService {
     rpc CancelRoleRequest(CancelRoleRequestRequest) returns (RoleRequestStatus);
     rpc ReviewRoleRequest(ReviewRequest) returns (Profile);
     rpc UploadProfilePicture(UploadProfilePictureRequest) returns (Profile);
+
+    rpc TouchPresence(google.protobuf.Empty) returns (Presence);
+    rpc SendFriendRequest(FriendTargetRequest) returns (Friendship);
+    rpc AcceptFriendRequest(FriendTargetRequest) returns (Friendship);
+    rpc RemoveFriend(FriendTargetRequest) returns (google.protobuf.Empty);
+    rpc ListFriends(google.protobuf.Empty) returns (FriendList);
 }
 
 message Profile {
@@ -39,6 +45,8 @@ message Profile {
     Theme theme = 5;
     google.protobuf.Timestamp created_at = 6;
     google.protobuf.Timestamp updated_at = 7;
+    bool is_online = 8;
+    optional google.protobuf.Timestamp last_seen_at = 9;
 }
 
 message Theme {
@@ -131,4 +139,31 @@ message UploadProfilePictureRequest {
     string id = 1;
     bytes image_data = 2;
     string extension = 3;
+}
+
+message Presence {
+    string id = 1;
+    bool is_online = 2;
+    google.protobuf.Timestamp last_seen_at = 3;
+}
+
+message FriendTargetRequest {
+    string target_id = 1;
+}
+
+message Friendship {
+    string user_id = 1;
+    string friend_id = 2;
+    string status = 3;
+    optional string profile_picture_url = 4;
+    bool is_online = 5;
+    optional google.protobuf.Timestamp last_seen_at = 6;
+    google.protobuf.Timestamp created_at = 7;
+    optional google.protobuf.Timestamp accepted_at = 8;
+    string requester_id = 9;
+    string addressee_id = 10;
+}
+
+message FriendList {
+    repeated Friendship friends = 1;
 }

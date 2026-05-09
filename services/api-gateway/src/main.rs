@@ -1,6 +1,7 @@
 mod api;
 mod error;
 mod grpc;
+mod metrics;
 mod state;
 
 use crate::state::AppState;
@@ -24,6 +25,8 @@ async fn optional_pg_pool(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    metrics::init();
+
     let addr = std::env::var("SERVER_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".into());
 
     let auth_client = crate::grpc::auth::connect().await?;

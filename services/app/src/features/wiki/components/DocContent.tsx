@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Article, NodeBreadcrumb } from "../types";
+import type { Article, NodeBreadcrumb, ResourceEntry } from "../types";
 
 export type WikiContentLine = {
   title: string;
@@ -9,8 +9,6 @@ export type WikiContentLine = {
 interface DocContentProps {
   article: Article | null;
   mode: "read" | "edit" | "create";
-  onModeChange: (mode: "read" | "edit" | "create") => void;
-  canContribute: boolean;
   parentOptions: NodeBreadcrumb[];
   onCreate: (data: {
     parentId?: number;
@@ -18,12 +16,14 @@ interface DocContentProps {
     tldr: string;
     notions: WikiContentLine[];
     keyQuestions: WikiContentLine[];
+    resources: ResourceEntry[];
   }) => Promise<void>;
   onEdit: (data: {
     title: string;
     tldr: string;
     notions: WikiContentLine[];
     keyQuestions: WikiContentLine[];
+    resources: ResourceEntry[];
   }) => Promise<void>;
 }
 
@@ -56,16 +56,46 @@ const formatNodeLine = ({ title, content }: { title: string; content: string }) 
   return `${trimmedTitle}: ${trimmedContent}`;
 };
 
-export default function DocContent({ article, mode, onModeChange, canContribute, parentOptions, onCreate, onEdit }: DocContentProps) {
+const parseResourceLines = (value: string): ResourceEntry[] => value
+  .split("\n")
+  .map((line) => line.trim())
+  .filter(Boolean)
+  .map((line) => {
+    const separatorIndex = line.indexOf("|");
+
+    if (separatorIndex === -1) {
+      return { label: line, url: undefined };
+    }
+
+    const label = line.slice(0, separatorIndex).trim();
+    const url = line.slice(separatorIndex + 1).trim();
+
+    return {
+      label: label || url || line,
+      url: url || undefined,
+    };
+  })
+  .filter((resource) => resource.label.trim().length > 0);
+
+const formatResourceLine = (resource: ResourceEntry) => {
+  const label = resource.label.trim();
+  const url = resource.url?.trim();
+
+  return url ? `${label} | ${url}` : label;
+};
+
+export default function DocContent({ article, mode, parentOptions, onCreate, onEdit }: DocContentProps) {
   const [title, setTitle] = useState("");
   const [tldr, setTldr] = useState("");
   const [notions, setNotions] = useState("");
   const [keyQuestions, setKeyQuestions] = useState("");
+  const [resources, setResources] = useState("");
   const [parentId, setParentId] = useState("");
   const [editTitle, setEditTitle] = useState("");
   const [editTldr, setEditTldr] = useState("");
   const [editNotions, setEditNotions] = useState("");
   const [editKeyQuestions, setEditKeyQuestions] = useState("");
+  const [editResources, setEditResources] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -74,6 +104,7 @@ export default function DocContent({ article, mode, onModeChange, canContribute,
       setEditTldr(article.article_node.content || "");
       setEditNotions((article.notions || []).map(formatNodeLine).join("\n"));
       setEditKeyQuestions((article.questions || []).map(formatNodeLine).join("\n"));
+      setEditResources((article.resources || []).map(formatResourceLine).join("\n"));
     }
   }, [article, mode]);
 
@@ -99,8 +130,9 @@ export default function DocContent({ article, mode, onModeChange, canContribute,
     e.preventDefault();
     const parsedNotions = parseContentLines(notions);
     const parsedKeyQuestions = parseContentLines(keyQuestions);
+    const parsedResources = parseResourceLines(resources);
 
-    if (!title.trim() || !tldr.trim() || parsedNotions.length === 0 || parsedKeyQuestions.length === 0) {
+    if (!title.trim() || !tldr.trim() || parsedNotions.length === 0 || parsedKeyQuestions.length === 0 || parsedResources.length === 0) {
       return;
     }
 
@@ -112,11 +144,13 @@ export default function DocContent({ article, mode, onModeChange, canContribute,
         tldr: tldr.trim(),
         notions: parsedNotions,
         keyQuestions: parsedKeyQuestions,
+        resources: parsedResources,
       });
       setTitle("");
       setTldr("");
       setNotions("");
       setKeyQuestions("");
+      setResources("");
       setParentId("");
     } finally {
       setIsSubmitting(false);
@@ -132,6 +166,7 @@ export default function DocContent({ article, mode, onModeChange, canContribute,
         tldr: editTldr,
         notions: parseContentLines(editNotions),
         keyQuestions: parseContentLines(editKeyQuestions),
+        resources: parseResourceLines(editResources),
       });
     } finally {
       setIsSubmitting(false);
@@ -141,32 +176,9 @@ export default function DocContent({ article, mode, onModeChange, canContribute,
   const fieldClass = "rounded-lg border-2 border-sub/30 bg-sub-alt/10 px-4 py-3 font-jakarta text-text outline-none transition-all placeholder:text-text/35 focus:border-main focus:bg-main/5";
   const labelClass = "font-bricolage font-semibold text-sm text-sub uppercase tracking-widest";
   const panelClass = "rounded-lg border border-main/10 bg-sub-alt/5 p-5 shadow-inner";
-  const availableModes: Array<"read" | "edit" | "create"> = canContribute
-    ? ["read", "edit", "create"]
-    : ["read"];
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-8">
-      {/* Tabs */}
-      {canContribute && (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-4">
-            {availableModes.map((m) => (
-              <button
-                key={m}
-                onClick={() => onModeChange(m)}
-                className={`font-bricolage font-semibold text-base transition-colors ${
-                  mode === m ? "text-sub underline underline-offset-4" : "text-sub/60 hover:text-sub"
-                } uppercase`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <div className="h-[1.5px] bg-sub w-full" />
-        </div>
-      )}
-
       {mode === "create" ? (
         <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
           <div className={panelClass}>
@@ -223,6 +235,17 @@ export default function DocContent({ article, mode, onModeChange, canContribute,
               onChange={(e) => setKeyQuestions(e.target.value)}
               placeholder="One required question per line..."
               rows={5}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+              required
+            />
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Resources</label>
+            <textarea
+              value={resources}
+              onChange={(e) => setResources(e.target.value)}
+              placeholder="One required resource per line. Optional URL format: Label | https://example.com"
+              rows={4}
               className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
               required
             />
@@ -309,6 +332,17 @@ export default function DocContent({ article, mode, onModeChange, canContribute,
               onChange={(e) => setEditKeyQuestions(e.target.value)}
               rows={5}
               className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+            />
+          </div>
+          <div className={panelClass}>
+            <label className={labelClass}>Resources</label>
+            <textarea
+              value={editResources}
+              onChange={(e) => setEditResources(e.target.value)}
+              placeholder="One resource per line. Optional URL format: Label | https://example.com"
+              rows={4}
+              className={`${fieldClass} mt-3 w-full min-w-0 resize-none`}
+              required
             />
           </div>
           <button

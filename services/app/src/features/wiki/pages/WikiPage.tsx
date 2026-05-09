@@ -4,6 +4,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import LeftSidebar from "../components/LeftSidebar";
 import DocContent from "../components/DocContent";
 import type { WikiContentLine } from "../components/DocContent";
+import type { ResourceEntry } from "../types";
 import RightSidebar from "../components/RightSidebar";
 import StaticWikiPage, { getStaticWikiPage, STATIC_WIKI_PAGES } from "../components/StaticWikiPage";
 import { useRootArticles, useArticle, useCreateArticle, useCreateNode, useUpdateNode } from "../hooks/useWiki";
@@ -18,6 +19,17 @@ type MobileConceptOption = {
   title: string;
   depth: number;
 };
+
+type SearchTypeFilter = "all" | "root" | "child";
+type SearchSort = "title-asc" | "title-desc";
+type WikiSearchItem = {
+  id: number;
+  title: string;
+  parentTitle?: string;
+  depth: number;
+};
+
+const SEARCH_PAGE_SIZE = 6;
 
 const normalizeTitle = (title: string) => title.trim().toLowerCase();
 
@@ -34,6 +46,10 @@ export default function WikiPage() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [wikiSearchQuery, setWikiSearchQuery] = useState("");
+  const [wikiSearchType, setWikiSearchType] = useState<SearchTypeFilter>("all");
+  const [wikiSearchSort, setWikiSearchSort] = useState<SearchSort>("title-asc");
+  const [wikiSearchPage, setWikiSearchPage] = useState(1);
 
   const { data: rootArticles, isLoading: isLoadingRoots, error: rootError } = useRootArticles();
   const { data: article, isLoading: isLoadingArticle, error: articleError } = useArticle(articleId);
@@ -123,12 +139,14 @@ export default function WikiPage() {
     tldr,
     notions,
     keyQuestions,
+    resources,
   }: {
     parentId?: number;
     title: string;
     tldr: string;
     notions: WikiContentLine[];
     keyQuestions: WikiContentLine[];
+    resources: ResourceEntry[];
   }) => {
     try {
       await createArticle({
@@ -153,6 +171,7 @@ export default function WikiPage() {
             order_index: notions.length + index + 1,
           })),
         ],
+        resources,
       });
       if (parentId) {
         setSearchParams({ id: parentId.toString() });
@@ -176,11 +195,13 @@ export default function WikiPage() {
     tldr,
     notions,
     keyQuestions,
+    resources,
   }: {
     title: string;
     tldr: string;
     notions: WikiContentLine[];
     keyQuestions: WikiContentLine[];
+    resources: ResourceEntry[];
   }) => {
     if (!article?.article_node?.id) return;
 
@@ -189,6 +210,7 @@ export default function WikiPage() {
         node_id: article.article_node.id,
         title,
         content: tldr,
+        resources,
       })];
 
       notions.forEach((notion, index) => {
@@ -269,7 +291,7 @@ export default function WikiPage() {
       })),
     },
     {
-      title: "Articles",
+      title: "Wiki",
       items: (rootArticles?.articles || []).map((root, index) => {
         const rootDetail = rootArticleDetails[index]?.data;
         const children = rootDetail?.sub_articles || [];
@@ -291,6 +313,87 @@ export default function WikiPage() {
       }),
     },
   ];
+
+  const searchableArticles = (() => {
+    const map = new Map<number, WikiSearchItem>();
+
+    (rootArticles?.articles || []).forEach((root, index) => {
+      const rootDetail = rootArticleDetails[index]?.data;
+      map.set(root.id, {
+        id: root.id,
+        title: root.title,
+        depth: 0,
+      });
+
+      (rootDetail?.sub_articles || []).forEach((child) => {
+        map.set(child.id, {
+          id: child.id,
+          title: child.title,
+          parentTitle: root.title,
+          depth: 1,
+        });
+      });
+    });
+
+    if (parentArticle?.article_node) {
+      map.set(parentArticle.article_node.id, {
+        id: parentArticle.article_node.id,
+        title: parentArticle.article_node.title,
+        depth: parentArticle.article_node.parent_id ? 1 : 0,
+      });
+      (parentArticle.sub_articles || []).forEach((child) => {
+        map.set(child.id, {
+          id: child.id,
+          title: child.title,
+          parentTitle: parentArticle.article_node.title,
+          depth: 2,
+        });
+      });
+    }
+
+    if (article?.article_node) {
+      map.set(article.article_node.id, {
+        id: article.article_node.id,
+        title: article.article_node.title,
+        parentTitle: article.article_node.parent_id ? parentArticle?.article_node?.title : undefined,
+        depth: article.article_node.parent_id ? 1 : 0,
+      });
+      (article.sub_articles || []).forEach((child) => {
+        map.set(child.id, {
+          id: child.id,
+          title: child.title,
+          parentTitle: article.article_node.title,
+          depth: 2,
+        });
+      });
+    }
+
+    return Array.from(map.values());
+  })();
+
+  const filteredSearchResults = searchableArticles
+    .filter((item) => {
+      const query = wikiSearchQuery.trim().toLowerCase();
+      const matchesQuery = !query || `${item.title} ${item.parentTitle || ""}`.toLowerCase().includes(query);
+      const matchesType =
+        wikiSearchType === "all" ||
+        (wikiSearchType === "root" && item.depth === 0) ||
+        (wikiSearchType === "child" && item.depth > 0);
+
+      return matchesQuery && matchesType;
+    })
+    .sort((a, b) => {
+      if (wikiSearchSort === "title-desc") return b.title.localeCompare(a.title);
+
+      return a.title.localeCompare(b.title);
+    });
+
+  const searchTotalPages = Math.max(1, Math.ceil(filteredSearchResults.length / SEARCH_PAGE_SIZE));
+  const boundedSearchPage = Math.min(wikiSearchPage, searchTotalPages);
+  const paginatedSearchResults = filteredSearchResults.slice(
+    (boundedSearchPage - 1) * SEARCH_PAGE_SIZE,
+    boundedSearchPage * SEARCH_PAGE_SIZE,
+  );
 
   const parentOptions = (() => {
     const map = new Map<number, NodeBreadcrumb>();
@@ -444,13 +547,39 @@ export default function WikiPage() {
           : "xl:grid-cols-[minmax(220px,280px)_minmax(0,860px)_minmax(220px,280px)]"
       }`}>
         {/* Left Sidebar */}
-        <div className="relative hidden min-w-0 xl:block xl:h-full xl:overflow-y-auto xl:pr-8">
+        <div className="relative hidden min-w-0 xl:flex xl:h-full xl:items-center xl:overflow-hidden xl:pr-12">
           <div className="absolute right-0 top-[10%] hidden h-4/5 w-px bg-sub/45 xl:block" />
-          <LeftSidebar sections={sidebarSections} onItemClick={handleItemClick} />
+          <div className="max-h-full w-full overflow-y-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <LeftSidebar
+              sections={sidebarSections}
+              onItemClick={handleItemClick}
+              search={{
+                query: wikiSearchQuery,
+                type: wikiSearchType,
+                sort: wikiSearchSort,
+                results: paginatedSearchResults,
+                page: boundedSearchPage,
+                totalPages: searchTotalPages,
+                onQueryChange: (value) => {
+                  setWikiSearchQuery(value);
+                  setWikiSearchPage(1);
+                },
+                onTypeChange: (value) => {
+                  setWikiSearchType(value);
+                  setWikiSearchPage(1);
+                },
+                onSortChange: (value) => {
+                  setWikiSearchSort(value);
+                  setWikiSearchPage(1);
+                },
+                onPageChange: setWikiSearchPage,
+              }}
+            />
+          </div>
         </div>
 
         {/* Main Content */}
-        <div className="min-w-0 w-full xl:h-full xl:overflow-y-auto xl:px-8">
+        <div className="min-w-0 w-full xl:h-full xl:overflow-y-auto xl:px-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {staticPage ? (
             <StaticWikiPage page={staticPage} />
           ) : isLoadingArticle ? (
@@ -459,8 +588,6 @@ export default function WikiPage() {
             <DocContent 
               article={article || null} 
               mode={mode} 
-              onModeChange={setMode}
-              canContribute={canContribute}
               parentOptions={parentOptions}
               onCreate={handleCreate}
               onEdit={handleEdit}
@@ -469,13 +596,18 @@ export default function WikiPage() {
         </div>
 
         {!staticPage && article && (
-          <div className="relative min-w-0 border-t border-sub/30 pt-6 xl:h-full xl:overflow-y-auto xl:border-t-0 xl:pl-8 xl:pt-0">
+          <div className="relative min-w-0 border-t border-sub/30 pt-6 xl:flex xl:h-full xl:items-center xl:overflow-hidden xl:border-t-0 xl:pl-8 xl:pt-0">
             <div className="absolute left-0 top-[10%] hidden h-4/5 w-px bg-sub/45 xl:block" />
-            <RightSidebar
-              article={article}
-              conceptLinks={rightConceptLinks}
-              onItemClick={handleItemClick}
-            />
+            <div className="max-h-full w-full overflow-y-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <RightSidebar
+                article={article}
+                conceptLinks={rightConceptLinks}
+                onItemClick={handleItemClick}
+                mode={mode}
+                canContribute={canContribute}
+                onModeChange={setMode}
+              />
+            </div>
           </div>
         )}
       </div>

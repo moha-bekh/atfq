@@ -7,6 +7,7 @@ import { Home } from "@/pages/Home";
 import ProfilePage from "@/pages/user/Profile";
 import DashboardPage from "@/pages/admin/Dashboard";
 import WikiPage from "@/features/wiki/pages/WikiPage";
+import { PrivacyPage, TermsPage } from "@/pages/legal/LegalPages";
 
 export function AppRouter() {
   return (
@@ -15,6 +16,8 @@ export function AppRouter() {
         <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />
           <Route path="/wiki" element={<WikiPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/profile" element={<ProfilePage />} />

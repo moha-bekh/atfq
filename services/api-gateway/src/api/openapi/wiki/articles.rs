@@ -64,10 +64,17 @@ pub struct CreateNodeRequest {
     pub order_index: i32,
 }
 
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct ResourceEntry {
+    pub label: String,
+    pub url: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct CreateArticleRequest {
     pub article_node: CreateNodeRequest,
     pub children: Vec<CreateNodeRequest>,
+    pub resources: Vec<ResourceEntry>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -75,6 +82,7 @@ pub struct UpdateNodeRequest {
     pub node_id: i32,
     pub title: String,
     pub content: String,
+    pub resources: Option<Vec<ResourceEntry>>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -93,8 +101,11 @@ pub struct ModerateVersionRequest {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ContributorResponse {
     pub id: i32,
+    pub user_id: Option<String>,
     pub username: String,
     pub profile_picture_url: Option<String>,
+    pub is_friend: bool,
+    pub is_online: bool,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -105,6 +116,7 @@ pub struct ArticleResponse {
     pub questions: Vec<NodeResponse>,
     pub lineage: Vec<NodeBreadcrumbResponse>,
     pub contributors: Vec<ContributorResponse>,
+    pub resources: Vec<ResourceEntry>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

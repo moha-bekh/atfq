@@ -6,6 +6,9 @@ import type {
   RoleChangeRequest,
   ReviewRoleRequest,
   RoleRequestsListResponse,
+  FriendListResponse,
+  Friendship,
+  UserSearchResponse,
 } from '../types';
 
 export const userApi = {
@@ -65,5 +68,29 @@ export const userApi = {
 
   listPermissions: async (): Promise<{ permissions: string[] }> => {
     return await api.get('user/permissions').json();
+  },
+
+  touchPresence: async (): Promise<{ id: string; is_online: boolean; last_seen_at?: string }> => {
+    return await api.post('user/presence').json();
+  },
+
+  listFriends: async (): Promise<FriendListResponse> => {
+    return await api.get('user/friends').json();
+  },
+
+  searchUsers: async (query: string): Promise<UserSearchResponse> => {
+    return await api.get('user/search', { searchParams: { q: query } }).json();
+  },
+
+  sendFriendRequest: async (targetId: string): Promise<Friendship> => {
+    return await api.post('user/friends', { json: { target_id: targetId } }).json();
+  },
+
+  acceptFriendRequest: async (targetId: string): Promise<Friendship> => {
+    return await api.put(`user/friends/${targetId}/accept`).json();
+  },
+
+  removeFriend: async (targetId: string): Promise<void> => {
+    await api.delete(`user/friends/${targetId}`);
   }
 };

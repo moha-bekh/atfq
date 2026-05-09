@@ -27,6 +27,23 @@ export const useProfile = () => {
     enabled: !!user?.id && !!accessToken,
   });
 
+  const friendsQuery = useQuery({
+    queryKey: ['friends', user?.id],
+    queryFn: () => userApi.listFriends(),
+    enabled: !!user?.id && !!accessToken,
+  });
+
+  useEffect(() => {
+    if (!user?.id || !accessToken) return;
+
+    userApi.touchPresence().catch(() => undefined);
+    const interval = window.setInterval(() => {
+      userApi.touchPresence().catch(() => undefined);
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
+  }, [user?.id, accessToken]);
+
   useEffect(() => {
     if (profileQuery.data) {
       useAppStore.getState().setProfile(profileQuery.data);
@@ -89,6 +106,28 @@ export const useProfile = () => {
     },
   });
 
+  const acceptFriendRequestMutation = useMutation({
+    mutationFn: (targetId: string) => userApi.acceptFriendRequest(targetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
+    },
+  });
+
+  const sendFriendRequestMutation = useMutation({
+    mutationFn: (targetId: string) => userApi.sendFriendRequest(targetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['user-search'] });
+    },
+  });
+
+  const removeFriendMutation = useMutation({
+    mutationFn: (targetId: string) => userApi.removeFriend(targetId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['friends', user?.id] });
+    },
+  });
+
   const deleteProfileMutation = useMutation({
     mutationFn: () => userApi.deleteProfile(),
     onSuccess: () => {
@@ -106,12 +145,18 @@ export const useProfile = () => {
     isPermissionsError: availablePermissionsQuery.isError,
     permissionsError: availablePermissionsQuery.error,
     roleRequests: roleRequestsQuery.data?.requests ?? [],
+    friends: friendsQuery.data?.friends ?? [],
     isRoleRequestsLoading: roleRequestsQuery.isLoading,
     isRoleRequestsError: roleRequestsQuery.isError,
+    isFriendsLoading: friendsQuery.isLoading,
+    isFriendsError: friendsQuery.isError,
     isUploading: uploadPictureMutation.isPending,
     isRequestingRole: roleRequestMutation.isPending,
     isCancelingRoleRequest: cancelRoleRequestMutation.isPending,
     isLeavingRole: leaveRoleMutation.isPending,
+    isAcceptingFriend: acceptFriendRequestMutation.isPending,
+    isSendingFriendRequest: sendFriendRequestMutation.isPending,
+    isRemovingFriend: removeFriendMutation.isPending,
     uploadError: uploadPictureMutation.error,
     updateProfile: updateProfileMutation.mutateAsync,
     updateTheme: updateThemeMutation.mutateAsync,
@@ -120,6 +165,9 @@ export const useProfile = () => {
     requestRole: roleRequestMutation.mutateAsync,
     cancelRoleRequest: cancelRoleRequestMutation.mutateAsync,
     leaveRole: leaveRoleMutation.mutateAsync,
+    sendFriendRequest: sendFriendRequestMutation.mutateAsync,
+    acceptFriendRequest: acceptFriendRequestMutation.mutateAsync,
+    removeFriend: removeFriendMutation.mutateAsync,
     deleteProfile: deleteProfileMutation.mutateAsync,
   };
 };

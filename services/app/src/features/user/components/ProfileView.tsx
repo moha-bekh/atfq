@@ -8,10 +8,12 @@ import { useAuthManagement } from '@/features/auth/hooks/useAuthManagement';
 import { useOAuth } from '@/features/auth/hooks/useOAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { userApi } from '@/features/user/api';
+import type { UserSearchResult } from '@/features/user/types';
 import { GoogleCircle } from '@/assets/icons/GoogleCircle';
 import { GithubCircle } from '@/assets/icons/GithubCircle';
 
-type Section = 'auth' | 'roles' | 'appearance';
+type Section = 'auth' | 'roles' | 'friends' | 'appearance';
 type RoleRequestFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'canceled';
 type UsernameForm = { username: string };
 type EmailForm = { newEmail: string };
@@ -157,18 +159,27 @@ export const ProfileView = () => {
     isPermissionsLoading,
     isPermissionsError,
     roleRequests,
+    friends,
     isRoleRequestsLoading,
     isRoleRequestsError,
+    isFriendsLoading,
+    isFriendsError,
     isUploading,
     isRequestingRole,
     isCancelingRoleRequest,
     isLeavingRole,
+    isAcceptingFriend,
+    isSendingFriendRequest,
+    isRemovingFriend,
     updateTheme: updateThemeApi, 
     uploadPicture, 
     removePicture,
     requestRole, 
     cancelRoleRequest,
     leaveRole,
+    sendFriendRequest,
+    acceptFriendRequest,
+    removeFriend,
   } = useProfile();
 
   const {
@@ -212,6 +223,9 @@ export const ProfileView = () => {
   const [roleRequestFilter, setRoleRequestFilter] = useState<RoleRequestFilter>('all');
   const [visibleRoleRequestCount, setVisibleRoleRequestCount] = useState(ROLE_REQUEST_PAGE_SIZE);
   const [isPhotoMenuOpen, setIsPhotoMenuOpen] = useState(false);
+  const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [friendSearchResults, setFriendSearchResults] = useState<UserSearchResult[]>([]);
+  const [isSearchingFriends, setIsSearchingFriends] = useState(false);
   const [cancelRequestTarget, setCancelRequestTarget] = useState<{
     requestId: string;
     role: string;
@@ -228,7 +242,7 @@ export const ProfileView = () => {
   const [status, setStatus] = useState<{
     type: 'success' | 'error';
     message: string;
-    target: 'username' | 'email' | 'password' | 'mfa' | 'account' | 'role';
+    target: 'username' | 'email' | 'password' | 'mfa' | 'account' | 'role' | 'friends';
   } | null>(null);
 
   useEffect(() => {
@@ -281,6 +295,7 @@ export const ProfileView = () => {
   const navItems = [
     { id: 'auth', label: 'Authentication' },
     { id: 'roles', label: 'Roles & Access' },
+    { id: 'friends', label: 'Friends' },
     { id: 'appearance', label: 'Interface' },
   ] as const;
 
@@ -429,6 +444,26 @@ export const ProfileView = () => {
     } catch (error) {
       const message = await getApiErrorMessage(error, 'Role request failed');
       setStatus({ type: 'error', message, target: 'role' });
+    }
+  };
+
+  const onSearchFriends = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const query = friendSearchQuery.trim();
+
+    if (query.length < 2) {
+      setFriendSearchResults([]);
+      return;
+    }
+
+    setIsSearchingFriends(true);
+    try {
+      const result = await userApi.searchUsers(query);
+      setFriendSearchResults(result.users);
+    } catch {
+      setStatus({ type: 'error', message: 'Unable to search users', target: 'friends' });
+    } finally {
+      setIsSearchingFriends(false);
     }
   };
 
@@ -1048,6 +1083,161 @@ export const ProfileView = () => {
                           </Button>
                         )}
                       </>
+                    )}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* SECTION: FRIENDS (USER SERVICE) */}
+            {activeSection === 'friends' && (
+              <div className="space-y-12">
+                <section>
+                  <h3 className="text-xl font-display font-bold text-text mb-8 italic tracking-tight">Friends Presence</h3>
+                  {status?.target === 'friends' && <StatusDisplay type={status.type} message={status.message} />}
+                  <form onSubmit={onSearchFriends} className="mb-8 grid gap-3 rounded-lg border border-main/10 bg-sub-alt/5 p-4 sm:p-5">
+                    <Input
+                      label="Find users"
+                      value={friendSearchQuery}
+                      onChange={(event) => setFriendSearchQuery(event.target.value)}
+                      placeholder="Search by username or email"
+                    />
+                    <div className="flex justify-end">
+                      <Button type="submit" variant="outline" disabled={isSearchingFriends || friendSearchQuery.trim().length < 2}>
+                        {isSearchingFriends ? 'Searching...' : 'Search'}
+                      </Button>
+                    </div>
+                    {friendSearchResults.length > 0 && (
+                      <div className="grid gap-3 border-t border-main/10 pt-4">
+                        {friendSearchResults.map((result) => {
+                          const alreadyPending = result.friendship_status === 'pending';
+                          const alreadyAccepted = result.friendship_status === 'accepted';
+
+                          return (
+                            <div key={result.id} className="flex flex-col gap-3 rounded-lg border border-main/10 bg-bg/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="flex min-w-0 items-center gap-3">
+                                {result.profile_picture_url ? (
+                                  <img src={result.profile_picture_url} alt={result.username} className="h-9 w-9 rounded-lg border border-sub/30 object-cover" />
+                                ) : (
+                                  <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-sub/30 bg-main/10 text-sm font-bold text-main">
+                                    {result.username[0]?.toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-bold text-text">{result.username}</p>
+                                  <p className="truncate text-[10px] font-mono text-sub">{result.email}</p>
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isSendingFriendRequest || alreadyPending || alreadyAccepted}
+                                onClick={async () => {
+                                  try {
+                                    await sendFriendRequest(result.id);
+                                    setFriendSearchResults((items) => items.map((item) => (
+                                      item.id === result.id ? { ...item, friendship_status: 'pending' } : item
+                                    )));
+                                    setStatus({ type: 'success', message: 'Friend request sent', target: 'friends' });
+                                  } catch {
+                                    setStatus({ type: 'error', message: 'Unable to send friend request', target: 'friends' });
+                                  }
+                                }}
+                                className="text-[10px] uppercase tracking-widest"
+                              >
+                                {alreadyAccepted ? 'Friend' : alreadyPending ? 'Pending' : 'Add'}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </form>
+                  <div className="grid gap-4">
+                    {isFriendsLoading ? (
+                      <div className="p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg text-[10px] text-sub uppercase font-bold tracking-widest animate-pulse">
+                        Loading friends...
+                      </div>
+                    ) : isFriendsError ? (
+                      <div className="p-4 sm:p-6 bg-error/5 border border-error/20 rounded-lg text-[10px] text-error uppercase font-bold tracking-widest">
+                        Unable to load friends
+                      </div>
+                    ) : friends.length === 0 ? (
+                      <div className="p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg text-[10px] text-sub uppercase font-bold tracking-widest">
+                        No friends yet. Add contributors from wiki pages.
+                      </div>
+                    ) : (
+                      friends.map((friend) => {
+                        const label = friend.friend_username || friend.friend_email || friend.friend_id;
+                        const isAccepted = friend.status.toLowerCase() === 'accepted';
+
+                        return (
+                          <article key={friend.friend_id} className="flex flex-col gap-4 rounded-lg border border-main/10 bg-sub-alt/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 items-center gap-3">
+                              {friend.profile_picture_url ? (
+                                <img src={friend.profile_picture_url} alt={label} className="h-10 w-10 rounded-lg border border-sub/30 object-cover" />
+                              ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-sub/30 bg-main/10 text-sm font-bold text-main">
+                                  {label[0]?.toUpperCase()}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-text">{label}</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <span className={`h-2 w-2 rounded-full ${friend.is_online ? 'bg-main' : 'bg-sub/40'}`} />
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-sub">
+                                    {friend.is_online ? 'online' : 'offline'}
+                                  </span>
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-sub/70">
+                                    {friend.status}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                              {friend.can_accept && (
+                                <Button
+                                  type="button"
+                                  variant="primary"
+                                  disabled={isAcceptingFriend}
+                                  onClick={async () => {
+                                    try {
+                                      await acceptFriendRequest(friend.friend_id);
+                                      setStatus({ type: 'success', message: 'Friend request accepted', target: 'friends' });
+                                    } catch {
+                                      setStatus({ type: 'error', message: 'Unable to accept friend request', target: 'friends' });
+                                    }
+                                  }}
+                                  className="text-[10px] uppercase tracking-widest"
+                                >
+                                  Accept
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isRemovingFriend}
+                                onClick={async () => {
+                                  try {
+                                    await removeFriend(friend.friend_id);
+                                    setStatus({
+                                      type: 'success',
+                                      message: isAccepted ? 'Friend removed' : 'Friend request removed',
+                                      target: 'friends',
+                                    });
+                                  } catch {
+                                    setStatus({ type: 'error', message: 'Unable to remove friend', target: 'friends' });
+                                  }
+                                }}
+                                className="border-error/40 text-error hover:bg-error/10 text-[10px] uppercase tracking-widest"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </article>
+                        );
+                      })
                     )}
                   </div>
                 </section>

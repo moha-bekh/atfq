@@ -25,10 +25,15 @@ pub mod user {
 use user::v1::user_service_server::{UserService, UserServiceServer};
 use user::v1::{
     CancelRoleRequestRequest, CreateProfileRequest, DeleteProfileRequest, GetProfileRequest,
-    HelloRequest, HelloResponse, LeaveRoleRequest, PermissionList, Profile, ReviewRequest,
-    RoleChangeRequest, RoleRequest, RoleRequestStatus, RoleRequestsList, Theme,
-    UpdateProfileRequest, UpdateThemeRequest, UploadProfilePictureRequest,
+    FriendList, FriendTargetRequest, Friendship, HelloRequest, HelloResponse, LeaveRoleRequest,
+    PermissionList, Presence, Profile, ReviewRequest, RoleChangeRequest, RoleRequest,
+    RoleRequestStatus, RoleRequestsList, Theme, UpdateProfileRequest, UpdateThemeRequest,
+    UploadProfilePictureRequest,
 };
+
+mod metrics;
+
+const ONLINE_WINDOW_SECONDS: i64 = 120;
 
 // --- AUTH LOGIC ---
 
@@ -186,7 +191,7 @@ impl MyUserService {
         let row = sqlx::query(
             r#"
             SELECT 
-                p.id, p.profile_picture_url, p.theme, p.created_at, p.updated_at,
+                p.id, p.profile_picture_url, p.theme, p.created_at, p.updated_at, p.last_seen_at,
                 COALESCE(array_agg(DISTINCT pr.role_name) FILTER (WHERE pr.role_name IS NOT NULL), '{}') as roles,
                 COALESCE(array_agg(DISTINCT rp.permission_slug) FILTER (WHERE rp.permission_slug IS NOT NULL), '{}') as permissions
             FROM profiles p
@@ -269,6 +274,85 @@ impl MyUserService {
 
         Ok(())
     }
+
+    async fn touch_presence_for(&self, user_id: Uuid) -> Result<Presence, Status> {
+        self.ensure_profile_exists(user_id).await?;
+
+        let row = sqlx::query(
+            r#"
+            UPDATE profiles
+            SET last_seen_at = NOW(), updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, last_seen_at
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error updating presence: {}", e)))?;
+
+        use sqlx::Row;
+        let id: Uuid = row.get("id");
+        let last_seen_at: chrono::DateTime<chrono::Utc> = row.get("last_seen_at");
+
+        Ok(Presence {
+            id: id.to_string(),
+            is_online: true,
+            last_seen_at: Some(timestamp_from_datetime(last_seen_at)),
+        })
+    }
+
+    async fn find_friendship(
+        &self,
+        user_id: Uuid,
+        friend_id: Uuid,
+    ) -> Result<Option<Friendship>, Status> {
+        let row = sqlx::query(
+            r#"
+            SELECT
+                f.requester_id,
+                f.addressee_id,
+                f.status,
+                f.created_at,
+                f.accepted_at,
+                p.profile_picture_url,
+                p.last_seen_at
+            FROM friendships f
+            JOIN profiles p ON p.id = CASE
+                WHEN f.requester_id = $1 THEN f.addressee_id
+                ELSE f.requester_id
+            END
+            WHERE
+                (f.requester_id = $1 AND f.addressee_id = $2)
+                OR (f.requester_id = $2 AND f.addressee_id = $1)
+            "#,
+        )
+        .bind(user_id)
+        .bind(friend_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error fetching friendship: {}", e)))?;
+
+        row.map(|row| map_row_to_friendship(row, user_id)).transpose()
+    }
+}
+
+fn timestamp_from_datetime(value: chrono::DateTime<chrono::Utc>) -> prost_types::Timestamp {
+    prost_types::Timestamp {
+        seconds: value.timestamp(),
+        nanos: value.timestamp_subsec_nanos() as i32,
+    }
+}
+
+fn is_online(last_seen_at: Option<chrono::DateTime<chrono::Utc>>) -> bool {
+    last_seen_at
+        .map(|seen_at| {
+            chrono::Utc::now()
+                .signed_duration_since(seen_at)
+                .num_seconds()
+                <= ONLINE_WINDOW_SECONDS
+        })
+        .unwrap_or(false)
 }
 
 fn map_row_to_profile(row: sqlx::postgres::PgRow) -> Result<Profile, Status> {
@@ -278,6 +362,7 @@ fn map_row_to_profile(row: sqlx::postgres::PgRow) -> Result<Profile, Status> {
     let theme_json: serde_json::Value = row.get("theme");
     let created_at: chrono::DateTime<chrono::Utc> = row.get("created_at");
     let updated_at: chrono::DateTime<chrono::Utc> = row.get("updated_at");
+    let last_seen_at: Option<chrono::DateTime<chrono::Utc>> = row.get("last_seen_at");
 
     let roles: Vec<String> = row.try_get("roles").unwrap_or_default();
     let permissions: Vec<String> = row.try_get("permissions").unwrap_or_default();
@@ -313,10 +398,40 @@ fn map_row_to_profile(row: sqlx::postgres::PgRow) -> Result<Profile, Status> {
             seconds: created_at.timestamp(),
             nanos: created_at.timestamp_subsec_nanos() as i32,
         }),
-        updated_at: Some(prost_types::Timestamp {
-            seconds: updated_at.timestamp(),
-            nanos: updated_at.timestamp_subsec_nanos() as i32,
-        }),
+        updated_at: Some(timestamp_from_datetime(updated_at)),
+        is_online: is_online(last_seen_at),
+        last_seen_at: last_seen_at.map(timestamp_from_datetime),
+    })
+}
+
+fn map_row_to_friendship(
+    row: sqlx::postgres::PgRow,
+    current_user_id: Uuid,
+) -> Result<Friendship, Status> {
+    use sqlx::Row;
+
+    let requester_id: Uuid = row.get("requester_id");
+    let addressee_id: Uuid = row.get("addressee_id");
+    let friend_id = if requester_id == current_user_id {
+        addressee_id
+    } else {
+        requester_id
+    };
+    let created_at: chrono::DateTime<chrono::Utc> = row.get("created_at");
+    let accepted_at: Option<chrono::DateTime<chrono::Utc>> = row.get("accepted_at");
+    let last_seen_at: Option<chrono::DateTime<chrono::Utc>> = row.get("last_seen_at");
+
+    Ok(Friendship {
+        user_id: current_user_id.to_string(),
+        friend_id: friend_id.to_string(),
+        status: row.get("status"),
+        profile_picture_url: row.get("profile_picture_url"),
+        is_online: is_online(last_seen_at),
+        last_seen_at: last_seen_at.map(timestamp_from_datetime),
+        created_at: Some(timestamp_from_datetime(created_at)),
+        accepted_at: accepted_at.map(timestamp_from_datetime),
+        requester_id: requester_id.to_string(),
+        addressee_id: addressee_id.to_string(),
     })
 }
 
@@ -874,6 +989,154 @@ impl UserService for MyUserService {
         Ok(Response::new(self.fetch_full_profile(user_id).await?))
     }
 
+    async fn touch_presence(&self, request: Request<()>) -> Result<Response<Presence>, Status> {
+        let user_id = self.get_user_id(&request)?;
+        Ok(Response::new(self.touch_presence_for(user_id).await?))
+    }
+
+    async fn send_friend_request(
+        &self,
+        request: Request<FriendTargetRequest>,
+    ) -> Result<Response<Friendship>, Status> {
+        let user_id = self.get_user_id(&request)?;
+        let req = request.into_inner();
+        let target_id = Uuid::parse_str(&req.target_id)
+            .map_err(|_| Status::invalid_argument("Invalid target UUID format"))?;
+
+        if user_id == target_id {
+            return Err(Status::invalid_argument("You cannot add yourself as a friend"));
+        }
+
+        self.ensure_profile_exists(user_id).await?;
+        self.ensure_profile_exists(target_id).await?;
+        self.touch_presence_for(user_id).await?;
+
+        if let Some(existing) = self.find_friendship(user_id, target_id).await? {
+            return Ok(Response::new(existing));
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO friendships (requester_id, addressee_id, status)
+            VALUES ($1, $2, 'pending')
+            "#,
+        )
+        .bind(user_id)
+        .bind(target_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error creating friendship: {}", e)))?;
+
+        let friendship = self
+            .find_friendship(user_id, target_id)
+            .await?
+            .ok_or_else(|| Status::internal("Friendship was not created"))?;
+
+        Ok(Response::new(friendship))
+    }
+
+    async fn accept_friend_request(
+        &self,
+        request: Request<FriendTargetRequest>,
+    ) -> Result<Response<Friendship>, Status> {
+        let user_id = self.get_user_id(&request)?;
+        let req = request.into_inner();
+        let requester_id = Uuid::parse_str(&req.target_id)
+            .map_err(|_| Status::invalid_argument("Invalid target UUID format"))?;
+
+        self.ensure_profile_exists(user_id).await?;
+        self.touch_presence_for(user_id).await?;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE friendships
+            SET status = 'accepted', accepted_at = NOW()
+            WHERE requester_id = $1 AND addressee_id = $2 AND status = 'pending'
+            "#,
+        )
+        .bind(requester_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error accepting friendship: {}", e)))?;
+
+        if result.rows_affected() == 0 {
+            return Err(Status::not_found("Pending friend request not found"));
+        }
+
+        let friendship = self
+            .find_friendship(user_id, requester_id)
+            .await?
+            .ok_or_else(|| Status::internal("Friendship was not found after accepting"))?;
+
+        Ok(Response::new(friendship))
+    }
+
+    async fn remove_friend(
+        &self,
+        request: Request<FriendTargetRequest>,
+    ) -> Result<Response<()>, Status> {
+        let user_id = self.get_user_id(&request)?;
+        let req = request.into_inner();
+        let target_id = Uuid::parse_str(&req.target_id)
+            .map_err(|_| Status::invalid_argument("Invalid target UUID format"))?;
+
+        self.touch_presence_for(user_id).await?;
+
+        sqlx::query(
+            r#"
+            DELETE FROM friendships
+            WHERE
+                (requester_id = $1 AND addressee_id = $2)
+                OR (requester_id = $2 AND addressee_id = $1)
+            "#,
+        )
+        .bind(user_id)
+        .bind(target_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error removing friendship: {}", e)))?;
+
+        Ok(Response::new(()))
+    }
+
+    async fn list_friends(&self, request: Request<()>) -> Result<Response<FriendList>, Status> {
+        let user_id = self.get_user_id(&request)?;
+        self.ensure_profile_exists(user_id).await?;
+        self.touch_presence_for(user_id).await?;
+
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                f.requester_id,
+                f.addressee_id,
+                f.status,
+                f.created_at,
+                f.accepted_at,
+                p.profile_picture_url,
+                p.last_seen_at
+            FROM friendships f
+            JOIN profiles p ON p.id = CASE
+                WHEN f.requester_id = $1 THEN f.addressee_id
+                ELSE f.requester_id
+            END
+            WHERE f.requester_id = $1 OR f.addressee_id = $1
+            ORDER BY f.created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| Status::internal(format!("Database error listing friends: {}", e)))?;
+
+        let friends = rows
+            .into_iter()
+            .map(|row| map_row_to_friendship(row, user_id))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Response::new(FriendList { friends }))
+    }
+
     async fn upload_profile_picture(
         &self,
         request: Request<UploadProfilePictureRequest>,
@@ -979,6 +1242,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let auth_layer = AuthLayer::new(jwt_secret);
 
     println!("UserService listening on {}", addr);
+
+    let metrics_addr = env::var("METRICS_ADDR").unwrap_or_else(|_| "0.0.0.0:9091".to_string());
+    tokio::spawn(async move {
+        if let Err(error) = metrics::serve("user", metrics_addr).await {
+            eprintln!("Metrics endpoint failed: {error}");
+        }
+    });
 
     Server::builder()
         .layer(auth_layer)

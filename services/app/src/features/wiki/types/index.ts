@@ -33,15 +33,22 @@ export interface CreateNodeRequest {
   order_index: number;
 }
 
+export interface ResourceEntry {
+  label: string;
+  url?: string | null;
+}
+
 export interface UpdateNodeRequest {
   node_id: number;
   title: string;
   content: string;
+  resources?: ResourceEntry[];
 }
 
 export interface CreateArticleRequest {
   article_node: CreateNodeRequest;
   children: CreateNodeRequest[];
+  resources: ResourceEntry[];
 }
 
 export interface Version {
@@ -62,12 +69,16 @@ export interface Article {
   questions: Node[];
   lineage: NodeBreadcrumb[];
   contributors: Contributor[];
+  resources: ResourceEntry[];
 }
 
 export interface Contributor {
   id: number;
+  user_id?: string | null;
   username: string;
   profile_picture_url?: string | null;
+  is_friend?: boolean;
+  is_online?: boolean;
 }
 
 export interface GetRootArticlesResponse {

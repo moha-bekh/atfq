@@ -13,6 +13,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://atfq:atfq@db-user:5432/atfq_db
       - SERVER_ADDR=0.0.0.0:8080
+      - METRICS_ADDR=0.0.0.0:9091
       - JWT_SECRET=jwt_secret
       - S3_ENDPOINT=http://minio-user:9000
       - S3_PUBLIC_URL=http://localhost:9000

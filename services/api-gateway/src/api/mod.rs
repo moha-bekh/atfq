@@ -1,5 +1,5 @@
 use crate::state::AppState;
-use axum::{Router, extract::DefaultBodyLimit, http::Method};
+use axum::{Router, extract::DefaultBodyLimit, http::Method, routing::get};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::OpenApi;
@@ -22,6 +22,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .merge(
             SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi::ApiDoc::openapi()),
         )
+        .route("/metrics", get(crate::metrics::handler))
         .nest("/api/v1", v1_routes(state))
         .layer(cors)
         .layer(DefaultBodyLimit::max(5 * 1024 * 1024))

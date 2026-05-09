@@ -10,6 +10,8 @@ pub struct ProfileResponse {
     pub theme: Option<ThemeSchema>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
+    pub is_online: bool,
+    pub last_seen_at: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -93,4 +95,54 @@ pub struct ReviewRoleRequest {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct CancelRoleRequest {
     pub request_id: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct FriendTargetRequest {
+    pub target_id: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct FriendshipResponse {
+    pub user_id: String,
+    pub friend_id: String,
+    pub requester_id: String,
+    pub addressee_id: String,
+    pub friend_username: Option<String>,
+    pub friend_email: Option<String>,
+    pub profile_picture_url: Option<String>,
+    pub status: String,
+    pub can_accept: bool,
+    pub is_online: bool,
+    pub last_seen_at: Option<String>,
+    pub created_at: Option<String>,
+    pub accepted_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct FriendListResponse {
+    pub friends: Vec<FriendshipResponse>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct PresenceResponse {
+    pub id: String,
+    pub is_online: bool,
+    pub last_seen_at: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserSearchResult {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub profile_picture_url: Option<String>,
+    pub friendship_status: Option<String>,
+    pub is_friend: bool,
+    pub is_online: bool,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserSearchResponse {
+    pub users: Vec<UserSearchResult>,
 }

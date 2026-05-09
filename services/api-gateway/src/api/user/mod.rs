@@ -11,6 +11,7 @@ pub mod profile;
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/say-hello", post(hello::say_hello_handler))
+        .route("/search", get(profile::search_users_handler))
         .route("/profile", post(profile::create_profile_handler))
         .route("/profile/:id", get(profile::get_profile_handler))
         .route("/profile", put(profile::update_profile_handler))
@@ -29,6 +30,14 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/profile/picture",
             delete(profile::delete_profile_picture_handler),
         )
+        .route("/presence", post(profile::touch_presence_handler))
+        .route("/friends", get(profile::list_friends_handler))
+        .route("/friends", post(profile::send_friend_request_handler))
+        .route(
+            "/friends/:target_id/accept",
+            put(profile::accept_friend_request_handler),
+        )
+        .route("/friends/:target_id", delete(profile::remove_friend_handler))
         .route("/permissions", get(profile::list_permissions_handler))
         .route("/role-requests", post(profile::create_role_request_handler))
         .route("/role-requests", get(profile::list_role_requests_handler))
