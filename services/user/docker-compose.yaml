@@ -73,8 +73,9 @@ services:
           "pg_isready -U $(cat /vault/secrets/POSTGRES_USER) -d $(cat /vault/secrets/POSTGRES_DB)",
         ]
       interval: 5s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 60
+      start_period: 2m
   minio:
     image: minio/minio
     container_name: minio-user
@@ -166,5 +167,6 @@ services:
           "test -s /vault/secrets/.env && test -s /vault/secrets/POSTGRES_USER && test -s /vault/secrets/POSTGRES_PASSWORD && test -s /vault/secrets/POSTGRES_DB && test -s /vault/secrets/MINIO_ROOT_USER && test -s /vault/secrets/MINIO_ROOT_PASSWORD && test -s /vault/secrets/S3_BUCKET",
         ]
       interval: 5s
-      timeout: 5s
-      retries: 12
+      timeout: 10s
+      retries: 120
+      start_period: 2m

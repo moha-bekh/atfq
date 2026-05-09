@@ -78,8 +78,9 @@ services:
           "pg_isready -U $(cat /vault/secrets/POSTGRES_USER) -d $(cat /vault/secrets/POSTGRES_DB)",
         ]
       interval: 5s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 60
+      start_period: 2m
   redis-auth:
     image: redis:alpine
     container_name: redis-auth
@@ -130,5 +131,6 @@ services:
           "test -s /vault/secrets/.env && test -s /vault/secrets/POSTGRES_USER && test -s /vault/secrets/POSTGRES_PASSWORD && test -s /vault/secrets/POSTGRES_DB",
         ]
       interval: 5s
-      timeout: 5s
-      retries: 12
+      timeout: 10s
+      retries: 120
+      start_period: 2m

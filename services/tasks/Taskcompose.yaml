@@ -14,10 +14,10 @@ tasks:
   prod:
     desc: "Run services in production mode"
     cmds:
-      - docker compose {{.COMPOSE_PROD}} up -d vault
+      - docker compose {{.COMPOSE_PROD}} up --no-build -d vault
       - task vault:up
-      - docker compose {{.COMPOSE_PROD}} up -d --force-recreate vault-agent-auth vault-agent-api-gateway vault-agent-user vault-agent-wiki vault-agent-net-gateway
-      - docker compose {{.COMPOSE_PROD}} up {{.CLI_ARGS}} -d --no-recreate
+      - docker compose {{.COMPOSE_PROD}} up --no-build -d --force-recreate vault-agent-auth vault-agent-api-gateway vault-agent-user vault-agent-wiki vault-agent-net-gateway
+      - docker compose {{.COMPOSE_PROD}} up --no-build {{.CLI_ARGS}} -d --no-recreate
 
   prod-build:
     desc: "Build production images"
@@ -34,5 +34,4 @@ tasks:
     prompt: "Warning: This deletes ALL data. Continue?"
     cmds:
       - docker compose --profile dev --profile full down --rmi local --volumes --remove-orphans
-      - docker run --rm -v "$PWD/vault:/vault-host" alpine sh -c 'rm -rf /vault-host/vault-data && mkdir -p /vault-host/vault-data && chown 100:1000 /vault-host/vault-data && chmod 700 /vault-host/vault-data'
       - rm -rf auth/vault/agent_ids api-gateway/vault/agent_ids user/vault/agent_ids wiki/vault/agent_ids net-gateway/vault/agent_ids

@@ -59,5 +59,6 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "test -s /vault/secrets/.env"]
       interval: 5s
-      timeout: 5s
-      retries: 12
+      timeout: 10s
+      retries: 120
+      start_period: 2m
