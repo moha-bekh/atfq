@@ -12,7 +12,15 @@ pub mod wiki;
 pub fn create_router(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        .allow_methods([
+            Method::GET,
+            Method::HEAD,
+            Method::POST,
+            Method::OPTIONS,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+        ])
         .allow_headers([
             axum::http::header::AUTHORIZATION,
             axum::http::header::CONTENT_TYPE,
@@ -25,7 +33,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/metrics", get(crate::metrics::handler))
         .nest("/api/v1", v1_routes(state))
         .layer(cors)
-        .layer(DefaultBodyLimit::max(5 * 1024 * 1024))
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
 }
 
 fn v1_routes(state: Arc<AppState>) -> Router {

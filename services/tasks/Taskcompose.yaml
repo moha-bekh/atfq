@@ -17,7 +17,7 @@ tasks:
       - docker compose {{.COMPOSE_PROD}} up --no-build -d vault
       - task vault:up
       - docker compose {{.COMPOSE_PROD}} up --no-build -d --force-recreate vault-agent-auth vault-agent-api-gateway vault-agent-user vault-agent-wiki vault-agent-net-gateway
-      - docker compose {{.COMPOSE_PROD}} up --no-build {{.CLI_ARGS}} -d --no-recreate
+      - docker compose {{.COMPOSE_PROD}} up --no-build {{.CLI_ARGS}} -d
 
   prod-build:
     desc: "Build production images"
