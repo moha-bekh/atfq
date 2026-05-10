@@ -1,10 +1,20 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocation } from 'react-router-dom';
 import { useAppStore } from '@/stores/app.store';
 import { useProfile } from '../hooks/useProfile';
 import { useLogout } from '@/features/auth/hooks/useLogout';
 import { useAuthManagement } from '@/features/auth/hooks/useAuthManagement';
+import {
+  profileEmailSchema,
+  profilePasswordSchema,
+  profileUsernameSchema,
+  getPasswordValidationMessage,
+  type ProfileEmailInput,
+  type ProfilePasswordInput,
+  type ProfileUsernameInput,
+} from '@/features/auth/utils/validation';
 import { useOAuth } from '@/features/auth/hooks/useOAuth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -16,13 +26,6 @@ import { GithubCircle } from '@/assets/icons/GithubCircle';
 
 type Section = 'auth' | 'roles' | 'friends' | 'appearance';
 type RoleRequestFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'canceled';
-type UsernameForm = { username: string };
-type EmailForm = { newEmail: string };
-type PasswordForm = {
-  currentPassword?: string;
-  newPassword: string;
-  confirmPassword: string;
-};
 type ApiErrorPayload = { error?: string };
 type ApiError = Error & {
   response?: {
@@ -202,17 +205,46 @@ export const ProfileView = () => {
   } = useOAuth();
 
   const profile = fetchedProfile ?? storedProfile;
+  const hasCurrentPassword = user?.has_password ?? false;
+  const passwordValidationSchema = useMemo(
+    () => profilePasswordSchema(hasCurrentPassword),
+    [hasCurrentPassword]
+  );
   const profilePictureUrl = getProfilePictureUrl(profile?.profile_picture_url);
   const usernameConfirmation = user?.username?.trim() ?? '';
 
   // Forms
-  const { register: regUsername, handleSubmit: handleUsernameSubmit, reset: resetUsername } = useForm<UsernameForm>({
+  const {
+    register: regUsername,
+    handleSubmit: handleUsernameSubmit,
+    reset: resetUsername,
+    formState: { errors: usernameErrors },
+  } = useForm<ProfileUsernameInput>({
+    resolver: zodResolver(profileUsernameSchema),
     defaultValues: { username: user?.username ?? '' }
   });
-  const { register: regEmail, handleSubmit: handleEmailSubmit, reset: resetEmail } = useForm<EmailForm>({
+  const {
+    register: regEmail,
+    handleSubmit: handleEmailSubmit,
+    reset: resetEmail,
+    formState: { errors: emailErrors },
+  } = useForm<ProfileEmailInput>({
+    resolver: zodResolver(profileEmailSchema),
     defaultValues: { newEmail: user?.email ?? '' }
   });
-  const { register: regPassword, handleSubmit: handlePasswordSubmit, reset: resetPassword } = useForm<PasswordForm>();
+  const {
+    register: regPassword,
+    handleSubmit: handlePasswordSubmit,
+    reset: resetPassword,
+    formState: { errors: passwordErrors },
+  } = useForm<ProfilePasswordInput>({
+    resolver: zodResolver(passwordValidationSchema),
+    defaultValues: {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
 
   // UI States
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -305,9 +337,28 @@ export const ProfileView = () => {
 
   // --- HANDLERS ---
 
-  const onUpdateUsername: SubmitHandler<UsernameForm> = async (data) => {
+  const onUpdateUsername: SubmitHandler<ProfileUsernameInput> = async (data) => {
+    const newUsername = data.username.trim();
+    const currentUsername = user?.username?.trim() ?? '';
+
+    if (newUsername.toLowerCase() === currentUsername.toLowerCase()) {
+      setIsEditingUsername(false);
+      resetUsername({ username: currentUsername });
+      return;
+    }
+
     try {
-      await updateUsername({ new_username: data.username });
+      const searchResult = await userApi.searchUsers(newUsername);
+      const usernameAlreadyTaken = searchResult.users.some((searchUser) => (
+        searchUser.username.toLowerCase() === newUsername.toLowerCase()
+      ));
+
+      if (usernameAlreadyTaken) {
+        setStatus({ type: 'error', message: 'Username already taken', target: 'username' });
+        return;
+      }
+
+      await updateUsername({ new_username: newUsername });
       setIsEditingUsername(false);
       setStatus({ type: 'success', message: 'Username updated', target: 'username' });
     } catch {
@@ -315,9 +366,18 @@ export const ProfileView = () => {
     }
   };
 
-  const onUpdateEmail: SubmitHandler<EmailForm> = async (data) => {
+  const onUpdateEmail: SubmitHandler<ProfileEmailInput> = async (data) => {
+    const newEmail = data.newEmail.trim();
+    const currentEmail = user?.email?.trim() ?? '';
+
+    if (newEmail.toLowerCase() === currentEmail.toLowerCase()) {
+      setIsEditingEmail(false);
+      resetEmail({ newEmail: currentEmail });
+      return;
+    }
+
     try {
-      await updateEmail({ new_email: data.newEmail });
+      await updateEmail({ new_email: newEmail });
       setIsEditingEmail(false);
       setStatus({ type: 'success', message: 'Email updated', target: 'email' });
     } catch {
@@ -325,15 +385,44 @@ export const ProfileView = () => {
     }
   };
 
-  const onUpdatePassword: SubmitHandler<PasswordForm> = async (data) => {
-    if (data.newPassword !== data.confirmPassword) {
+  const onUpdatePassword: SubmitHandler<ProfilePasswordInput> = async (data) => {
+    const currentPassword = data.currentPassword?.trim() ?? '';
+    const newPassword = data.newPassword.trim();
+    const confirmPassword = data.confirmPassword.trim();
+
+    if (!currentPassword && !newPassword && !confirmPassword) {
+      resetPassword();
+      setIsEditingPassword(false);
+      return;
+    }
+
+    const passwordValidationMessage = getPasswordValidationMessage(newPassword);
+
+    if (passwordValidationMessage) {
+      setStatus({ type: 'error', message: passwordValidationMessage, target: 'password' });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
       setStatus({ type: 'error', message: 'Passwords do not match', target: 'password' });
       return;
     }
+
+    if (hasCurrentPassword && !currentPassword) {
+      setStatus({ type: 'error', message: 'Current password is required', target: 'password' });
+      return;
+    }
+
+    if (hasCurrentPassword && currentPassword === newPassword) {
+      resetPassword();
+      setIsEditingPassword(false);
+      return;
+    }
+
     try {
       await updatePassword({ 
-        old_password: data.currentPassword || "", 
-        new_password: data.newPassword 
+        old_password: currentPassword,
+        new_password: newPassword
       });
       resetPassword();
       setIsEditingPassword(false);
@@ -647,10 +736,11 @@ export const ProfileView = () => {
                   
                   <div className="space-y-6">
                     {/* Username Update */}
-                    <form onSubmit={handleUsernameSubmit(onUpdateUsername)} className="grid gap-4 p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg relative group">
-                       <Input 
+                    <form onSubmit={handleUsernameSubmit(onUpdateUsername)} className="grid gap-4 p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg relative group" noValidate>
+                      <Input 
                         label="Terminal Username" 
                         {...regUsername("username")} 
+                        error={usernameErrors.username?.message}
                         readOnly={!isEditingUsername}
                         onClick={() => setIsEditingUsername(true)}
                         className={!isEditingUsername ? "cursor-pointer hover:border-main/30 transition-colors" : ""}
@@ -669,10 +759,12 @@ export const ProfileView = () => {
                     </form>
 
                     {/* Email Update with Click-to-Edit */}
-                    <form onSubmit={handleEmailSubmit(onUpdateEmail)} className="grid gap-4 p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg relative">
+                    <form onSubmit={handleEmailSubmit(onUpdateEmail)} className="grid gap-4 p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg relative" noValidate>
                       <Input 
                         label="Encryption Email" 
+                        type="email"
                         {...regEmail("newEmail")} 
+                        error={emailErrors.newEmail?.message}
                         readOnly={!isEditingEmail}
                         onClick={() => setIsEditingEmail(true)}
                         className={!isEditingEmail ? "cursor-pointer hover:border-main/30 transition-colors" : ""}
@@ -691,7 +783,7 @@ export const ProfileView = () => {
                     </form>
 
                     {/* Password Update with Confirmation */}
-                    <form onSubmit={handlePasswordSubmit(onUpdatePassword)} className="grid gap-4 p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg">
+                    <form onSubmit={handlePasswordSubmit(onUpdatePassword)} className="grid gap-4 p-4 sm:p-6 bg-sub-alt/5 border border-main/10 rounded-lg" noValidate>
                       {!isEditingPassword ? (
                         <Input 
                           label={user?.has_password ? "Security Password" : "Set Security Password"} 
@@ -704,11 +796,26 @@ export const ProfileView = () => {
                       ) : (
                         <div className="space-y-4 animate-in slide-in-from-top-2">
                           {user?.has_password && (
-                            <Input label="Current Password" type="password" {...regPassword("currentPassword")} required />
+                            <Input
+                              label="Current Password"
+                              type="password"
+                              {...regPassword("currentPassword")}
+                              error={passwordErrors.currentPassword?.message}
+                            />
                           )}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <Input label="New Password" type="password" {...regPassword("newPassword")} required />
-                            <Input label="Confirm New Password" type="password" {...regPassword("confirmPassword")} required />
+                            <Input
+                              label="New Password"
+                              type="password"
+                              {...regPassword("newPassword")}
+                              error={passwordErrors.newPassword?.message}
+                            />
+                            <Input
+                              label="Confirm New Password"
+                              type="password"
+                              {...regPassword("confirmPassword")}
+                              error={passwordErrors.confirmPassword?.message}
+                            />
                           </div>
                           <div className="flex flex-col sm:flex-row gap-2">
                             <Button type="submit" variant="primary" className="w-full sm:w-auto">

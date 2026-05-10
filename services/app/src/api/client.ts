@@ -1,4 +1,5 @@
 import ky from "ky";
+import { useAppStore } from "@/stores/app.store";
 
 type RefreshResponse = {
   status: string;
@@ -51,7 +52,6 @@ const refreshAccessToken = async () => {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
-    const { useAppStore } = await import("@/stores/app.store");
     const { refreshToken } = useAppStore.getState();
 
     if (!refreshToken) return null;
@@ -91,8 +91,6 @@ export const api = ky.create({
   hooks: {
     beforeRequest: [
       async (request) => {
-        // Import dynamique du store seulement quand on en a besoin
-        const { useAppStore } = await import("@/stores/app.store");
         let token = useAppStore.getState().accessToken;
 
         if (token && shouldRefreshToken(token)) {

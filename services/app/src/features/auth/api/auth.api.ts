@@ -1,4 +1,5 @@
 import { api } from '@/api/client';
+import { getPasswordValidationMessage } from '../utils/validation';
 import type { 
   LoginRequest, 
   LoginResponse, 
@@ -78,6 +79,12 @@ export const authApi = {
   },
 
   updatePassword: async (payload: { old_password: string; new_password: string }): Promise<void> => {
+    const validationMessage = getPasswordValidationMessage(payload.new_password);
+
+    if (validationMessage) {
+      throw new Error(validationMessage);
+    }
+
     await api.put('auth/password', { json: payload });
   },
 

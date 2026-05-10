@@ -22,5 +22,8 @@ export default defineConfig({
     strictPort: true,
     host: true,
     allowedHosts: ['atfq.org']
+  },
+  build: {
+    chunkSizeWarningLimit: 700
   }
 })
