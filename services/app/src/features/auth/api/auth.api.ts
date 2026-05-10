@@ -15,7 +15,13 @@ export const authApi = {
   },
 
   login: async (payload: LoginRequest): Promise<LoginResponse> => {
-    return await api.post('auth/login', { json: payload }).json<LoginResponse>();
+    const response = await api.post('auth/login', { json: payload }).json<LoginResponse>();
+
+    if (response.status === 'INVALID_CREDENTIALS') {
+      throw new Error('Invalid identifier or password');
+    }
+
+    return response;
   },
 
   logout: async (accessToken: string, refreshToken: string): Promise<void> => {

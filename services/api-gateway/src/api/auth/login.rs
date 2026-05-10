@@ -4,6 +4,7 @@ use crate::grpc::auth::{Identifier, auth_response::Result as AuthResult, identif
 use crate::state::AppState;
 use axum::{Json, extract::State};
 use std::sync::Arc; // Import corrigé du message et de son enum interne
+use tonic::Code;
 
 #[utoipa::path(
     post,
@@ -11,7 +12,7 @@ use std::sync::Arc; // Import corrigé du message et de son enum interne
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Login Success", body = LoginResponse),
-        (status = 401, description = "Unauthorized")
+        (status = 202, description = "MFA required", body = LoginResponse)
     )
 )]
 pub async fn login_handler(
@@ -38,7 +39,22 @@ pub async fn login_handler(
         password: payload.password,
     });
 
-    let response = client.login(request).await?.into_inner();
+    let response = match client.login(request).await {
+        Ok(response) => response.into_inner(),
+        Err(status) if status.code() == Code::Unauthenticated => {
+            return Ok((
+                axum::http::StatusCode::OK,
+                Json(LoginResponse {
+                    status: "INVALID_CREDENTIALS".into(),
+                    access_token: None,
+                    refresh_token: None,
+                    mfa_login_id: None,
+                    user: None,
+                }),
+            ));
+        }
+        Err(status) => return Err(status.into()),
+    };
 
     // On traite le résultat 'oneof' du service auth
     match response.result {

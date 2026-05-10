@@ -33,7 +33,12 @@ export const authHandlers = [
     await delay(1000);
 
     if (body.password === 'wrongpassword') {
-      return new HttpResponse(JSON.stringify({ message: 'Invalid credentials' }), { status: 401 });
+      return HttpResponse.json({
+        status: 'INVALID_CREDENTIALS',
+        access_token: null,
+        refresh_token: null,
+        user: null,
+      } as LoginResponse);
     }
 
     return HttpResponse.json({

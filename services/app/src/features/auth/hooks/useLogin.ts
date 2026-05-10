@@ -32,7 +32,12 @@ export function useLogin(onMfaRequired?: (id: string) => void) {
         }
       }
     },
-    onError: async (error: HTTPError) => {
+    onError: async (error: Error | HTTPError) => {
+      if (!('response' in error)) {
+        error.message = error.message || "Authentication failed";
+        return;
+      }
+
       try {
         const errorData = await error.response.json() as any;
         // On attache le message d'erreur du backend à l'objet error pour React Query

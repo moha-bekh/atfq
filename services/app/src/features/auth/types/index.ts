@@ -20,9 +20,10 @@ export type LoginRequest = {
 
 export type LoginResponse = {
   status: string;
-  access_token?: string;
-  refresh_token?: string;
-  user?: User;
+  access_token?: string | null;
+  refresh_token?: string | null;
+  mfa_login_id?: string | null;
+  user?: User | null;
 };
 
 export type AuthSuccess = {
