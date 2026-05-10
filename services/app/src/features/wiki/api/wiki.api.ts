@@ -1,5 +1,5 @@
 import { api } from "@/api/client";
-import type { Article, GetRootArticlesResponse, SearchResponse, Node, Version, DeleteResponse, CreateNodeRequest, UpdateNodeRequest, CreateArticleRequest } from "../types";
+import type { Article, GetRootArticlesResponse, SearchResponse, Node, Version, DeleteResponse, CreateNodeRequest, UpdateNodeRequest, CreateArticleRequest, DeleteNodeRequest, AssignParentRequest } from "../types";
 
 export const wikiApi = {
   getRootArticles: async (): Promise<GetRootArticlesResponse> => {
@@ -22,11 +22,16 @@ export const wikiApi = {
     return api.put("wiki/nodes", { json: data }).json();
   },
 
-  deleteNode: async (id: number): Promise<DeleteResponse> => {
-    return api.delete(`wiki/nodes/${id}`).json();
+  deleteNode: async ({ id, mode, newParent }: DeleteNodeRequest): Promise<DeleteResponse> => {
+    return api.delete(`wiki/nodes/${id}`, {
+      searchParams: {
+        mode,
+        ...(newParent !== undefined ? { new_parent: newParent } : {}),
+      },
+    }).json();
   },
 
-  assignParent: async (data: { new_parent: number, child: number }): Promise<Node> => {
+  assignParent: async (data: AssignParentRequest): Promise<Node> => {
     return api.post("wiki/nodes/assign-parent", { json: data }).json();
   },
 

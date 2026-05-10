@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Article, NodeBreadcrumb, ResourceEntry } from "../types";
 
@@ -12,6 +12,7 @@ interface DocContentProps {
   mode: "read" | "edit" | "create";
   canContribute: boolean;
   parentOptions: NodeBreadcrumb[];
+  createParentId: string;
   onModeChange: (mode: "read" | "edit" | "create") => void;
   onCreate: (data: {
     parentId?: number;
@@ -22,6 +23,7 @@ interface DocContentProps {
     resources: ResourceEntry[];
   }) => Promise<void>;
   onEdit: (data: {
+    parentId?: number;
     title: string;
     tldr: string;
     notions: WikiContentLine[];
@@ -87,7 +89,9 @@ const formatResourceLine = (resource: ResourceEntry) => {
   return url ? `${label} | ${url}` : label;
 };
 
-export default function DocContent({ article, mode, canContribute, parentOptions, onModeChange, onCreate, onEdit }: DocContentProps) {
+export default function DocContent({ article, mode, canContribute, parentOptions, createParentId, onModeChange, onCreate, onEdit }: DocContentProps) {
+  const previousMode = useRef(mode);
+  const previousCreateParentId = useRef(createParentId);
   const [title, setTitle] = useState("");
   const [tldr, setTldr] = useState("");
   const [notions, setNotions] = useState("");
@@ -95,6 +99,7 @@ export default function DocContent({ article, mode, canContribute, parentOptions
   const [resources, setResources] = useState("");
   const [parentId, setParentId] = useState("");
   const [editTitle, setEditTitle] = useState("");
+  const [editParentId, setEditParentId] = useState("");
   const [editTldr, setEditTldr] = useState("");
   const [editNotions, setEditNotions] = useState("");
   const [editKeyQuestions, setEditKeyQuestions] = useState("");
@@ -104,12 +109,25 @@ export default function DocContent({ article, mode, canContribute, parentOptions
   useEffect(() => {
     if (mode === "edit" && article?.article_node) {
       setEditTitle(article.article_node.title || "");
+      setEditParentId(article.article_node.parent_id ? String(article.article_node.parent_id) : "");
       setEditTldr(article.article_node.content || "");
       setEditNotions((article.notions || []).map(formatNodeLine).join("\n"));
       setEditKeyQuestions((article.questions || []).map(formatNodeLine).join("\n"));
       setEditResources((article.resources || []).map(formatResourceLine).join("\n"));
     }
   }, [article, mode]);
+
+  useEffect(() => {
+    if (
+      mode === "create" &&
+      (previousMode.current !== "create" || previousCreateParentId.current !== createParentId)
+    ) {
+      setParentId(createParentId);
+    }
+
+    previousMode.current = mode;
+    previousCreateParentId.current = createParentId;
+  }, [createParentId, mode]);
 
   const sections = article ? [
     {
@@ -165,6 +183,7 @@ export default function DocContent({ article, mode, canContribute, parentOptions
     setIsSubmitting(true);
     try {
       await onEdit({
+        parentId: editParentId ? Number(editParentId) : undefined,
         title: editTitle,
         tldr: editTldr,
         notions: parseContentLines(editNotions),
@@ -179,6 +198,11 @@ export default function DocContent({ article, mode, canContribute, parentOptions
   const fieldClass = "rounded-lg border-2 border-sub/30 bg-sub-alt/10 px-4 py-3 font-jakarta text-text outline-none transition-all placeholder:text-text/35 focus:border-main focus:bg-main/5";
   const labelClass = "font-bricolage font-semibold text-sm text-sub uppercase tracking-widest";
   const panelClass = "rounded-lg border border-main/10 bg-sub-alt/5 p-5 shadow-inner";
+  const blockedParentIds = new Set([
+    article?.article_node?.id,
+    ...(article?.sub_articles || []).map((subArticle) => subArticle.id),
+  ].filter((id): id is number => typeof id === "number"));
+  const editParentOptions = parentOptions.filter((parent) => !blockedParentIds.has(parent.id));
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-8">
@@ -295,10 +319,19 @@ export default function DocContent({ article, mode, canContribute, parentOptions
       ) : mode === "edit" && article ? (
         <form onSubmit={handleEditSubmit} className="flex flex-col gap-6">
           <div className={panelClass}>
-            <p className={labelClass}>Parent article</p>
-            <p className="mt-1 font-jakarta text-sm text-text">
-              {article.article_node.parent_id ? `Node ${article.article_node.parent_id}` : "Root article"}
-            </p>
+            <label className={labelClass}>Parent article</label>
+            <select
+              value={editParentId}
+              onChange={(e) => setEditParentId(e.target.value)}
+              className={`${fieldClass} mt-3 w-full min-w-0`}
+            >
+              <option value="">Root article</option>
+              {editParentOptions.map((parent) => (
+                <option key={parent.id} value={parent.id}>
+                  {parent.title}
+                </option>
+              ))}
+            </select>
           </div>
           <div className={panelClass}>
             <label className={labelClass}>Title</label>

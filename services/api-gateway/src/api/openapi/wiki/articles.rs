@@ -51,6 +51,7 @@ pub struct VersionResponse {
     pub created_at: Option<String>,
     pub author: i32,
     pub activated_at: Option<String>,
+    pub requested_parent_id: Option<i32>,
 }
 
 // --- REQUESTS ---
@@ -83,6 +84,7 @@ pub struct UpdateNodeRequest {
     pub title: String,
     pub content: String,
     pub resources: Option<Vec<ResourceEntry>>,
+    pub requested_parent_id: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

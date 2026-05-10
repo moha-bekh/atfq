@@ -78,19 +78,6 @@ export type UpdatePasswordRequest = {
   new_password: string;
 };
 
-export type PasswordResetRequest = {
-  identifier: string;
-};
-
-export type PasswordResetResponse = {
-  accepted: boolean;
-};
-
-export type PasswordResetConfirmRequest = {
-  reset_token: string;
-  new_password: string;
-};
-
 export type DeleteAccountRequest = {
   refresh_token: string;
 };

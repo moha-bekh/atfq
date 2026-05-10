@@ -35,6 +35,17 @@ export function useUpdateNode() {
   });
 }
 
+export function useAssignParent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: wikiApi.assignParent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wiki", "root"] });
+      queryClient.invalidateQueries({ queryKey: ["wiki", "article"] });
+    },
+  });
+}
+
 export function useCreateNode() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -52,6 +63,18 @@ export function useCreateArticle() {
     mutationFn: wikiApi.createArticle,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["wiki", "root"] });
+      queryClient.invalidateQueries({ queryKey: ["wiki", "pending"] });
+    },
+  });
+}
+
+export function useDeleteNode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: wikiApi.deleteNode,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wiki", "root"] });
+      queryClient.invalidateQueries({ queryKey: ["wiki", "article"] });
       queryClient.invalidateQueries({ queryKey: ["wiki", "pending"] });
     },
   });

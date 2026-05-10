@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { userApi } from '@/features/user/api';
 import { wikiApi } from '@/features/wiki/api/wiki.api';
 import { useAppStore } from '@/stores/app.store';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import type { RoleRequestHistoryEntry, ReviewRoleRequest } from '@/features/user/types';
-import type { Version } from '@/features/wiki/types';
+import type { Article, Version } from '@/features/wiki/types';
 
 type ReviewStatus = {
   type: 'success' | 'error';
@@ -17,6 +17,11 @@ type DashboardMode = 'pending' | 'history';
 type WikiReviewGroup = {
   id: string;
   versions: Version[];
+};
+type WikiNodeSnapshot = {
+  title: string;
+  content: string;
+  block: 'TLDR' | 'Notions' | 'Questions';
 };
 
 const getApiErrorMessage = async (error: unknown, fallback: string) => {
@@ -53,6 +58,16 @@ const formatDate = (value?: string | null) => {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);
+};
+
+const stripWikiResourceMarker = (content?: string | null) => {
+  const value = content || '';
+  const marker = '\n\n<!-- ATFQ_RESOURCES:';
+  const markerIndex = value.lastIndexOf(marker);
+
+  if (markerIndex === -1) return value.trim();
+
+  return value.slice(0, markerIndex).trim();
 };
 
 const groupWikiVersions = (versions: Version[]): WikiReviewGroup[] => {
@@ -222,12 +237,18 @@ function RequestRow({
 
 function WikiReviewGroupRow({
   group,
+  parentTitles,
+  currentParentTitles,
+  nodeSnapshots,
   isReviewing,
   canReview,
   onApprove,
   onReject,
 }: {
   group: WikiReviewGroup;
+  parentTitles: Map<number, string>;
+  currentParentTitles: Map<number, string>;
+  nodeSnapshots: Map<number, WikiNodeSnapshot>;
   isReviewing: boolean;
   canReview: boolean;
   onApprove: (versionIds: number[]) => void;
@@ -239,7 +260,28 @@ function WikiReviewGroupRow({
     .sort((a, b) => a.node_id - b.node_id || a.version_id - b.version_id)
     .map((version) => version.version_id);
   const isGrouped = group.versions.length > 1;
-  const preview = primaryVersion?.content?.trim() || 'No content provided.';
+  const changedContentVersions = group.versions.filter((version) => {
+    const snapshot = nodeSnapshots.get(version.node_id);
+    if (!snapshot) return true;
+
+    return snapshot.title.trim() !== version.title.trim() || snapshot.content.trim() !== stripWikiResourceMarker(version.content);
+  });
+  const hasContentChange = changedContentVersions.length > 0;
+  const parentChangeVersion = group.versions.find((version) => (
+    version.requested_parent_id !== undefined && version.requested_parent_id !== null
+  ));
+  const parentChange = parentChangeVersion?.requested_parent_id;
+  const currentParentLabel = parentChangeVersion
+    ? currentParentTitles.get(parentChangeVersion.node_id) || 'Current parent'
+    : 'Current parent';
+  const requestedParentLabel = parentChange == null || parentChange === 0
+    ? 'Root article'
+    : parentTitles.get(parentChange) || 'Unknown parent';
+  const hasParentChange = Boolean(parentChangeVersion);
+  const changeLabels = [
+    ...(hasContentChange ? ['Content'] : []),
+    ...(hasParentChange ? ['Parent'] : []),
+  ];
 
   return (
     <article className="grid gap-5 rounded-lg border border-main/10 bg-sub-alt/5 p-5 shadow-inner">
@@ -252,6 +294,14 @@ function WikiReviewGroupRow({
             <span className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${statusTone(primaryVersion.status)}`}>
               {primaryVersion.status}
             </span>
+            {changeLabels.map((label) => (
+              <span
+                key={label}
+                className="rounded border border-sub/30 bg-bg/30 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sub"
+              >
+                {label}
+              </span>
+            ))}
             <span className="font-mono text-[10px] uppercase tracking-widest text-sub">
               {formatDate(primaryVersion.created_at)}
             </span>
@@ -260,24 +310,33 @@ function WikiReviewGroupRow({
           <h2 className="mt-4 break-words font-display text-2xl font-bold italic text-text">
             {primaryVersion.title || 'Untitled wiki change'}
           </h2>
-          <p className="mt-2 break-all font-mono text-[11px] text-sub">
-            author:{primaryVersion.author} versions:{versionIds.join(', ')}
-          </p>
-          <p className="mt-4 line-clamp-4 whitespace-pre-line text-sm leading-relaxed text-text">
-            {preview}
-          </p>
-          {isGrouped && (
+          {hasParentChange && (
+            <div className="mt-4 rounded-lg border border-main/20 bg-main/5 p-3">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-main">
+                Parent change
+              </p>
+              <p className="mt-2 flex flex-wrap items-center gap-2 break-words text-sm text-text">
+                <span>{currentParentLabel}</span>
+                <span className="font-mono text-xs uppercase tracking-widest text-sub">-&gt;</span>
+                <span className="font-semibold text-main">{requestedParentLabel}</span>
+              </p>
+            </div>
+          )}
+          {hasContentChange && (
             <div className="mt-5 grid gap-2 border-t border-main/10 pt-4">
-              {group.versions.map((version) => (
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-sub">
+                Content changes
+              </p>
+              {changedContentVersions.map((version) => (
                 <div key={version.version_id} className="rounded-lg border border-main/10 bg-bg/30 p-3">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-main">
+                    {nodeSnapshots.get(version.node_id)?.block || 'Content'}
+                  </p>
                   <p className="break-words text-sm font-bold text-text">
                     {version.title || 'Untitled part'}
                   </p>
-                  <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-sub">
-                    node:{version.node_id} version:{version.version_id}
-                  </p>
                   <p className="mt-2 line-clamp-2 whitespace-pre-line text-xs leading-5 text-text/80">
-                    {version.content?.trim() || 'No content provided.'}
+                    {stripWikiResourceMarker(version.content) || 'No content provided.'}
                   </p>
                 </div>
               ))}
@@ -364,6 +423,48 @@ export default function DashboardPage() {
     queryFn: () => wikiApi.getAllPending(),
     enabled: activeSection === 'wiki' && canReviewWikiRequests,
   });
+  const wikiVersions = wikiPendingData?.versions ?? [];
+  const parentChangeNodeIds = useMemo(() => {
+    return Array.from(new Set(
+      wikiVersions
+        .filter((version) => version.requested_parent_id !== undefined && version.requested_parent_id !== null)
+        .map((version) => version.node_id),
+    ));
+  }, [wikiVersions]);
+
+  const { data: wikiRootsData } = useQuery({
+    queryKey: ['wiki', 'root', 'dashboard'],
+    queryFn: () => wikiApi.getRootArticles(),
+    enabled: activeSection === 'wiki' && canReviewWikiRequests,
+  });
+
+  const wikiRootDetails = useQueries({
+    queries: (wikiRootsData?.articles || []).map((root) => ({
+      queryKey: ['wiki', 'article', root.id, 'dashboard-parent-map'],
+      queryFn: () => wikiApi.getArticle(root.id),
+      enabled: activeSection === 'wiki' && canReviewWikiRequests,
+    })),
+  });
+  const wikiChildArticleIds = useMemo(() => {
+    return Array.from(new Set(
+      wikiRootDetails.flatMap((query) => query.data?.sub_articles.map((article) => article.id) || []),
+    ));
+  }, [wikiRootDetails]);
+  const wikiChildArticleDetails = useQueries({
+    queries: wikiChildArticleIds.map((articleId) => ({
+      queryKey: ['wiki', 'article', articleId, 'dashboard-child-map'],
+      queryFn: () => wikiApi.getArticle(articleId),
+      enabled: activeSection === 'wiki' && canReviewWikiRequests,
+    })),
+  });
+
+  const wikiParentChangeDetails = useQueries({
+    queries: parentChangeNodeIds.map((nodeId) => ({
+      queryKey: ['wiki', 'article', nodeId, 'dashboard-parent-change'],
+      queryFn: () => wikiApi.getArticle(nodeId),
+      enabled: activeSection === 'wiki' && canReviewWikiRequests,
+    })),
+  });
 
   const reviewMutation = useMutation({
     mutationFn: (payload: ReviewRoleRequest) => userApi.reviewRoleRequest(payload),
@@ -423,7 +524,74 @@ export default function DashboardPage() {
   });
 
   const roleRequests = roleRequestsData?.requests ?? [];
-  const wikiVersions = wikiPendingData?.versions ?? [];
+  const wikiParentTitles = useMemo(() => {
+    const titles = new Map<number, string>();
+    const articleDetails = [
+      ...wikiRootDetails.map((query) => query.data),
+      ...wikiChildArticleDetails.map((query) => query.data),
+    ].filter((article): article is Article => Boolean(article));
+
+    (wikiRootsData?.articles || []).forEach((root) => {
+      titles.set(root.id, root.title);
+    });
+
+    articleDetails.forEach((article) => {
+      titles.set(article.article_node.id, article.article_node.title);
+      article.sub_articles.forEach((subArticle) => {
+        titles.set(subArticle.id, subArticle.title);
+      });
+    });
+
+    return titles;
+  }, [wikiChildArticleDetails, wikiRootDetails, wikiRootsData]);
+  const wikiNodeSnapshots = useMemo(() => {
+    const snapshots = new Map<number, WikiNodeSnapshot>();
+    const articleDetails = [
+      ...wikiRootDetails.map((query) => query.data),
+      ...wikiChildArticleDetails.map((query) => query.data),
+      ...wikiParentChangeDetails.map((query) => query.data),
+    ].filter((article): article is Article => Boolean(article));
+
+    articleDetails.forEach((article) => {
+      snapshots.set(article.article_node.id, {
+        title: article.article_node.title,
+        content: article.article_node.content,
+        block: 'TLDR',
+      });
+      article.notions.forEach((notion) => {
+        snapshots.set(notion.id, {
+          title: notion.title,
+          content: notion.content,
+          block: 'Notions',
+        });
+      });
+      article.questions.forEach((question) => {
+        snapshots.set(question.id, {
+          title: question.title,
+          content: question.content,
+          block: 'Questions',
+        });
+      });
+    });
+
+    return snapshots;
+  }, [wikiChildArticleDetails, wikiParentChangeDetails, wikiRootDetails]);
+  const wikiCurrentParentTitles = useMemo(() => {
+    const titles = new Map<number, string>();
+
+    wikiParentChangeDetails.forEach((query) => {
+      const article = query.data;
+      if (!article) return;
+
+      const currentParentId = article.article_node.parent_id;
+      titles.set(
+        article.article_node.id,
+        currentParentId ? wikiParentTitles.get(currentParentId) || 'Unknown parent' : 'Root article',
+      );
+    });
+
+    return titles;
+  }, [wikiParentChangeDetails, wikiParentTitles]);
   const wikiReviewGroups = useMemo(() => groupWikiVersions(wikiVersions), [wikiVersions]);
   const isCurrentSectionLoading = activeSection === 'roles' ? isRoleRequestsLoading : isWikiPendingLoading;
   const refreshCurrentSection = () => {
@@ -603,6 +771,9 @@ export default function DashboardPage() {
             <WikiReviewGroupRow
               key={group.id}
               group={group}
+              parentTitles={wikiParentTitles}
+              currentParentTitles={wikiCurrentParentTitles}
+              nodeSnapshots={wikiNodeSnapshots}
               isReviewing={approveWikiMutation.isPending || rejectWikiMutation.isPending || !canReviewWikiRequests}
               canReview={canReviewWikiRequests}
               onApprove={approveWikiMutation.mutate}

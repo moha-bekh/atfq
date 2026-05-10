@@ -6,9 +6,6 @@ import type {
   OAuthProvider,
   OAuthUrlResponse,
   OAuthCallbackParams,
-  PasswordResetRequest,
-  PasswordResetResponse,
-  PasswordResetConfirmRequest,
   User
 } from '../types';
 
@@ -76,14 +73,6 @@ export const authApi = {
 
   updatePassword: async (payload: { old_password: string; new_password: string }): Promise<void> => {
     await api.put('auth/password', { json: payload });
-  },
-
-  requestPasswordReset: async (payload: PasswordResetRequest): Promise<PasswordResetResponse> => {
-    return await api.post('auth/password-reset/request', { json: payload }).json<PasswordResetResponse>();
-  },
-
-  confirmPasswordReset: async (payload: PasswordResetConfirmRequest): Promise<void> => {
-    await api.post('auth/password-reset/confirm', { json: payload });
   },
 
   deleteAccount: async (payload: { refresh_token: string }): Promise<void> => {

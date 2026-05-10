@@ -82,7 +82,7 @@ const termsSections: LegalSection[] = [
     title: "Accounts and security",
     paragraphs: [
       "You may need an account to create or edit content, manage a profile, request elevated roles, or access protected features. You are responsible for keeping your credentials and authentication factors secure.",
-      "ATFQ supports password-based sign in, OAuth providers, password reset flows, and multi-factor authentication. If you believe your account has been compromised, contact us as soon as possible.",
+      "ATFQ supports password-based sign in, OAuth providers, and multi-factor authentication. If you believe your account has been compromised, contact us as soon as possible.",
     ],
   },
   {

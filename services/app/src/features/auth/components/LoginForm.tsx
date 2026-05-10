@@ -49,20 +49,12 @@ export function LoginForm({ onMfaRequired }: { onMfaRequired?: (id: string) => v
         {...register("identifier")}
       />
 
-      <div className="flex flex-col gap-1">
-        <Input
-          type="password"
-          placeholder="••••••••"
-          error={errors.password?.message}
-          {...register("password")}
-        />
-        <Link
-          to="/password-reset"
-          className="self-end text-[10px] uppercase tracking-widest text-text hover:text-sub transition-colors"
-        >
-          Forgot password?
-        </Link>
-      </div>
+      <Input
+        type="password"
+        placeholder="••••••••"
+        error={errors.password?.message}
+        {...register("password")}
+      />
 
       <Button
         type="submit"

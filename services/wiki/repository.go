@@ -270,6 +270,35 @@ func (s *wikiServer) updateNodeInternal(ctx context.Context, ext Ext, req *pb.Up
 		return nil, status.Errorf(codes.Internal, "update failed: %v", err)
 	}
 
+	if len(metadataJSON) > 0 {
+		var metadata map[string]interface{}
+		if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to parse update metadata: %v", err)
+		}
+
+		if rawParentID, ok := metadata["requested_parent_id"]; ok {
+			parentIDNumber, ok := rawParentID.(float64)
+			if !ok {
+				return nil, status.Error(codes.InvalidArgument, "invalid requested parent metadata")
+			}
+
+			var parentID sql.NullInt32
+			if parentIDNumber > 0 {
+				parentID = sql.NullInt32{Int32: int32(parentIDNumber), Valid: true}
+			}
+
+			_, err := ext.ExecContext(
+				ctx,
+				"INSERT INTO pending_parent_changes (version_id, requested_parent_id) VALUES ($1, $2)",
+				res.VersionID,
+				parentID,
+			)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "failed to save requested parent change: %v", err)
+			}
+		}
+	}
+
 	return &res, nil
 }
 
@@ -299,6 +328,23 @@ func (s *wikiServer) approveVersionInternal(ctx context.Context, ext Ext, versio
 	}
 
 	return nodeID, nil
+}
+
+func (s *wikiServer) requestedParentIDFromVersion(ctx context.Context, ext Ext, versionID int32) (*int32, bool, error) {
+	var parentID sql.NullInt32
+	err := ext.GetContext(ctx, &parentID, "SELECT requested_parent_id FROM pending_parent_changes WHERE version_id = $1", versionID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, false, nil
+		}
+		return nil, false, status.Errorf(codes.Internal, "failed to read requested parent change: %v", err)
+	}
+
+	if !parentID.Valid {
+		return nil, true, nil
+	}
+
+	return &parentID.Int32, true, nil
 }
 
 // denyVersionInternal
@@ -358,9 +404,13 @@ func (s *wikiServer) fetchPendingVersionsInternal(ctx context.Context, ext Ext, 
 	query := `
 	SELECT
 		v.id, v.node_id, v.title, v.content, v.created_at, v.created_by, v.status, v.activated_at,
-		q.metadata
+		CASE
+			WHEN ppc.version_id IS NOT NULL THEN jsonb_build_object('requested_parent_id', COALESCE(ppc.requested_parent_id, 0))
+			ELSE q.metadata
+		END AS metadata
 	FROM node_versions v
 	LEFT JOIN questions q ON v.id = q.node_version_id
+	LEFT JOIN pending_parent_changes ppc ON v.id = ppc.version_id
 	WHERE v.status = 'pending'
 	`
 	var args []interface{}
@@ -482,9 +532,13 @@ func (s *wikiServer) fetchVersionHistoryInternal(ctx context.Context, ext Ext, n
 	query := `
 	SELECT
 		v.id, v.node_id, v.title, v.content, v.created_at, v.created_by, v.status, v.activated_at,
-		q.metadata
+		CASE
+			WHEN ppc.version_id IS NOT NULL THEN jsonb_build_object('requested_parent_id', COALESCE(ppc.requested_parent_id, 0))
+			ELSE q.metadata
+		END AS metadata
 	FROM node_versions v
 	LEFT JOIN questions q ON v.id = q.node_version_id
+	LEFT JOIN pending_parent_changes ppc ON v.id = ppc.version_id
 	WHERE v.status = 'approved'
 	AND v.node_id = $1
 	ORDER BY v.created_at DESC

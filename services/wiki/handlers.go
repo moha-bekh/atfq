@@ -246,8 +246,41 @@ func (s *wikiServer) ApproveVersion(ctx context.Context, req *pb.ModerateVersion
 		return nil, status.Errorf(codes.Internal, "failed to check hierarchy: %v", err)
 	}
 
+	requestedParentID, hasRequestedParent, err := s.requestedParentIDFromVersion(ctx, tx, req.VersionId)
+	if err != nil {
+		return nil, err
+	}
+
+	if hasRequestedParent {
+		if requestedParentID != nil {
+			var parentApprovedID sql.NullInt32
+			err = tx.GetContext(ctx, &parentApprovedID, "SELECT current_version_id FROM nodes WHERE id = $1 AND type = 'article'", *requestedParentID)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					return nil, status.Error(codes.NotFound, "requested parent article not found")
+				}
+				return nil, status.Errorf(codes.Internal, "failed to check requested parent: %v", err)
+			}
+
+			if !parentApprovedID.Valid || parentApprovedID.Int32 == 0 {
+				return nil, status.Errorf(codes.FailedPrecondition,
+					"cannot approve: requested parent article (ID %d) must be approved first", *requestedParentID)
+			}
+		}
+
+		var nodeID int32
+		err = tx.GetContext(ctx, &nodeID, "SELECT node_id FROM node_versions WHERE id = $1", req.VersionId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to fetch node for parent request: %v", err)
+		}
+
+		if err := s.assignParentInternal(ctx, tx, nodeID, requestedParentID); err != nil {
+			return nil, err
+		}
+	}
+
 	// If the node has a parent, but that parent has no approved version, we block the request.
-	if hierarchy.ParentID != nil && (hierarchy.ParentApprovedID == nil || *hierarchy.ParentApprovedID == 0) {
+	if !hasRequestedParent && hierarchy.ParentID != nil && (hierarchy.ParentApprovedID == nil || *hierarchy.ParentApprovedID == 0) {
 		return nil, status.Errorf(codes.FailedPrecondition,
 			"cannot approve: parent article (ID %d) must be approved first", *hierarchy.ParentID)
 	}

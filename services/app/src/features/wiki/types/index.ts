@@ -43,6 +43,12 @@ export interface UpdateNodeRequest {
   title: string;
   content: string;
   resources?: ResourceEntry[];
+  requested_parent_id?: number;
+}
+
+export interface AssignParentRequest {
+  new_parent: number;
+  child: number;
 }
 
 export interface CreateArticleRequest {
@@ -60,6 +66,7 @@ export interface Version {
   created_at?: string;
   author: number;
   activated_at?: string;
+  requested_parent_id?: number;
 }
 
 export interface Article {
@@ -92,4 +99,12 @@ export interface SearchResponse {
 
 export interface DeleteResponse {
   message: string;
+}
+
+export type DeleteNodeMode = 'delete_branch' | 'reassign_children';
+
+export interface DeleteNodeRequest {
+  id: number;
+  mode: DeleteNodeMode;
+  newParent?: number;
 }

@@ -27,7 +27,7 @@ includes:
     taskfile: ./vault/Taskfile.yaml
     dir: ./vault
   prod:
-    taskfile: ./Taskprod.yaml
+    taskfile: ./Taskcorrec.yaml
 
   docker:
     taskfile: ./tasks/Taskcompose.yaml

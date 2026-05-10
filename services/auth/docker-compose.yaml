@@ -26,7 +26,7 @@ services:
       - METRICS_ADDR=0.0.0.0:9091
       - USER_SERVICE_ADDR=http://user:8080
       - STARTUP_MAX_RETRIES=90
-      - APP_PUBLIC_URL=http://localhost:8080
+      - APP_PUBLIC_URL=https://atfq.org
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
       - SMTP_TLS=false

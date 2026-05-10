@@ -23,7 +23,9 @@ type SearchResult = {
 
 interface LeftSidebarProps {
   sections: SidebarSection[];
+  canCreateRootArticle: boolean;
   onItemClick: (id: number | string) => void;
+  onCreateRootArticle: () => void;
   search: {
     query: string;
     type: SearchTypeFilter;
@@ -40,7 +42,9 @@ interface LeftSidebarProps {
 
 export default function LeftSidebar({
   sections,
+  canCreateRootArticle,
   onItemClick,
+  onCreateRootArticle,
   search,
 }: LeftSidebarProps) {
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
@@ -54,7 +58,7 @@ export default function LeftSidebar({
 
   return (
     <aside className="flex w-full min-w-0 flex-col gap-6">
-      {sections.map((section) => (
+      {sections.map((section, index) => (
         <div key={section.title} className="flex flex-col gap-2">
           <div className="flex flex-col gap-2">
             <span className="font-bricolage font-semibold text-base text-sub uppercase">
@@ -116,6 +120,15 @@ export default function LeftSidebar({
               );
             })}
           </div>
+          {index === 0 && canCreateRootArticle && (
+            <button
+              type="button"
+              onClick={onCreateRootArticle}
+              className="mt-3 rounded-lg border border-main/30 px-3 py-2 text-left font-bricolage text-xs font-bold uppercase tracking-widest text-main transition-colors hover:bg-main/10"
+            >
+              Create article
+            </button>
+          )}
         </div>
       ))}
 

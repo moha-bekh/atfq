@@ -2,12 +2,51 @@ version: "3"
 
 vars:
   API_BASE: '{{.API_BASE | default "https://localhost"}}'
-  ADMIN_USERNAME: '{{.ADMIN_USERNAME | default "admin"}}'
-  ADMIN_EMAIL: '{{.ADMIN_EMAIL | default "admin@atfq.demo"}}'
-  ADMIN_PASSWORD: '{{.ADMIN_PASSWORD | default "Admin0000"}}'
+  ADMIN_USERNAME: '{{.ADMIN_USERNAME}}'
+  ADMIN_EMAIL: '{{.ADMIN_EMAIL}}'
+  ADMIN_PASSWORD: '{{.ADMIN_PASSWORD}}'
   DOCKER_NETWORK: '{{.DOCKER_NETWORK | default "atfq_backend"}}'
 
 tasks:
+  check-vars:
+    desc: "Check required variables before running correction tasks"
+    silent: true
+    env:
+      API_BASE: "{{.API_BASE}}"
+      ADMIN_USERNAME: "{{.ADMIN_USERNAME}}"
+      ADMIN_EMAIL: "{{.ADMIN_EMAIL}}"
+      ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
+      DOCKER_NETWORK: "{{.DOCKER_NETWORK}}"
+    cmds:
+      - |
+        set -eu
+
+        missing=0
+        check_required() {
+          name="$1"
+          value="$2"
+
+          if [ -z "$value" ]; then
+            echo "Missing required variable: $name"
+            missing=1
+          else
+            echo "$name is set"
+          fi
+        }
+
+        check_required "API_BASE" "$API_BASE"
+        check_required "ADMIN_USERNAME" "$ADMIN_USERNAME"
+        check_required "ADMIN_EMAIL" "$ADMIN_EMAIL"
+        check_required "ADMIN_PASSWORD" "$ADMIN_PASSWORD"
+        check_required "DOCKER_NETWORK" "$DOCKER_NETWORK"
+
+        if [ "$missing" -ne 0 ]; then
+          echo
+          echo "Example:"
+          echo "  ADMIN_USERNAME=admin ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='change-me' task prod:demo-bootstrap"
+          exit 1
+        fi
+
   wiki-seed-demo:
     desc: "Seed the production wiki database with the full demo documentation tree"
     cmds:
@@ -42,6 +81,7 @@ tasks:
   create-admin-user:
     desc: "Create or promote the demo admin user (override ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD, API_BASE)"
     cmds:
+      - task: check-vars
       - |
         set -eu
 

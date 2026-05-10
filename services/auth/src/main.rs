@@ -63,8 +63,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(587);
-    let smtp_username = env::var("SMTP_USERNAME").ok();
-    let smtp_password = env::var("SMTP_PASSWORD").ok();
+    let clean_optional_env = |key: &str| {
+        env::var(key)
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty() && value != "<no value>")
+    };
+    let smtp_username = clean_optional_env("SMTP_USERNAME");
+    let smtp_password = clean_optional_env("SMTP_PASSWORD");
     let smtp_from = env::var("SMTP_FROM").expect("SMTP_FROM must be set");
     let smtp_tls = env::var("SMTP_TLS")
         .ok()

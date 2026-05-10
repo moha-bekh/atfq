@@ -31,7 +31,9 @@ impl SmtpEmailService {
             AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&host).port(port)
         };
 
-        if let (Some(username), Some(password)) = (username, password) {
+        let should_use_auth = !(host == "mailpit" || (!use_tls && port == 1025));
+
+        if let (true, Some(username), Some(password)) = (should_use_auth, username, password) {
             if !username.is_empty() && !password.is_empty() {
                 builder = builder.credentials(Credentials::new(username, password));
             }

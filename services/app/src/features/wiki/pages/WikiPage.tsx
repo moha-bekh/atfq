@@ -4,10 +4,10 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import LeftSidebar from "../components/LeftSidebar";
 import DocContent from "../components/DocContent";
 import type { WikiContentLine } from "../components/DocContent";
-import type { ResourceEntry } from "../types";
+import type { DeleteNodeMode, ResourceEntry } from "../types";
 import RightSidebar from "../components/RightSidebar";
 import StaticWikiPage, { getStaticWikiPage, STATIC_WIKI_PAGES } from "../components/StaticWikiPage";
-import { useRootArticles, useArticle, useCreateArticle, useCreateNode, useUpdateNode } from "../hooks/useWiki";
+import { useRootArticles, useArticle, useCreateArticle, useCreateNode, useUpdateNode, useDeleteNode } from "../hooks/useWiki";
 import { wikiApi } from "../api/wiki.api";
 import { useAppStore } from "@/stores/app.store";
 import type { NodeBreadcrumb } from "../types";
@@ -32,6 +32,15 @@ type WikiSearchItem = {
 const SEARCH_PAGE_SIZE = 6;
 
 const normalizeTitle = (title: string) => title.trim().toLowerCase();
+const normalizeText = (value?: string | null) => (value || "").trim();
+const normalizeResources = (resources: ResourceEntry[]) => JSON.stringify(
+  resources
+    .map((resource) => ({
+      label: normalizeText(resource.label),
+      url: normalizeText(resource.url || ""),
+    }))
+    .filter((resource) => resource.label.length > 0),
+);
 
 export default function WikiPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -40,8 +49,11 @@ export default function WikiPage() {
   const articleId = searchParams.get("id") ? parseInt(searchParams.get("id")!) : null;
   const requestedTitle = searchParams.get("title");
   const [mode, setMode] = useState<"read" | "edit" | "create">("read");
+  const [createParentIdOverride, setCreateParentIdOverride] = useState<string | null>(null);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
+  const roles = useAppStore((state) => state.roles);
   const canContribute = isAuthenticated;
+  const canDeleteArticle = roles.some((role) => role.toLowerCase() === "admin");
   const [popup, setPopup] = useState<{
     type: "success" | "error";
     message: string;
@@ -56,6 +68,7 @@ export default function WikiPage() {
   const { mutateAsync: createArticle } = useCreateArticle();
   const { mutateAsync: createNode } = useCreateNode();
   const { mutateAsync: updateNode } = useUpdateNode();
+  const { mutateAsync: deleteNode, isPending: isDeletingNode } = useDeleteNode();
   const rootArticleDetails = useQueries({
     queries: (rootArticles?.articles || []).map((root) => ({
       queryKey: ["wiki", "article", root.id, "sidebar"],
@@ -72,7 +85,7 @@ export default function WikiPage() {
 
   // Resolve stable links such as /wiki?title=Getting%20Started or /wiki?page=contribute.
   useEffect(() => {
-    if (articleId || staticPage || !rootArticles?.articles?.length) return;
+    if (mode === "create" || articleId || staticPage || !rootArticles?.articles?.length) return;
 
     if (requestedTitle) {
       const targetTitle = normalizeTitle(requestedTitle);
@@ -102,7 +115,7 @@ export default function WikiPage() {
     if (!requestedTitle || rootArticleDetails.every((query) => !query.isLoading)) {
       setSearchParams({ page: "getting-started" });
     }
-  }, [articleId, requestedTitle, rootArticles, rootArticleDetails, setSearchParams, staticPage]);
+  }, [articleId, mode, requestedTitle, rootArticles, rootArticleDetails, setSearchParams, staticPage]);
 
   useEffect(() => {
     if (articleError && articleId) {
@@ -131,6 +144,18 @@ export default function WikiPage() {
       setSearchParams({ id: id.toString() });
     }
     setMode("read");
+    setCreateParentIdOverride(null);
+  };
+
+  const handleModeChange = (nextMode: "read" | "edit" | "create") => {
+    setCreateParentIdOverride(null);
+    setMode(nextMode);
+  };
+
+  const handleCreateRootArticle = () => {
+    setSearchParams({});
+    setCreateParentIdOverride("");
+    setMode("create");
   };
 
   const handleCreate = async ({
@@ -190,12 +215,14 @@ export default function WikiPage() {
   };
 
   const handleEdit = async ({
+    parentId,
     title,
     tldr,
     notions,
     keyQuestions,
     resources,
   }: {
+    parentId?: number;
     title: string;
     tldr: string;
     notions: WikiContentLine[];
@@ -205,21 +232,38 @@ export default function WikiPage() {
     if (!article?.article_node?.id) return;
 
     try {
-      const updates: Promise<unknown>[] = [updateNode({
-        node_id: article.article_node.id,
-        title,
-        content: tldr,
-        resources,
-      })];
+      const currentParentId = article.article_node.parent_id ?? 0;
+      const nextParentId = parentId ?? 0;
+      const updates: Promise<unknown>[] = [];
+      const articleContentChanged =
+        normalizeText(article.article_node.title) !== normalizeText(title) ||
+        normalizeText(article.article_node.content) !== normalizeText(tldr) ||
+        normalizeResources(article.resources || []) !== normalizeResources(resources);
+      const parentChanged = currentParentId !== nextParentId;
+
+      if (articleContentChanged || parentChanged) {
+        updates.push(updateNode({
+          node_id: article.article_node.id,
+          title,
+          content: tldr,
+          resources,
+          ...(parentChanged ? { requested_parent_id: nextParentId } : {}),
+        }));
+      }
 
       notions.forEach((notion, index) => {
         const existing = article.notions[index];
         if (existing) {
-          updates.push(updateNode({
-            node_id: existing.id,
-            title: notion.title,
-            content: notion.content,
-          }));
+          if (
+            normalizeText(existing.title) !== normalizeText(notion.title) ||
+            normalizeText(existing.content) !== normalizeText(notion.content)
+          ) {
+            updates.push(updateNode({
+              node_id: existing.id,
+              title: notion.title,
+              content: notion.content,
+            }));
+          }
           return;
         }
 
@@ -235,11 +279,16 @@ export default function WikiPage() {
       keyQuestions.forEach((question, index) => {
         const existing = article.questions[index];
         if (existing) {
-          updates.push(updateNode({
-            node_id: existing.id,
-            title: question.title,
-            content: question.content,
-          }));
+          if (
+            normalizeText(existing.title) !== normalizeText(question.title) ||
+            normalizeText(existing.content) !== normalizeText(question.content)
+          ) {
+            updates.push(updateNode({
+              node_id: existing.id,
+              title: question.title,
+              content: question.content,
+            }));
+          }
           return;
         }
 
@@ -252,6 +301,14 @@ export default function WikiPage() {
         }));
       });
 
+      if (updates.length === 0) {
+        setPopup({
+          type: "error",
+          message: "No changes to submit.",
+        });
+        return;
+      }
+
       await Promise.all(updates);
       setMode("read");
       setPopup({
@@ -262,6 +319,30 @@ export default function WikiPage() {
       setPopup({
         type: "error",
         message: "Failed to submit edit. Make sure you are logged in.",
+      });
+    }
+  };
+
+  const handleDeleteArticle = async (deleteMode: DeleteNodeMode, newParent?: number) => {
+    if (!article?.article_node?.id) return;
+
+    const articleNode = article.article_node;
+    const parentId = articleNode.parent_id;
+
+    try {
+      await deleteNode({ id: articleNode.id, mode: deleteMode, newParent });
+      setMode("read");
+      setSearchParams(parentId ? { id: parentId.toString() } : { page: "getting-started" });
+      setPopup({
+        type: "success",
+        message: deleteMode === "delete_branch"
+          ? "Article branch deleted."
+          : "Article deleted. Child articles were reassigned.",
+      });
+    } catch (error) {
+      setPopup({
+        type: "error",
+        message: getErrorMessage(error),
       });
     }
   };
@@ -397,6 +478,14 @@ export default function WikiPage() {
     const map = new Map<number, NodeBreadcrumb>();
 
     (rootArticles?.articles || []).forEach((root) => map.set(root.id, root));
+    (article?.lineage || []).forEach((ancestor) => map.set(ancestor.id, ancestor));
+
+    if (parentArticle?.article_node) {
+      map.set(parentArticle.article_node.id, {
+        id: parentArticle.article_node.id,
+        title: parentArticle.article_node.title,
+      });
+    }
 
     if (article?.article_node) {
       map.set(article.article_node.id, {
@@ -426,6 +515,8 @@ export default function WikiPage() {
 
     return [];
   })();
+
+  const createParentId = createParentIdOverride ?? (article?.article_node?.id ? String(article.article_node.id) : "");
 
   const mobileConceptOptions = (() => {
     const options: MobileConceptOption[] = [];
@@ -563,7 +654,9 @@ export default function WikiPage() {
           <div className="max-h-full w-full overflow-y-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <LeftSidebar
               sections={sidebarSections}
+              canCreateRootArticle={canContribute}
               onItemClick={handleItemClick}
+              onCreateRootArticle={handleCreateRootArticle}
               search={{
                 query: wikiSearchQuery,
                 type: wikiSearchType,
@@ -601,7 +694,8 @@ export default function WikiPage() {
               mode={mode} 
               canContribute={canContribute}
               parentOptions={parentOptions}
-              onModeChange={setMode}
+              createParentId={createParentId}
+              onModeChange={handleModeChange}
               onCreate={handleCreate}
               onEdit={handleEdit}
             />
@@ -614,11 +708,15 @@ export default function WikiPage() {
             <div className="max-h-full w-full overflow-y-auto py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <RightSidebar
                 article={article}
+                parentOptions={parentOptions}
                 conceptLinks={rightConceptLinks}
                 onItemClick={handleItemClick}
                 mode={mode}
                 canContribute={canContribute}
-                onModeChange={setMode}
+                canDeleteArticle={canDeleteArticle}
+                isDeletingArticle={isDeletingNode}
+                onModeChange={handleModeChange}
+                onDeleteArticle={handleDeleteArticle}
               />
             </div>
           </div>

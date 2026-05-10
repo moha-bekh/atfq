@@ -21,6 +21,12 @@ pub struct SearchQuery {
 }
 
 #[derive(Deserialize)]
+pub struct DeleteNodeQuery {
+    pub mode: Option<String>,
+    pub new_parent: Option<i32>,
+}
+
+#[derive(Deserialize)]
 struct TokenClaims {
     sub: String,
     typ: String,
@@ -58,6 +64,36 @@ async fn touch_user_presence(state: &Arc<AppState>, user_id: &str) {
         .execute(user_db)
         .await;
     }
+}
+
+async fn require_wiki_admin(state: &Arc<AppState>, user_id: &str) -> Result<(), AppError> {
+    let Some(user_db) = &state.user_db else {
+        return Err(AppError::Grpc(tonic::Status::permission_denied(
+            "Admin role check is unavailable",
+        )));
+    };
+
+    let is_admin: bool = sqlx::query_scalar(
+        r#"
+        SELECT EXISTS (
+            SELECT 1
+            FROM profile_roles
+            WHERE profile_id = $1::uuid AND role_name = 'admin'
+        )
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(user_db)
+    .await
+    .map_err(|e| AppError::Internal(format!("Failed to check admin role: {}", e)))?;
+
+    if !is_admin {
+        return Err(AppError::Grpc(tonic::Status::permission_denied(
+            "Only admins can delete wiki articles",
+        )));
+    }
+
+    Ok(())
 }
 
 fn add_auth_header<T>(request: &mut tonic::Request<T>, headers: &HeaderMap) {
@@ -263,6 +299,16 @@ fn validate_create_article_payload(payload: &CreateArticleRequest) -> Result<(),
 }
 
 fn map_version(v: crate::grpc::wiki::Version) -> VersionResponse {
+    let requested_parent_id = v.metadata.as_ref().and_then(|metadata| {
+        metadata
+            .fields
+            .get("requested_parent_id")
+            .and_then(|value| match &value.kind {
+                Some(prost_types::value::Kind::NumberValue(parent_id)) => Some(*parent_id as i32),
+                _ => None,
+            })
+    });
+
     VersionResponse {
         version_id: v.version_id,
         node_id: v.node_id,
@@ -272,7 +318,21 @@ fn map_version(v: crate::grpc::wiki::Version) -> VersionResponse {
         created_at: v.created_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
         author: v.author,
         activated_at: v.activated_at.map(|t| format!("{}.{}", t.seconds, t.nanos)),
+        requested_parent_id,
     }
+}
+
+fn build_update_metadata(requested_parent_id: Option<i32>) -> Option<prost_types::Struct> {
+    requested_parent_id.map(|parent_id| {
+        let mut metadata = prost_types::Struct::default();
+        metadata.fields.insert(
+            "requested_parent_id".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::NumberValue(parent_id as f64)),
+            },
+        );
+        metadata
+    })
 }
 
 fn parse_contributor_id(label: &str) -> Option<i32> {
@@ -602,7 +662,7 @@ pub async fn update_node_handler(
         node_id: payload.node_id,
         title: payload.title,
         content,
-        metadata: None,
+        metadata: build_update_metadata(payload.requested_parent_id),
     });
     add_required_auth_header(&mut request, &headers)?;
 
@@ -615,7 +675,9 @@ pub async fn update_node_handler(
     path = "/api/v1/wiki/nodes/{id}",
     operation_id = "delete_node",
     params(
-        ("id" = i32, Path, description = "Node ID")
+        ("id" = i32, Path, description = "Node ID"),
+        ("mode" = Option<String>, Query, description = "delete_branch or reassign_children"),
+        ("new_parent" = Option<i32>, Query, description = "Target parent for reassign_children. Use 0 for root.")
     ),
     responses(
         (status = 200, description = "Node deleted", body = DeleteResponse),
@@ -628,8 +690,39 @@ pub async fn delete_node_handler(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<i32>,
+    Query(query): Query<DeleteNodeQuery>,
 ) -> Result<Json<DeleteResponse>, AppError> {
+    let user_id = current_user_id_from_headers(&headers)
+        .ok_or_else(|| AppError::Unauthorized("Invalid or missing access token".into()))?;
+    require_wiki_admin(&state, &user_id).await?;
+
     let mut client = state.wiki_client.clone();
+    let mode = query.mode.as_deref().unwrap_or("delete_branch");
+
+    if mode == "reassign_children" {
+        let response = client
+            .get_article(tonic::Request::new(crate::grpc::wiki::GetArticleRequest {
+                id,
+            }))
+            .await?
+            .into_inner();
+        let fallback_parent = response.article_node.and_then(|node| node.parent_id).unwrap_or(0);
+        let new_parent = query.new_parent.unwrap_or(fallback_parent);
+
+        for child in response.sub_articles {
+            client
+                .assign_parent(tonic::Request::new(crate::grpc::wiki::AssignParentRequest {
+                    new_parent,
+                    child: child.id,
+                }))
+                .await?;
+        }
+    } else if mode != "delete_branch" {
+        return Err(AppError::Grpc(tonic::Status::invalid_argument(
+            "Unsupported delete mode",
+        )));
+    }
+
     let mut request = tonic::Request::new(crate::grpc::wiki::DeleteNodeRequest { node_id: id });
     add_required_auth_header(&mut request, &headers)?;
 
@@ -656,6 +749,10 @@ pub async fn assign_parent_handler(
     headers: HeaderMap,
     Json(payload): Json<AssignParentRequest>,
 ) -> Result<Json<NodeResponse>, AppError> {
+    let user_id = current_user_id_from_headers(&headers)
+        .ok_or_else(|| AppError::Unauthorized("Invalid or missing access token".into()))?;
+    require_wiki_admin(&state, &user_id).await?;
+
     let mut client = state.wiki_client.clone();
     let mut request = tonic::Request::new(crate::grpc::wiki::AssignParentRequest {
         new_parent: payload.new_parent,
