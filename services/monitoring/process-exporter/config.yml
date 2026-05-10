@@ -1,0 +1,14 @@
+process_names:
+  - name: api-gateway
+    comm:
+      - api-gateway
+      - gateway
+  - name: auth
+    comm:
+      - auth
+  - name: user
+    comm:
+      - user
+  - name: wiki
+    comm:
+      - api-user

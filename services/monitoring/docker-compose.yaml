@@ -32,12 +32,12 @@ services:
   grafana:
     image: grafana/grafana:11.3.1
     container_name: monitoring-grafana
-    ports:
-      - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-https://atfq.org/grafana/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
@@ -67,8 +67,28 @@ services:
       - "--docker_only=true"
       - "--housekeeping_interval=10s"
       - "--disable_metrics=disk,diskIO,tcp,udp,percpu,sched"
-      - "--store_container_labels=false"
-      - "--whitelisted_container_labels=io.kubernetes.container.name,io.kubernetes.pod.name,io.kubernetes.pod.namespace"
+      - "--store_container_labels=true"
+      - "--whitelisted_container_labels=io.kubernetes.container.name,io.kubernetes.pod.name,io.kubernetes.pod.namespace,com.docker.compose.project,com.docker.compose.service"
+    restart: unless-stopped
+
+  process-exporter:
+    image: ncabatoff/process-exporter:latest
+    container_name: monitoring-process-exporter
+    pid: host
+    volumes:
+      - ./process-exporter/config.yml:/etc/process-exporter/config.yml:ro
+      - /proc:/host/proc:ro
+    command:
+      - "-procfs=/host/proc"
+      - "-config.path=/etc/process-exporter/config.yml"
+      - "-recheck"
+      - "-remove-empty-groups"
+      - "-gather-smaps=false"
+      - "-debug"
+    networks:
+      - backend
+    ports:
+      - "9256:9256"
     restart: unless-stopped
 
   node-exporter:

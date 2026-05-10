@@ -203,6 +203,7 @@ export const ProfileView = () => {
 
   const profile = fetchedProfile ?? storedProfile;
   const profilePictureUrl = getProfilePictureUrl(profile?.profile_picture_url);
+  const usernameConfirmation = user?.username?.trim() ?? '';
 
   // Forms
   const { register: regUsername, handleSubmit: handleUsernameSubmit, reset: resetUsername } = useForm<UsernameForm>({
@@ -349,7 +350,7 @@ export const ProfileView = () => {
   };
 
   const onDeleteAccount = async () => {
-    if (deleteConfirmationText !== user?.username) {
+    if (!usernameConfirmation || deleteConfirmationText.trim() !== usernameConfirmation) {
       setStatus({ type: 'error', message: 'Confirmation username mismatch', target: 'account' });
       return;
     }
@@ -826,11 +827,11 @@ export const ProfileView = () => {
                       </div>
                     ) : (
                       <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                        <p className="text-[10px] font-bold text-error uppercase tracking-widest">
-                          Type <span className="underline">{user?.username}</span> to confirm deletion:
+                        <p className="text-[10px] font-bold text-error tracking-widest">
+                          <span className="uppercase">Type</span> <span className="underline normal-case font-mono tracking-normal">{usernameConfirmation}</span> <span className="uppercase">to confirm deletion:</span>
                         </p>
                         <Input 
-                          placeholder="Confirm username..." 
+                          placeholder={usernameConfirmation || 'Confirm username...'} 
                           value={deleteConfirmationText}
                           onChange={(e) => setDeleteConfirmationText(e.target.value)}
                           className="border-error/50 focus:border-error"
@@ -1114,7 +1115,7 @@ export const ProfileView = () => {
                       label="Find users"
                       value={friendSearchQuery}
                       onChange={(event) => setFriendSearchQuery(event.target.value)}
-                      placeholder="Search by username or email"
+                      placeholder="Search by username"
                     />
                     <div className="flex justify-end">
                       <Button type="submit" variant="outline" disabled={isSearchingFriends || friendSearchQuery.trim().length < 2}>
@@ -1140,7 +1141,6 @@ export const ProfileView = () => {
                                 )}
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-bold text-text">{result.username}</p>
-                                  <p className="truncate text-[10px] font-mono text-sub">{result.email}</p>
                                 </div>
                               </div>
                               <Button

@@ -711,7 +711,7 @@ pub async fn touch_presence_handler(
     path = "/api/v1/user/search",
     operation_id = "search_users",
     params(
-        ("q" = String, Query, description = "Username or email search")
+        ("q" = String, Query, description = "Username search")
     ),
     responses(
         (status = 200, description = "Matching users", body = UserSearchResponse),
@@ -741,7 +741,7 @@ pub async fn search_users_handler(
         SELECT id::text AS id, username, email
         FROM users
         WHERE id::text <> $1
-        AND (username ILIKE $2 OR email ILIKE $2)
+        AND username ILIKE $2
         ORDER BY username ASC
         LIMIT 10
         "#,

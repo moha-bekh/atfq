@@ -12,6 +12,7 @@ interface DocContentProps {
   mode: "read" | "edit" | "create";
   canContribute: boolean;
   parentOptions: NodeBreadcrumb[];
+  onModeChange: (mode: "read" | "edit" | "create") => void;
   onCreate: (data: {
     parentId?: number;
     title: string;
@@ -86,7 +87,7 @@ const formatResourceLine = (resource: ResourceEntry) => {
   return url ? `${label} | ${url}` : label;
 };
 
-export default function DocContent({ article, mode, canContribute, parentOptions, onCreate, onEdit }: DocContentProps) {
+export default function DocContent({ article, mode, canContribute, parentOptions, onModeChange, onCreate, onEdit }: DocContentProps) {
   const [title, setTitle] = useState("");
   const [tldr, setTldr] = useState("");
   const [notions, setNotions] = useState("");
@@ -362,6 +363,15 @@ export default function DocContent({ article, mode, canContribute, parentOptions
               ? "Select an article or click CREATE to start."
               : "Select an article, or sign in to create one."}
           </span>
+          {canContribute && (
+            <button
+              type="button"
+              onClick={() => onModeChange("create")}
+              className="rounded-lg border border-main/30 px-4 py-3 font-bricolage text-[10px] font-bold uppercase tracking-widest text-main transition-colors hover:bg-main/10"
+            >
+              Create
+            </button>
+          )}
           {!canContribute && (
             <Link
               to="/login"

@@ -476,6 +476,19 @@ export default function WikiPage() {
     return options;
   })();
 
+  const selectedMobileConceptValue = (() => {
+    if (staticPage?.id) return staticPage.id;
+
+    if (articleId !== null) {
+      const value = articleId.toString();
+      if (mobileConceptOptions.some((option) => String(option.id) === value)) {
+        return value;
+      }
+    }
+
+    return "";
+  })();
+
   return (
     <div className="mx-auto mt-6 flex w-full max-w-[1680px] flex-col gap-4 px-4 pb-6 pt-4 sm:px-6 lg:px-8 xl:h-[calc(100vh-128px)] xl:overflow-hidden">
       {popup && (
@@ -513,7 +526,7 @@ export default function WikiPage() {
           </label>
           <select
             id="wiki-mobile-concepts"
-            value={staticPage?.id ?? articleId ?? ""}
+            value={selectedMobileConceptValue}
             onChange={(event) => {
               const nextValue = event.target.value;
               const nextStaticPage = getStaticWikiPage(nextValue);
@@ -588,6 +601,7 @@ export default function WikiPage() {
               mode={mode} 
               canContribute={canContribute}
               parentOptions={parentOptions}
+              onModeChange={setMode}
               onCreate={handleCreate}
               onEdit={handleEdit}
             />
