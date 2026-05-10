@@ -1,0 +1,56 @@
+erDiagram
+    profiles {
+        uuid id PK
+        text profile_picture_url
+        jsonb theme
+        timestamptz last_seen_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    roles {
+        varchar name PK
+        text description
+    }
+
+    permissions {
+        varchar slug PK
+        text description
+    }
+
+    role_permissions {
+        varchar role_name FK
+        varchar permission_slug FK
+    }
+
+    profile_roles {
+        uuid profile_id FK
+        varchar role_name FK
+    }
+
+    role_change_requests {
+        uuid request_id PK
+        uuid profile_id FK
+        varchar requested_role FK
+        text reason
+        request_status status
+        text rejection_reason
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    friendships {
+        uuid requester_id FK
+        uuid addressee_id FK
+        text status
+        timestamptz created_at
+        timestamptz accepted_at
+    }
+
+    profiles ||--o{ profile_roles : has
+    roles ||--o{ profile_roles : assigned_to
+    roles ||--o{ role_permissions : grants
+    permissions ||--o{ role_permissions : included_in
+    profiles ||--o{ role_change_requests : requests
+    profiles ||--o{ friendships : requester
+    profiles ||--o{ friendships : addressee

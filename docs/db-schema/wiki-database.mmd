@@ -1,0 +1,29 @@
+erDiagram
+    nodes {
+        int id PK
+        int parent_id FK
+        varchar type
+        int current_version_id FK
+        int order_index
+    }
+
+    node_versions {
+        int id PK
+        int node_id FK
+        text title
+        text content
+        timestamp created_at
+        int created_by
+        varchar status
+        timestamp activated_at
+    }
+
+    questions {
+        int id PK
+        int node_version_id FK
+        jsonb metadata
+    }
+
+    nodes ||--o{ nodes : parent_child
+    nodes ||--o{ node_versions : versions
+    node_versions ||--o| questions : question_metadata

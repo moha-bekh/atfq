@@ -41,24 +41,15 @@ The project does not commit runtime `.env` files. Service secrets are managed th
 ### Run the website
 
 ```bash
-task dc:up -- vault
-task vault:up
-task dc:up
+task up
 ```
 
 This is the single-command containerized deployment expected by the subject. It starts the frontend, API gateway, auth service, user service, wiki service, databases, object storage, Vault, WAF gateway, and monitoring stack.
 
-After running this command once, you may run all containers using just `task dc:up`.
+Main URLs:
 
-Main local URLs:
-
-- Frontend through Vite/dev container: `http://localhost:8080`
-- Swagger/OpenAPI: `http://localhost:8081/swagger-ui`
-- Net gateway HTTPS entrypoint: `https://atfq.org` when local DNS/hosts and certificates are configured.
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Mailpit: `http://localhost:8025`
-- MinIO console: `http://localhost:9001`
+- app: `https://atfq.org`
+- grafana: `https://atfq.org/grafana`
 
 ### Useful commands
 
@@ -79,47 +70,15 @@ cd services && docker compose logs -f
 cd services && docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up --build -d
 ```
 
-### Frontend development
-
-```bash
-cd services/app
-npm install
-npm run dev
-npm run lint
-npm run build
-```
-
-### Backend development
-
-Rust services:
-
-```bash
-cd services/auth
-cargo test
-
-cd ../api-gateway
-cargo test
-
-cd ../user
-cargo test
-```
-
-Wiki service:
-
-```bash
-cd services/wiki
-go test ./...
-```
-
 ## Team Information
 
 | Member | Role(s) | Responsibilities |
 | --- | --- | --- |
-| acaetano | Product Owner, Developer | Product direction, feature prioritization, wiki experience, content workflow validation. |
-| jamar | Project Manager, Developer | Planning, task coordination, review flow, delivery tracking, frontend integration. |
-| jsommet | Technical Lead, Developer | Architecture decisions, backend contracts, service boundaries, code quality. |
-| mbekheir | Developer, DevOps/Security | Containerization, Vault, WAF, monitoring, authentication and API integration. |
-| sdeutsch | Developer | User-facing features, profile management, accessibility checks, documentation support. |
+| mbekheir | Product Owner, Technical Lead, Developer, DevOps/Security | Product direction, Art Direction, technical architecture, authentication, OAuth, Vault, WAF, monitoring, design system, API integration, and delivery coherence. |
+| jamar | Project Manager, Developer | Planning, task coordination, meeting follow-up, 2FA implementation, user management support, and integration tracking. |
+| jsommet | Developer | Backend/frontend framework work, API and microservice integration, ORM/database usage, and shared module implementation. |
+| acaetano | Developer | RBAC support, user management, backend/frontend framework work, API integration, ORM/database usage, and shared module implementation. |
+| sdeutsch | Developer | Advanced search support, user-facing features, backend/frontend framework work, API integration, ORM/database usage, and shared module implementation. |
 
 All team members are expected to understand the global architecture, explain their own work, and demonstrate at least one implemented feature during evaluation.
 
@@ -130,9 +89,8 @@ The team organized the project around small vertical features rather than isolat
 Practices used:
 
 - Regular synchronization meetings for progress, blockers, and module validation.
-- GitHub Issues or equivalent task tracking for backlog and assignments.
+- GitHub pull requests for code review.
 - Discord for daily communication and quick technical decisions.
-- Pull request reviews for important changes.
 - Shared architecture notes for service contracts, database decisions, and security choices.
 - Meaningful Git commits from all members to show individual and collective work.
 
@@ -141,6 +99,9 @@ During evaluation, the team can explain how the work was distributed, how module
 ## Technical Stack
 
 ### Frontend
+
+Prototype
+- Figma URL: https://www.figma.com/design/Wcn6Z4MUuzDb3OOM34E9VM/ATFQ-Prototype?node-id=65-69&t=oat3AzMCOrUZrXQ2-1
 
 - React 19 with TypeScript.
 - Vite for development and production build.
@@ -182,31 +143,7 @@ Why: the infrastructure mirrors real production concerns: service isolation, HTT
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    Browser["Chrome / Browser"] --> NetGateway["Nginx + ModSecurity WAF"]
-    Browser --> App["React Frontend"]
-    App --> ApiGateway["Axum API Gateway"]
-    NetGateway --> App
-    ApiGateway --> Auth["Auth Service"]
-    ApiGateway --> User["User Service"]
-    ApiGateway --> Wiki["Wiki Service"]
-    Auth --> AuthDb["PostgreSQL auth DB"]
-    Auth --> Redis["Redis"]
-    User --> UserDb["PostgreSQL user DB"]
-    User --> MinIO["MinIO profile storage"]
-    Wiki --> WikiDb["PostgreSQL wiki DB"]
-    Vault["HashiCorp Vault"] --> Auth
-    Vault --> User
-    Vault --> Wiki
-    Vault --> ApiGateway
-    Vault --> NetGateway
-    Prometheus["Prometheus"] --> ApiGateway
-    Prometheus --> Auth
-    Prometheus --> User
-    Prometheus --> Wiki
-    Grafana["Grafana"] --> Prometheus
-```
+File: atfq.excalidraw
 
 ## Database Schema
 
@@ -214,162 +151,66 @@ ATFQ uses separate PostgreSQL databases per domain service.
 
 ### Auth database
 
-```mermaid
-erDiagram
-    users {
-        uuid id PK
-        varchar username UK
-        varchar email UK
-        varchar password_hash
-        bytea mfa_secret
-        bytea mfa_nonce
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    user_oauth {
-        uuid user_id FK
-        varchar provider
-        varchar provider_id
-    }
-
-    users ||--o{ user_oauth : links
-```
+<img src="docs/db-schema/auth-database.svg" alt="Auth database schema" width="520">
 
 ### User database
 
-```mermaid
-erDiagram
-    profiles {
-        uuid id PK
-        text profile_picture_url
-        jsonb theme
-        timestamptz last_seen_at
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    roles {
-        varchar name PK
-        text description
-    }
-
-    permissions {
-        varchar slug PK
-        text description
-    }
-
-    role_permissions {
-        varchar role_name FK
-        varchar permission_slug FK
-    }
-
-    profile_roles {
-        uuid profile_id FK
-        varchar role_name FK
-    }
-
-    role_change_requests {
-        uuid request_id PK
-        uuid profile_id FK
-        varchar requested_role FK
-        text reason
-        request_status status
-        text rejection_reason
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    friendships {
-        uuid requester_id FK
-        uuid addressee_id FK
-        text status
-        timestamptz created_at
-        timestamptz accepted_at
-    }
-
-    profiles ||--o{ profile_roles : has
-    roles ||--o{ profile_roles : assigned_to
-    roles ||--o{ role_permissions : grants
-    permissions ||--o{ role_permissions : included_in
-    profiles ||--o{ role_change_requests : requests
-    profiles ||--o{ friendships : requester
-    profiles ||--o{ friendships : addressee
-```
+<img src="docs/db-schema/user-database.svg" alt="User database schema" width="760">
 
 ### Wiki database
 
-```mermaid
-erDiagram
-    nodes {
-        int id PK
-        int parent_id FK
-        varchar type
-        int current_version_id FK
-        int order_index
-    }
-
-    node_versions {
-        int id PK
-        int node_id FK
-        text title
-        text content
-        timestamp created_at
-        int created_by
-        varchar status
-        timestamp activated_at
-    }
-
-    questions {
-        int id PK
-        int node_version_id FK
-        jsonb metadata
-    }
-
-    nodes ||--o{ nodes : parent_child
-    nodes ||--o{ node_versions : versions
-    node_versions ||--o| questions : question_metadata
-```
+<img src="docs/db-schema/wiki-database.svg" alt="Wiki database schema" width="680">
 
 ## Features List
 
 | Feature | Description | Main contributors |
 | --- | --- | --- |
-| Public wiki browsing | Users can browse root articles, nested articles, notions, questions, and resources. | acaetano, jamar |
-| Wiki creation and editing | Authenticated users can submit new articles and edits as pending versions. | acaetano, jsommet |
-| Wiki moderation | Moderators/admins can approve or reject pending wiki versions. | jsommet, jamar |
-| Authentication | Signup, login, logout, refresh tokens, password reset, account deletion. | mbekheir, jsommet |
+| Frontend and backend frameworks | React/Vite frontend, Rust Axum/Tonic services, and Go wiki service organized around clear service boundaries. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Public wiki browsing | Users can browse root articles, nested articles, notions, questions, and resources. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Wiki creation and editing | Authenticated users can submit new articles and edits as pending versions. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Wiki moderation | Moderators/admins can approve or reject pending wiki versions. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| API layer | HTTP endpoints exposed by the API gateway, gRPC contracts between internal services, and Swagger/OpenAPI documentation. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Authentication | Signup, login, logout, refresh tokens, password reset, account deletion. | mbekheir |
 | OAuth | Google and GitHub authentication and provider unlinking. | mbekheir |
-| MFA | TOTP-based MFA enable, verify, and disable flow. | mbekheir, sdeutsch |
-| Profile management | Username/email/password update, avatar upload/removal, theme customization. | sdeutsch, jamar |
-| Friends and presence | User search, friend requests, accepted friends, online/last-seen status. | sdeutsch, mbekheir |
-| Roles and permissions | Admin, moderator, user roles with permission-based UI and backend checks. | jsommet, mbekheir |
-| Admin dashboard | Role request history/review and wiki moderation review surface. | jamar, jsommet |
-| Legal pages | Privacy Policy and Terms of Service available from the application. | acaetano, sdeutsch |
+| MFA | TOTP-based MFA enable, verify, and disable flow. | jamar |
+| Profile management | Username/email/password update, avatar upload/removal, theme customization. | acaetano, mbekheir, jamar |
+| Friends and presence | User search, friend requests, accepted friends, online/last-seen status. | acaetano, mbekheir, jamar |
+| Roles and permissions | Admin, moderator, user roles with permission-based UI and backend checks. | mbekheir, acaetano |
+| Admin dashboard | Role request history/review and wiki moderation review surface. | mbekheir, acaetano, jamar |
+| ORM/database access | SQLx-based Rust persistence and sqlx-based Go persistence with migrations per service. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Custom design system | Shared UI primitives, theme tokens, typography choices, reusable layout elements, and a Figma-supported visual direction. | mbekheir |
+| Advanced search | Wiki search with filtering, sorting, pagination, and user/profile search support. | sdeutsch, mbekheir |
+| Legal pages | Privacy Policy and Terms of Service available from the application. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
 | Monitoring | Prometheus metrics and Grafana dashboard. | mbekheir |
-| WAF and secret management | ModSecurity gateway and Vault-managed service secrets. | mbekheir, jsommet |
+| WAF and secret management | ModSecurity gateway and Vault-managed service secrets. | mbekheir |
 
 ## Chosen Modules
 
-The project claims 15 module points. Only fully functional modules should be counted during evaluation.
+The project claims 23 module points. Only fully functional modules should be counted during evaluation.
 
 | Category | Module | Type | Points | Implementation | Contributors |
 | --- | --- | --- | ---: | --- | --- |
-| Web | Use a framework for both frontend and backend | Major | 2 | React/Vite frontend and Axum/Tonic backend services. | jamar, jsommet, mbekheir |
-| Web | Advanced search with filters, sorting, and pagination | Minor | 1 | Wiki search UI includes query, type filtering, title sorting, and paginated results. | acaetano, jamar |
-| User Management | Standard user management and authentication | Major | 2 | Profile updates, avatar support, friends, online presence, and profile page. | sdeutsch, mbekheir |
+| Web | Use a framework for both frontend and backend | Major | 2 | React/Vite frontend, Rust Axum/Tonic services, and Go wiki service. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Web | API | Major | 2 | API gateway, REST endpoints, OpenAPI/Swagger documentation, and gRPC contracts between services. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Web | Advanced search with filters, sorting, and pagination | Minor | 1 | Wiki search UI includes query, type filtering, title sorting, and paginated results; user search is available from profile flows. | sdeutsch, mbekheir |
+| User Management | Standard user management and authentication | Major | 2 | Profile updates, avatar support, friends, online presence, role requests, and account settings. | acaetano, mbekheir, jamar |
 | User Management | OAuth 2.0 remote authentication | Minor | 1 | Google and GitHub OAuth login/link/unlink flows. | mbekheir |
-| User Management | Advanced permissions system | Major | 2 | Roles, permissions, role requests, admin review, and permission-gated actions. | jsommet, jamar |
-| User Management | Complete 2FA system | Minor | 1 | TOTP MFA enable, verify, and disable with encrypted stored material. | mbekheir, sdeutsch |
-| Cybersecurity | WAF/ModSecurity + HashiCorp Vault | Major | 2 | OWASP ModSecurity CRS gateway and Vault agents for isolated secret injection. | mbekheir, jsommet |
+| User Management | Advanced permissions system | Major | 2 | Roles, permissions, role requests, admin review, and permission-gated actions. | mbekheir, acaetano |
+| User Management | Complete 2FA system | Minor | 1 | TOTP MFA enable, verify, and disable with encrypted stored material. | jamar |
+| Cybersecurity | WAF/ModSecurity + HashiCorp Vault | Major | 2 | OWASP ModSecurity CRS gateway and Vault agents for isolated secret injection. | mbekheir |
 | DevOps | Monitoring with Prometheus and Grafana | Major | 2 | Metrics endpoints for services, Prometheus scrape config, Grafana provisioning. | mbekheir |
-| DevOps | Backend as microservices | Major | 2 | API gateway, auth, user, and wiki services with separate databases and gRPC contracts. | jsommet, mbekheir |
+| DevOps | Backend as microservices | Major | 2 | API gateway, auth, user, and wiki services with separate databases and gRPC contracts. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Database | ORM/database toolkit | Major | 2 | SQLx is used in Rust services and sqlx is used in the Go wiki service to structure database access and migrations. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Module of choice | Multi-language / API / framework stack | Minor | 1 | The project combines Rust and Go backend services, React frontend, OpenAPI documentation, and gRPC service contracts. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
+| Module of choice | Figma-driven UI preparation | Minor | 1 | Figma was used to prepare the visual direction and align the custom ATFQ interface before implementation. | mbekheir |
+| Module of choice | Custom-made design system | Major | 2 | Shared UI primitives, theme tokens, custom typography/theme settings, reusable navigation, and consistent ATFQ visual language. | mbekheir |
 
-Total: 15 points.
+Total: 23 points.
 
 ## Module Justification
 
 - Frameworks: the project uses a real frontend framework and backend frameworks instead of a static page or ad hoc server.
+- API: the gateway exposes documented REST endpoints while internal services communicate through typed gRPC contracts.
 - Advanced search: the wiki would be hard to navigate without filtering, sorting, and pagination, so this directly improves the product.
 - Standard user management: profiles, avatars, friendship, and presence are core to a multi-user collaborative platform.
 - OAuth: remote login reduces account friction and demonstrates provider integration.
@@ -378,53 +219,65 @@ Total: 15 points.
 - WAF + Vault: the project handles authentication and user data, so gateway hardening and secret isolation are important.
 - Monitoring: Prometheus and Grafana make service health visible and support debugging during multi-service deployment.
 - Microservices: auth, user, and wiki domains have different responsibilities and storage needs; service separation keeps these boundaries clear.
+- ORM/database toolkit: SQLx keeps database access explicit while still providing typed rows, migrations, and structured persistence code.
+- Multi-language/API/framework module of choice: the project demonstrates integration across Rust, Go, React, REST, OpenAPI, and gRPC rather than a single monolithic stack.
+- Figma module of choice: the interface was prepared from a visual design source before being translated into reusable frontend components.
+- Custom design system: ATFQ has reusable UI primitives and theme behavior instead of one-off screen styling.
 
 ## Individual Contributions
 
 ### acaetano
 
-- Helped define the ATFQ product concept and user journey.
-- Worked on wiki browsing and contribution workflows.
+- Worked on the advanced permissions system with mbekheir.
+- Contributed to user management with mbekheir and jamar.
+- Participated in the shared frontend/backend framework work.
+- Participated in API integration, microservice behavior, and ORM/database usage.
 - Helped validate content structure: articles, notions, questions, and resources.
-- Contributed to README/product documentation and evaluation preparation.
 
-Main challenge: making the wiki feel structured enough for learning while keeping contribution forms understandable.
+Main challenge: keeping user-facing account and permission flows understandable while the backend rules became more detailed.
 
 ### jamar
 
-- Coordinated planning, task breakdown, and frontend integration.
-- Built or integrated React screens for wiki browsing, search, moderation, and navigation.
-- Helped implement admin dashboard UX for role and wiki review flows.
-- Participated in code reviews and cross-service integration testing.
+- Acted as Project Manager and coordinated planning, task breakdown, and progress tracking.
+- Implemented the 2FA flow.
+- Contributed to user management with acaetano and mbekheir.
+- Participated in the shared frontend/backend framework work.
+- Participated in API integration, microservice behavior, and ORM/database usage.
 
-Main challenge: keeping frontend state consistent while content versions, roles, and permissions change asynchronously.
+Main challenge: coordinating delivery while security-sensitive authentication features required careful integration and testing.
 
 ### jsommet
 
-- Led technical architecture and backend service boundaries.
-- Implemented or reviewed gRPC contracts, role/permission workflows, and moderation logic.
-- Worked on database schema design and data consistency.
-- Reviewed critical backend and API gateway changes.
+- Participated in the shared frontend/backend framework work.
+- Contributed to API and microservice integration.
+- Worked with the shared ORM/database layer and service migrations.
+- Helped keep backend contracts and service boundaries consistent.
+- Participated in integration and evaluation preparation.
 
 Main challenge: keeping domain services independent while still exposing a simple API to the frontend.
 
 ### mbekheir
 
-- Implemented DevOps and security infrastructure: Docker Compose, Vault, ModSecurity, monitoring.
-- Worked on authentication, OAuth, MFA, API gateway integration, and service secrets.
-- Added metrics and operational tooling for local evaluation.
-- Helped connect backend services to the frontend API client.
+- Acted as Product Owner and Technical Lead.
+- Implemented remote authentication with OAuth 2.0 for Google and GitHub.
+- Implemented DevOps and security infrastructure: Docker Compose, Vault, ModSecurity, Prometheus, and Grafana.
+- Worked on the advanced permissions system with acaetano.
+- Contributed to user management with acaetano and jamar.
+- Worked on advanced search with sdeutsch.
+- Built the custom-made design system and prepared the Figma-based visual direction.
+- Participated in the shared framework, API, microservice, and ORM/database modules.
 
 Main challenge: making the application reproducible with many containers while keeping secrets out of source code.
 
 ### sdeutsch
 
-- Worked on user profile features, avatar handling, theme customization, and account settings.
-- Helped implement friendship and presence user flows.
-- Participated in accessibility and responsive UI checks.
-- Supported documentation and evaluation readiness.
+- Worked on advanced search functionality with mbekheir.
+- Participated in the shared frontend/backend framework work.
+- Participated in API integration, microservice behavior, and ORM/database usage.
+- Contributed to user-facing features and evaluation readiness.
+- Helped test flows from the user perspective.
 
-Main challenge: designing user settings that expose many account/security actions without becoming confusing.
+Main challenge: making search and user-facing workflows practical while the content and profile data came from multiple services.
 
 ## Security Notes
 
@@ -468,11 +321,13 @@ Technical references used:
 - Tonic gRPC documentation: https://docs.rs/tonic/latest/tonic/
 - SQLx documentation: https://docs.rs/sqlx/latest/sqlx/
 - PostgreSQL documentation: https://www.postgresql.org/docs/
+- OpenAPI specification: https://spec.openapis.org/oas/latest.html
 - Docker Compose documentation: https://docs.docker.com/compose/
 - HashiCorp Vault documentation: https://developer.hashicorp.com/vault/docs
 - OWASP ModSecurity Core Rule Set: https://coreruleset.org/
 - Prometheus documentation: https://prometheus.io/docs/
 - Grafana documentation: https://grafana.com/docs/
+- Figma documentation: https://help.figma.com/
 - OAuth 2.0 overview: https://oauth.net/2/
 - OWASP Web Security Testing Guide: https://owasp.org/www-project-web-security-testing-guide/
 
@@ -482,18 +337,3 @@ AI usage:
 - AI was used for brainstorming wording, module justification, and checklist coverage.
 - AI was not treated as an authority for project behavior; generated text must be reviewed by the team and kept consistent with the implemented code.
 - Any AI-assisted content is the team's responsibility and should be explainable by team members during evaluation.
-
-## Evaluation Checklist
-
-Before the defense, verify:
-
-- All team members are present and can explain their role and contributions.
-- `README.md` is up to date with implemented modules only.
-- `docker compose up --build` starts the whole stack from `services/`.
-- Chrome console has no unexpected errors or warnings.
-- Privacy Policy and Terms of Service are accessible from the UI.
-- `.env` and unencrypted secrets are not committed.
-- The database schema can be explained by at least two team members.
-- Password hashing, OAuth, MFA, roles, and Vault can be demonstrated.
-- Each claimed module can be shown live.
-- The validated module count reaches at least 14 points.
