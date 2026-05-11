@@ -52,6 +52,10 @@ tasks:
       - task: prod-build
       - task: prod-up
 
+  up2:
+    cmds:
+      - task dc:up -- vault -d && task vault:unseal && task dc:up -- -d
+
   re:
     desc: "Clean all local infra data, build images, then start the production stack"
     cmds:
