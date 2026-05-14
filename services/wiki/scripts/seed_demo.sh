@@ -68,7 +68,9 @@ seed_child() {
     local content="$4"
     local order_index="$5"
 
-    if [ "$node_type" = "question" ]; then
+    if [ "$node_type" = "notion" ]; then
+        content=""
+    elif [ "$node_type" = "question" ]; then
         content="$title"
     fi
 
@@ -147,7 +149,9 @@ seed_article_details "$os_id" \
     "question" "How does the OS manage multiple programs simultaneously?" "It schedules execution, isolates address spaces, multiplexes I/O, and tracks process state." \
     "question" "Why is memory virtualization necessary?" "It gives each process a stable private address space while enabling protection and efficient allocation." \
     "question" "How does the kernel interact with hardware?" "It uses drivers, interrupts, privileged instructions, and controlled system-call interfaces." \
-    "question" "What tradeoffs exist between performance and isolation?" "Stronger isolation improves safety but can add context switching, copying, and validation overhead."
+    "question" "What tradeoffs exist between performance and isolation?" "Stronger isolation improves safety but can add context switching, copying, and validation overhead." \
+    "question" "What happens when a program makes a system call?" "" \
+    "question" "How do interrupts change what the CPU is doing?" ""
 
 seed_article_details "$processes_id" \
     "notion" "Process lifecycle" "The sequence of states a process moves through while it exists." \
@@ -157,7 +161,10 @@ seed_article_details "$processes_id" \
     "notion" "Threads" "Execution flows that share a process address space and resources." \
     "question" "What differentiates a process from a thread?" "A process owns isolated resources, while threads share resources inside one process." \
     "question" "Why does context switching have overhead?" "The kernel must save and restore execution state and may disturb CPU caches and TLB entries." \
-    "question" "How are processes isolated from each other?" "The OS uses virtual memory, permissions, kernel mediation, and separate resource tables."
+    "question" "How are processes isolated from each other?" "The OS uses virtual memory, permissions, kernel mediation, and separate resource tables." \
+    "question" "What information does the kernel need to remember about a process?" "" \
+    "question" "How does process creation affect parent and child state?" "" \
+    "question" "When does a process stop being runnable?" ""
 
 seed_article_details "$process_lifecycle_id" \
     "notion" "Ready queue" "The set of processes prepared to run when CPU time becomes available." \
@@ -166,7 +173,9 @@ seed_article_details "$process_lifecycle_id" \
     "notion" "Scheduler interaction" "The scheduler moves processes between states based on timers, events, and priority." \
     "question" "Why do processes wait?" "They wait for I/O, locks, child processes, timers, or external events." \
     "question" "What triggers state transitions?" "System calls, interrupts, I/O completion, scheduler decisions, and process termination." \
-    "question" "How does multitasking work internally?" "The OS rapidly switches CPU time between runnable tasks while preserving each task's state."
+    "question" "How does multitasking work internally?" "The OS rapidly switches CPU time between runnable tasks while preserving each task's state." \
+    "question" "How does the OS decide when a waiting process becomes ready again?" "" \
+    "question" "What state changes happen when a process exits?" ""
 
 seed_article_details "$threads_vs_processes_id" \
     "notion" "Shared memory" "Memory visible to multiple threads in the same process." \
@@ -175,7 +184,10 @@ seed_article_details "$threads_vs_processes_id" \
     "notion" "Synchronization" "Coordination mechanisms that protect shared state from races." \
     "question" "Why are threads more lightweight?" "They share address space and resources, so creating and switching them often costs less." \
     "question" "What problems arise with shared memory?" "Race conditions, deadlocks, visibility bugs, and data corruption can occur." \
-    "question" "When should processes be preferred?" "Use processes when fault isolation, security boundaries, or independent lifecycles matter more."
+    "question" "When should processes be preferred?" "Use processes when fault isolation, security boundaries, or independent lifecycles matter more." \
+    "question" "How does a thread crash affect the rest of its process?" "" \
+    "question" "Why does shared memory require synchronization?" "" \
+    "question" "How do processes communicate when memory is isolated?" ""
 
 seed_article_details "$cpu_scheduling_id" \
     "notion" "Preemption" "The OS interrupting a running task to give another task CPU time." \
@@ -185,7 +197,9 @@ seed_article_details "$cpu_scheduling_id" \
     "notion" "Fairness" "The goal of giving competing tasks reasonable access to CPU resources." \
     "question" "Why is scheduling necessary?" "Most systems have more runnable work than CPUs, so the OS must choose what runs." \
     "question" "What makes a scheduling algorithm fair?" "It avoids starvation and distributes CPU time according to clear policy goals." \
-    "question" "How do operating systems balance responsiveness and throughput?" "They tune priorities, time slices, preemption, and queues for interactive and batch workloads."
+    "question" "How do operating systems balance responsiveness and throughput?" "They tune priorities, time slices, preemption, and queues for interactive and batch workloads." \
+    "question" "What changes when scheduling happens on multiple cores?" "" \
+    "question" "How can priorities improve or harm fairness?" ""
 
 seed_article_details "$scheduling_basics_id" \
     "notion" "CPU bursts" "Periods where a process primarily uses the CPU." \
@@ -194,7 +208,10 @@ seed_article_details "$scheduling_basics_id" \
     "notion" "Dispatcher" "The OS component that hands the CPU to the chosen task." \
     "question" "Why can't all processes run simultaneously?" "A machine has a limited number of CPUs or cores, so runnable tasks must share them." \
     "question" "What is the role of the dispatcher?" "It performs the actual switch into the selected process or thread." \
-    "question" "How does time slicing improve interactivity?" "It prevents one task from monopolizing the CPU for too long."
+    "question" "How does time slicing improve interactivity?" "It prevents one task from monopolizing the CPU for too long." \
+    "question" "How do CPU-bound and I/O-bound tasks behave differently?" "" \
+    "question" "What does a ready queue reveal about system load?" "" \
+    "question" "Why does dispatch latency matter?" ""
 
 seed_article_details "$scheduling_policies_id" \
     "notion" "FCFS" "First-Come, First-Served runs tasks in arrival order." \
@@ -204,7 +221,9 @@ seed_article_details "$scheduling_policies_id" \
     "notion" "Multilevel Queues" "Multilevel Queues separate workloads into different scheduling classes." \
     "question" "Why is Round Robin widely used?" "It is simple and gives interactive tasks regular CPU access." \
     "question" "What makes SJF theoretically optimal?" "If job lengths are known, it minimizes average waiting time." \
-    "question" "How can starvation occur?" "Lower-priority or longer tasks may wait indefinitely if favored work keeps arriving."
+    "question" "How can starvation occur?" "Lower-priority or longer tasks may wait indefinitely if favored work keeps arriving." \
+    "question" "Why is predicting job length difficult in practice?" "" \
+    "question" "How does aging reduce starvation?" ""
 
 seed_article_details "$memory_management_id" \
     "notion" "Paging" "Dividing virtual and physical memory into fixed-size units." \
@@ -214,7 +233,10 @@ seed_article_details "$memory_management_id" \
     "notion" "Memory protection" "Rules that prevent invalid or unauthorized memory access." \
     "question" "Why is virtual memory necessary?" "It simplifies programming, improves protection, and lets the OS manage physical memory flexibly." \
     "question" "How does paging reduce fragmentation?" "Fixed-size pages avoid many external fragmentation problems." \
-    "question" "What happens during a page fault?" "The CPU traps to the kernel, which resolves the missing mapping or terminates the process."
+    "question" "What happens during a page fault?" "The CPU traps to the kernel, which resolves the missing mapping or terminates the process." \
+    "question" "How does address translation protect one process from another?" "" \
+    "question" "What tradeoffs exist between paging and segmentation?" "" \
+    "question" "Why can memory management affect performance so much?" ""
 
 seed_article_details "$paging_id" \
     "notion" "Pages" "Fixed-size blocks of virtual memory." \
@@ -223,7 +245,9 @@ seed_article_details "$paging_id" \
     "notion" "TLB" "A CPU cache for recent virtual-to-physical address translations." \
     "question" "How are virtual addresses translated?" "The hardware and OS consult page tables, often accelerated by the TLB." \
     "question" "Why are TLBs important?" "They avoid expensive page-table walks for common memory accesses." \
-    "question" "What causes page faults?" "A page may be absent, protected, swapped out, or otherwise unmapped."
+    "question" "What causes page faults?" "A page may be absent, protected, swapped out, or otherwise unmapped." \
+    "question" "How do page sizes change memory overhead?" "" \
+    "question" "What information lives inside a page table entry?" ""
 
 seed_article_details "$file_systems_id" \
     "notion" "Directories" "Structures that map names to files and subdirectories." \
@@ -233,7 +257,9 @@ seed_article_details "$file_systems_id" \
     "notion" "Metadata" "Information such as ownership, timestamps, permissions, and file layout." \
     "question" "How are files represented internally?" "File systems store metadata and references to blocks containing file data." \
     "question" "Why is journaling important?" "It improves consistency and recovery when a crash interrupts writes." \
-    "question" "What tradeoffs exist between speed and reliability?" "Caching and delayed writes improve speed but can risk data loss without safeguards."
+    "question" "What tradeoffs exist between speed and reliability?" "Caching and delayed writes improve speed but can risk data loss without safeguards." \
+    "question" "How do directories map human names to stored data?" "" \
+    "question" "What must a file system recover after a crash?" ""
 
 seed_article_details "$db_id" \
     "notion" "Relational models" "A table-based model that represents data as relations." \
@@ -244,7 +270,10 @@ seed_article_details "$db_id" \
     "notion" "Consistency" "The guarantee that data respects defined rules and expected visibility." \
     "question" "Why are databases necessary?" "They provide durable, queryable, concurrent, and consistent data management." \
     "question" "How do databases ensure consistency?" "They use constraints, transactions, isolation, logging, and recovery protocols." \
-    "question" "What tradeoffs exist in distributed systems?" "Systems balance consistency, availability, latency, cost, and partition tolerance."
+    "question" "What tradeoffs exist in distributed systems?" "Systems balance consistency, availability, latency, cost, and partition tolerance." \
+    "question" "When is a database better than a plain file?" "" \
+    "question" "How does an index change the cost of reads and writes?" "" \
+    "question" "Why does query planning matter?" ""
 
 seed_article_details "$relational_db_id" \
     "notion" "Tables" "Named relations made of rows and columns." \
@@ -254,7 +283,9 @@ seed_article_details "$relational_db_id" \
     "notion" "SQL" "A language for defining, querying, and modifying relational data." \
     "question" "Why are relations useful?" "They make data structure explicit and support declarative querying." \
     "question" "What is normalization?" "A design process that reduces redundancy and update anomalies." \
-    "question" "How do joins combine data?" "They match rows from different tables using related values."
+    "question" "How do joins combine data?" "They match rows from different tables using related values." \
+    "question" "Why do primary keys matter for data integrity?" "" \
+    "question" "What problems do foreign keys prevent?" ""
 
 seed_article_details "$joins_id" \
     "notion" "INNER JOIN" "A join that returns only matching rows from both sides." \
@@ -263,7 +294,10 @@ seed_article_details "$joins_id" \
     "notion" "Cartesian products" "All possible combinations of rows from two inputs." \
     "question" "Why are joins computationally expensive?" "They may require comparing many rows, moving data, sorting, or hashing." \
     "question" "How does indexing improve joins?" "Indexes help the database find matching rows faster." \
-    "question" "What is the difference between INNER and LEFT JOIN?" "INNER JOIN keeps matches only; LEFT JOIN also keeps unmatched left-side rows."
+    "question" "What is the difference between INNER and LEFT JOIN?" "INNER JOIN keeps matches only; LEFT JOIN also keeps unmatched left-side rows." \
+    "question" "When can a join accidentally duplicate rows?" "" \
+    "question" "How does join order affect query performance?" "" \
+    "question" "Why can a missing join condition be dangerous?" ""
 
 seed_article_details "$transactions_id" \
     "notion" "ACID" "Atomicity, Consistency, Isolation, and Durability properties for reliable transactions." \
@@ -273,7 +307,9 @@ seed_article_details "$transactions_id" \
     "notion" "Rollbacks" "Reverting a transaction's changes when it cannot commit." \
     "question" "Why are transactions necessary?" "They protect data correctness when operations fail or run concurrently." \
     "question" "What causes dirty reads?" "A transaction reads uncommitted changes from another transaction." \
-    "question" "How does isolation affect performance?" "Stronger isolation can reduce concurrency or add coordination overhead."
+    "question" "How does isolation affect performance?" "Stronger isolation can reduce concurrency or add coordination overhead." \
+    "question" "What should happen if one step of a transaction fails?" "" \
+    "question" "How does durability survive process or machine crashes?" ""
 
 seed_article_details "$isolation_levels_id" \
     "notion" "Read committed" "A level where transactions only read committed data." \
@@ -282,7 +318,10 @@ seed_article_details "$isolation_levels_id" \
     "notion" "Phantom reads" "New matching rows appearing between repeated predicate reads." \
     "question" "What anomalies can occur with concurrency?" "Dirty reads, non-repeatable reads, phantom reads, lost updates, and write skew." \
     "question" "Why is serializable isolation expensive?" "It may require more locking, validation, retries, or dependency tracking." \
-    "question" "How do databases balance correctness and performance?" "They expose isolation levels so applications can choose appropriate guarantees."
+    "question" "How do databases balance correctness and performance?" "They expose isolation levels so applications can choose appropriate guarantees." \
+    "question" "What is the difference between a dirty read and a non-repeatable read?" "" \
+    "question" "When is read committed not strong enough?" "" \
+    "question" "How can write skew break an invariant?" ""
 
 seed_article_details "$distributed_db_id" \
     "notion" "Replication" "Copying data across nodes for availability and read scalability." \
@@ -291,7 +330,9 @@ seed_article_details "$distributed_db_id" \
     "notion" "CAP theorem" "A framework describing consistency, availability, and partition-tolerance tradeoffs." \
     "question" "Why distribute databases?" "To scale capacity, improve availability, reduce latency, and tolerate failures." \
     "question" "What is eventual consistency?" "A model where replicas converge over time if no new updates occur." \
-    "question" "Why is consensus difficult?" "Nodes can fail, messages can be delayed, and participants must still agree safely."
+    "question" "Why is consensus difficult?" "Nodes can fail, messages can be delayed, and participants must still agree safely." \
+    "question" "How does sharding change query design?" "" \
+    "question" "What can go wrong when replicas disagree?" ""
 
 seed_article_details "$cap_theorem_id" \
     "notion" "Network partitions" "Failures where nodes cannot reliably communicate." \
@@ -300,7 +341,10 @@ seed_article_details "$cap_theorem_id" \
     "notion" "Availability" "The ability to return a response for each request." \
     "question" "Why are partitions unavoidable?" "Networks and machines fail, messages drop, and latency spikes happen in real systems." \
     "question" "What systems prioritize consistency?" "Systems that reject or delay requests rather than risk stale or conflicting data." \
-    "question" "What systems prioritize availability?" "Systems that continue serving requests during partitions and reconcile later."
+    "question" "What systems prioritize availability?" "Systems that continue serving requests during partitions and reconcile later." \
+    "question" "Why does CAP focus specifically on partitions?" "" \
+    "question" "What does a stale read mean for an application?" "" \
+    "question" "How can systems reconcile conflicting writes?" ""
 
 seed_article_details "$cybersecurity_id" \
     "notion" "Authentication" "Verifying who a user or system claims to be." \
@@ -311,7 +355,10 @@ seed_article_details "$cybersecurity_id" \
     "notion" "Isolation" "Limiting access and blast radius between components." \
     "question" "What makes systems vulnerable?" "Bugs, weak assumptions, poor configuration, exposed secrets, and unsafe trust boundaries." \
     "question" "How does encryption secure communication?" "It protects confidentiality and, with authentication, helps preserve integrity." \
-    "question" "Why is security always a tradeoff?" "Controls affect usability, performance, complexity, cost, and operational flexibility."
+    "question" "Why is security always a tradeoff?" "Controls affect usability, performance, complexity, cost, and operational flexibility." \
+    "question" "How do you decide what needs protection first?" "" \
+    "question" "What is the difference between authentication and authorization?" "" \
+    "question" "How does isolation reduce blast radius?" ""
 
 seed_article_details "$cryptography_id" \
     "notion" "Symmetric encryption" "Encryption where the same secret key encrypts and decrypts data." \
@@ -320,7 +367,9 @@ seed_article_details "$cryptography_id" \
     "notion" "Digital signatures" "Cryptographic proof that a private key signed data." \
     "question" "Why are public and private keys necessary?" "They enable secure exchange and identity proofs without sharing a single secret first." \
     "question" "What makes hash functions secure?" "Preimage resistance, collision resistance, and predictable avalanche behavior." \
-    "question" "How are identities verified online?" "Certificates, signatures, keys, and trusted authorities bind identities to cryptographic material."
+    "question" "How are identities verified online?" "Certificates, signatures, keys, and trusted authorities bind identities to cryptographic material." \
+    "question" "When should hashing be used instead of encryption?" "" \
+    "question" "Why is key management often the hardest part?" ""
 
 seed_article_details "$public_key_crypto_id" \
     "notion" "RSA" "A public-key cryptosystem based on the difficulty of factoring large integers." \
@@ -329,7 +378,10 @@ seed_article_details "$public_key_crypto_id" \
     "notion" "Digital signatures" "Using a private key to prove authenticity and integrity." \
     "question" "Why can public keys be shared openly?" "They do not reveal the private key and are designed for public distribution." \
     "question" "How do signatures verify authenticity?" "A verifier checks that the signature matches the data and the signer's public key." \
-    "question" "Why is asymmetric encryption slower?" "It relies on heavier mathematical operations than symmetric cryptography."
+    "question" "Why is asymmetric encryption slower?" "It relies on heavier mathematical operations than symmetric cryptography." \
+    "question" "How does a certificate connect a key to an identity?" "" \
+    "question" "Why do protocols often combine asymmetric and symmetric cryptography?" "" \
+    "question" "What happens if a private key leaks?" ""
 
 seed_article_details "$web_security_id" \
     "notion" "XSS" "Injecting script into pages viewed by other users." \
@@ -339,7 +391,9 @@ seed_article_details "$web_security_id" \
     "notion" "Authentication" "Confirming identity before granting access." \
     "question" "Why is user input dangerous?" "Attackers can craft input that changes parsing, queries, rendering, or control flow." \
     "question" "How does XSS exploit browsers?" "It runs attacker-controlled script in a trusted page context." \
-    "question" "What protections prevent CSRF attacks?" "SameSite cookies, CSRF tokens, origin checks, and careful HTTP method semantics."
+    "question" "What protections prevent CSRF attacks?" "SameSite cookies, CSRF tokens, origin checks, and careful HTTP method semantics." \
+    "question" "Why are cookies both useful and risky?" "" \
+    "question" "How does output encoding reduce XSS risk?" ""
 
 seed_article_details "$sql_injection_id" \
     "notion" "Unsanitized input" "Input included in queries without safe binding or escaping." \
@@ -347,7 +401,9 @@ seed_article_details "$sql_injection_id" \
     "notion" "Query execution" "The database parsing, planning, and running SQL commands." \
     "question" "Why are prepared statements safer?" "They prevent user input from being interpreted as SQL syntax." \
     "question" "How can attackers exfiltrate data?" "They can alter query logic to read unauthorized rows or tables." \
-    "question" "Why is input validation insufficient alone?" "Validation can miss edge cases; parameter binding enforces code/data separation."
+    "question" "Why is input validation insufficient alone?" "Validation can miss edge cases; parameter binding enforces code/data separation." \
+    "question" "How does SQL injection change the meaning of a query?" "" \
+    "question" "Where should authorization be checked around database reads?" ""
 
 seed_article_details "$network_security_id" \
     "notion" "Firewalls" "Policy enforcement points for network traffic." \
@@ -356,7 +412,10 @@ seed_article_details "$network_security_id" \
     "notion" "Packet inspection" "Examining traffic metadata or payloads for policy and threat detection." \
     "question" "How does TLS secure internet traffic?" "It authenticates endpoints and encrypts data in transit." \
     "question" "Why are VPNs useful?" "They protect traffic across untrusted networks and extend private network access." \
-    "question" "What attacks target network protocols?" "Spoofing, interception, replay, downgrade, routing attacks, and denial of service."
+    "question" "What attacks target network protocols?" "Spoofing, interception, replay, downgrade, routing attacks, and denial of service." \
+    "question" "What can a firewall know and what can it miss?" "" \
+    "question" "How do replay attacks work?" "" \
+    "question" "Why does network security depend on configuration?" ""
 
 seed_article_details "$ai_id" \
     "notion" "Machine learning" "Training models to infer patterns from data." \
@@ -366,7 +425,10 @@ seed_article_details "$ai_id" \
     "notion" "Inference" "Using a trained model to produce predictions or outputs." \
     "question" "What differentiates AI from traditional programming?" "AI learns behavior from data instead of relying only on explicit rules." \
     "question" "How do models learn patterns?" "Training adjusts parameters to reduce prediction error on examples." \
-    "question" "Why do large models require massive datasets?" "More parameters need diverse evidence to learn useful general patterns."
+    "question" "Why do large models require massive datasets?" "More parameters need diverse evidence to learn useful general patterns." \
+    "question" "What does it mean for a system to generalize?" "" \
+    "question" "How can an AI system fail even when it is statistically accurate?" "" \
+    "question" "Why does representation shape what a model can learn?" ""
 
 seed_article_details "$machine_learning_id" \
     "notion" "Training" "The process of fitting model parameters using examples." \
@@ -376,7 +438,9 @@ seed_article_details "$machine_learning_id" \
     "notion" "Generalization" "A model's ability to perform well on new data." \
     "question" "What is overfitting?" "A model memorizes training data patterns that do not hold on new data." \
     "question" "Why is data quality important?" "Bad, biased, or noisy data teaches the model unreliable patterns." \
-    "question" "How do models generalize?" "They learn patterns that transfer beyond the specific examples seen during training."
+    "question" "How do models generalize?" "They learn patterns that transfer beyond the specific examples seen during training." \
+    "question" "How do training and evaluation data need to differ?" "" \
+    "question" "What does a loss function really measure?" ""
 
 seed_article_details "$gradient_descent_id" \
     "notion" "Loss functions" "Numerical objectives that optimization tries to minimize." \
@@ -385,7 +449,10 @@ seed_article_details "$gradient_descent_id" \
     "notion" "Convergence" "The process of approaching a stable or good solution." \
     "question" "Why can learning rates be unstable?" "Too large a step can overshoot; too small a step can learn too slowly." \
     "question" "What causes local minima?" "Complex loss surfaces can contain valleys that are not globally optimal." \
-    "question" "Why is optimization difficult in deep learning?" "High-dimensional, nonconvex landscapes make training sensitive and expensive."
+    "question" "Why is optimization difficult in deep learning?" "High-dimensional, nonconvex landscapes make training sensitive and expensive." \
+    "question" "How does gradient descent know which direction to move?" "" \
+    "question" "What happens when gradients vanish or explode?" "" \
+    "question" "Why can a smaller loss still produce a worse model?" ""
 
 seed_article_details "$neural_networks_id" \
     "notion" "Weights" "Learned parameters that scale signals between neurons." \
@@ -394,7 +461,9 @@ seed_article_details "$neural_networks_id" \
     "notion" "Hidden layers" "Intermediate layers that learn internal representations." \
     "question" "Why are deep networks powerful?" "Multiple layers can compose simple patterns into complex representations." \
     "question" "What role does backpropagation play?" "It efficiently propagates error signals so weights can be updated." \
-    "question" "Why do neural networks require large datasets?" "They have many parameters and need enough examples to learn robust patterns."
+    "question" "Why do neural networks require large datasets?" "They have many parameters and need enough examples to learn robust patterns." \
+    "question" "What do hidden layers learn?" "" \
+    "question" "Why do activations need to be nonlinear?" ""
 
 seed_article_details "$transformers_id" \
     "notion" "Attention" "A mechanism for weighting relationships between tokens." \
@@ -403,7 +472,10 @@ seed_article_details "$transformers_id" \
     "notion" "Context windows" "The amount of input a model can consider at once." \
     "question" "Why are transformers scalable?" "Self-attention and parallel training fit modern accelerator hardware well." \
     "question" "How does attention work?" "It compares token representations and uses the scores to mix relevant information." \
-    "question" "Why are transformers effective for language?" "They model long-range dependencies and contextual token relationships."
+    "question" "Why are transformers effective for language?" "They model long-range dependencies and contextual token relationships." \
+    "question" "What information is lost or changed during tokenization?" "" \
+    "question" "Why does context length matter for reasoning over text?" "" \
+    "question" "How do embeddings encode relationships between tokens?" ""
 
 seed_article_details "$llm_id" \
     "notion" "Tokenization" "Splitting text into model-readable units." \
@@ -413,6 +485,9 @@ seed_article_details "$llm_id" \
     "notion" "Inference" "Generating outputs from a trained model." \
     "question" "How do LLMs generate coherent text?" "They predict likely next tokens conditioned on previous context and learned patterns." \
     "question" "What are hallucinations?" "Confident outputs that are unsupported, false, or inconsistent with the available context." \
-    "question" "Why are context windows important?" "They limit how much information the model can use at generation time."
+    "question" "Why are context windows important?" "They limit how much information the model can use at generation time." \
+    "question" "How does pretraining differ from fine-tuning?" "" \
+    "question" "Why can fluent text still be wrong?" "" \
+    "question" "What changes when generation is guided by feedback?" ""
 
 echo "Seed demo complete!"

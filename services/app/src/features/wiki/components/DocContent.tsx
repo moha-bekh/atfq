@@ -306,7 +306,7 @@ export default function DocContent({ article, mode, canContribute, parentOptions
                   {section.items.map((item, i) => (
                     <p
                       key={i}
-                      className="mb-4 break-words font-jakarta text-base font-normal leading-7 text-text last:mb-0 whitespace-pre-line"
+                      className="mb-1.5 break-words font-jakarta text-base font-normal leading-7 text-text last:mb-0 whitespace-pre-line"
                     >
                       {item}
                     </p>

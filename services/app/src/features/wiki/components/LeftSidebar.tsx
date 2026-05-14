@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface SidebarItem {
   id: number | string;
@@ -48,6 +48,17 @@ export default function LeftSidebar({
   search,
 }: LeftSidebarProps) {
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+  const hasSearchQuery = search.query.trim().length > 0;
+  const searchSuggestionsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasSearchQuery) return;
+
+    searchSuggestionsRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [hasSearchQuery, search.query]);
 
   const toggleItem = (id: number | string) => {
     setOpenItems((current) => ({
@@ -145,67 +156,71 @@ export default function LeftSidebar({
           placeholder="Search articles..."
           className="min-h-10 rounded-lg border-2 border-sub/30 bg-bg px-3 font-jakarta text-sm text-text outline-none transition-colors placeholder:text-text/35 focus:border-main"
         />
-        <div className="grid grid-cols-2 gap-2">
-          <select
-            value={search.type}
-            onChange={(event) => search.onTypeChange(event.target.value as SearchTypeFilter)}
-            className="min-h-10 rounded-lg border-2 border-sub/30 bg-bg px-2 font-jakarta text-xs text-text outline-none focus:border-main"
-          >
-            <option value="all">All</option>
-            <option value="root">Root</option>
-            <option value="child">Children</option>
-          </select>
-          <select
-            value={search.sort}
-            onChange={(event) => search.onSortChange(event.target.value as SearchSort)}
-            className="min-h-10 rounded-lg border-2 border-sub/30 bg-bg px-2 font-jakarta text-xs text-text outline-none focus:border-main"
-          >
-            <option value="title-asc">A-Z</option>
-            <option value="title-desc">Z-A</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          {search.results.length > 0 ? (
-            search.results.map((result) => (
-              <button
-                key={`search-${result.id}`}
-                type="button"
-                onClick={() => onItemClick(result.id)}
-                className="min-w-0 rounded-lg px-2 py-2 text-left font-jakarta text-sm text-text transition-colors hover:bg-main/5 hover:text-main"
+        {hasSearchQuery && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={search.type}
+                onChange={(event) => search.onTypeChange(event.target.value as SearchTypeFilter)}
+                className="min-h-10 rounded-lg border-2 border-sub/30 bg-bg px-2 font-jakarta text-xs text-text outline-none focus:border-main"
               >
-                <span className="block break-words font-semibold">{result.title}</span>
-                <span className="block truncate text-[10px] uppercase tracking-widest text-sub">
-                  {result.depth === 0 ? "Root article" : result.parentTitle || "Child article"}
-                </span>
+                <option value="all">All</option>
+                <option value="root">Root</option>
+                <option value="child">Children</option>
+              </select>
+              <select
+                value={search.sort}
+                onChange={(event) => search.onSortChange(event.target.value as SearchSort)}
+                className="min-h-10 rounded-lg border-2 border-sub/30 bg-bg px-2 font-jakarta text-xs text-text outline-none focus:border-main"
+              >
+                <option value="title-asc">A-Z</option>
+                <option value="title-desc">Z-A</option>
+              </select>
+            </div>
+            <div ref={searchSuggestionsRef} className="flex flex-col gap-1">
+              {search.results.length > 0 ? (
+                search.results.map((result) => (
+                  <button
+                    key={`search-${result.id}`}
+                    type="button"
+                    onClick={() => onItemClick(result.id)}
+                    className="min-w-0 rounded-lg px-2 py-2 text-left font-jakarta text-sm text-text transition-colors hover:bg-main/5 hover:text-main"
+                  >
+                    <span className="block break-words font-semibold">{result.title}</span>
+                    <span className="block truncate text-[10px] uppercase tracking-widest text-sub">
+                      {result.depth === 0 ? "Root article" : result.parentTitle || "Child article"}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <p className="px-2 py-3 font-jakarta text-sm text-text/60">
+                  No result.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                disabled={search.page <= 1}
+                onClick={() => search.onPageChange(Math.max(1, search.page - 1))}
+                className="rounded-lg border border-sub/30 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sub transition-colors hover:border-main hover:text-main disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Prev
               </button>
-            ))
-          ) : (
-            <p className="px-2 py-3 font-jakarta text-sm text-text/60">
-              No result.
-            </p>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            disabled={search.page <= 1}
-            onClick={() => search.onPageChange(Math.max(1, search.page - 1))}
-            className="rounded-lg border border-sub/30 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sub transition-colors hover:border-main hover:text-main disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Prev
-          </button>
-          <span className="font-jakarta text-[10px] font-bold uppercase tracking-widest text-sub">
-            {search.page}/{search.totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={search.page >= search.totalPages}
-            onClick={() => search.onPageChange(Math.min(search.totalPages, search.page + 1))}
-            className="rounded-lg border border-sub/30 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sub transition-colors hover:border-main hover:text-main disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+              <span className="font-jakarta text-[10px] font-bold uppercase tracking-widest text-sub">
+                {search.page}/{search.totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={search.page >= search.totalPages}
+                onClick={() => search.onPageChange(Math.min(search.totalPages, search.page + 1))}
+                className="rounded-lg border border-sub/30 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-sub transition-colors hover:border-main hover:text-main disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </aside>
   );
