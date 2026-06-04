@@ -16,6 +16,8 @@ backend.tf
 credentials
 credentials.json
 service-account*.json
+secrets.enc.yaml
+*.enc.yaml
 .env
 .env.*
 !.env.example
