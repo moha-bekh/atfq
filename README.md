@@ -141,41 +141,14 @@ The gateway exposes the public HTTP API consumed by the frontend. Internal servi
 
 ## Deployment
 
-The project supports two deployment modes:
+The project was designed to be deployable in two modes:
 
-- **Docker Compose** for local end-to-end execution.
+- **Docker Compose** for end-to-end development and integration.
 - **Kubernetes** for the public demo infrastructure.
 
 The live deployment runs container images published to GHCR and pulls them from Kubernetes. Application secrets are injected through Vault-backed flows rather than committed environment files.
 
-## Local Development
-
-Prerequisites:
-
-- Docker
-- Task
-- SOPS
-- age
-- jq
-- yq
-
-Run the full Docker Compose stack:
-
-```bash
-cd services
-task up
-```
-
-Common commands:
-
-```bash
-cd services
-docker compose up --build
-docker compose logs -f
-docker compose down
-```
-
-The project intentionally does not commit real runtime `.env` files.
+The repository intentionally does not include real runtime environment files or credentials. The public README focuses on the product, architecture, and engineering decisions rather than asking visitors to run the full infrastructure locally.
 
 ## Repository Structure
 
