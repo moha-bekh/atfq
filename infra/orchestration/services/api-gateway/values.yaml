@@ -1,6 +1,7 @@
 image:
   repository: ghcr.io/moha-bekh/atfq-prototype-api-gateway
   tag: latest
+  pullPolicy: Always
 
 imagePullSecrets:
   - name: ghcr-pull-secret
