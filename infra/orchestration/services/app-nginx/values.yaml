@@ -1,0 +1,14 @@
+base-app:
+  image:
+    repository: bitnami/nginx
+    tag: latest
+  nodeSelector:
+    type: workload
+  service:
+    targetPort: 8080
+  nginxTmpEnabled: true
+  securityContext:
+    runAsUser: 1001
+  ingress:
+    enabled: true
+    host: atfq.org

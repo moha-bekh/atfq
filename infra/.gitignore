@@ -1,0 +1,27 @@
+# Tools
+.devbox/
+.task/
+
+# Packer
+.packer.d/
+packer_cache/
+*.pkrvars
+*.pkrvars.hcl
+packerlog.txt
+packer-manifest.json
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+
+# kubernetes
+*kubeconfig*

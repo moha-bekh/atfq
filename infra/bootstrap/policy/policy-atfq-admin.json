@@ -1,0 +1,80 @@
+{
+  "Statement": [
+    {
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:DeleteObject"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:s3:::atfq-st-state-store",
+        "arn:aws:s3:::atfq-st-state-store/*"
+      ],
+      "Sid": "S3BackendAccess"
+    },
+    {
+      "Action": [
+        "ec2:Describe*",
+        "ec2:CreateVpc",
+        "ec2:DeleteVpc",
+        "ec2:ModifyVpcAttribute",
+        "ec2:CreateSubnet",
+        "ec2:DeleteSubnet",
+        "ec2:ModifySubnetAttribute",
+        "ec2:CreateSecurityGroup",
+        "ec2:DeleteSecurityGroup",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupEgress",
+        "ec2:CreateInternetGateway",
+        "ec2:AttachInternetGateway",
+        "ec2:DetachInternetGateway",
+        "ec2:DeleteInternetGateway",
+        "ec2:CreateRouteTable",
+        "ec2:DeleteRouteTable",
+        "ec2:CreateRoute",
+        "ec2:DeleteRoute",
+        "ec2:AssociateRouteTable",
+        "ec2:DisassociateRouteTable",
+        "ec2:ImportKeyPair",
+        "ec2:DeleteKeyPair",
+        "ec2:RunInstances",
+        "ec2:TerminateInstances",
+        "ec2:StopInstances",
+        "ec2:StartInstances",
+        "ec2:CreateTags",
+        "ec2:ModifyInstanceAttribute"
+      ],
+      "Effect": "Allow",
+      "Resource": "*",
+      "Sid": "EC2AndNetworkManagement"
+    },
+    {
+      "Action": [
+        "route53:CreateHostedZone",
+        "route53:GetHostedZone",
+        "route53:ListHostedZones",
+        "route53:ChangeResourceRecordSets",
+        "route53:GetChange",
+        "route53:DeleteHostedZone",
+        "route53:ChangeTagsForResource",
+        "route53:ListTagsForResource",
+        "route53:GetHostedZone",
+        "route53:ListResourceRecordSets"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    },
+    {
+      "Action": ["iam:PassRole", "sts:AssumeRole", "sts:GetCallerIdentity"],
+      "Effect": "Allow",
+      "Resource": "*",
+      "Sid": "IAMAndSTS"
+    }
+  ],
+  "Version": "2012-10-17"
+}

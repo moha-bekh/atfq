@@ -2,12 +2,14 @@
 .DS_Store
 Thumbs.db
 .vscode/
+*.env
 *.log
 *.pem
 *.pub
 
-*.env
-
 # Tools
 .devbox/
 .task/
+
+# utils
+ignored

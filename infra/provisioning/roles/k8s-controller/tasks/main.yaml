@@ -1,0 +1,68 @@
+---
+- name: Initialize Kubernetes Control Plane
+  command: >
+    kubeadm init
+    --pod-network-cidr={{ pod_network_cidr }}
+    --apiserver-cert-extra-sans={{ ansible_host }}
+    --node-name {{ inventory_hostname }}
+  register: kubeadm_init
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Setup kubeconfig for ubuntu user
+  file:
+    path: /home/ubuntu/.kube
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Copy admin.conf
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/ubuntu/.kube/config
+    remote_src: yes
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+
+- name: Generate join command
+  command: kubeadm token create --print-join-command
+  register: join_command_raw
+  changed_when: false
+
+- name: Install Helm
+  shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    creates: /usr/local/bin/helm
+
+- name: Deploy Cilium Networking
+  become: no
+  shell: |
+    helm repo add cilium https://helm.cilium.io/
+    helm repo update
+    helm upgrade --install cilium cilium/cilium --version 1.14.5 \
+      --namespace kube-system \
+      --set operator.replicas=1 \
+      --set k8sServiceHost={{ controller_private_ip }} \
+      --set k8sServicePort=6443 \
+      --set ipam.operator.clusterPoolIPv4PodCIDRList={{"{"}}{{ pod_network_cidr }}{{"}"}}
+  environment:
+    KUBECONFIG: /home/ubuntu/.kube/config
+  register: cilium_install
+  until: cilium_install is success
+  retries: 5
+  delay: 15
+
+- name: Prepare external kubeconfig
+  shell: |
+    cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config_external
+    sed -i "s|{{ controller_private_ip }}|{{ ansible_host }}|g" /home/ubuntu/.kube/config_external
+  args:
+    executable: /bin/bash
+
+- name: Fetch kubeconfig
+  fetch:
+    src: /home/ubuntu/.kube/config_external
+    dest: "{{ playbook_dir }}/../orchestration/kubeconfig_atfq"
+    flat: yes

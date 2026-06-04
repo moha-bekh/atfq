@@ -1,0 +1,77 @@
+---
+- name: Ensure hostname is correctly set
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Add hostname to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "127.0.1.1 {{ inventory_hostname }}"
+    state: present
+
+- name: Load kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Kernel modules persistence
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+
+- name: Sysctl parameters
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/k8s.conf
+    reload: yes
+  loop:
+    - { key: "net.bridge.bridge-nf-call-iptables", value: "1" }
+    - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { key: "net.ipv4.ip_forward", value: "1" }
+
+- name: Disable Swap
+  command: swapoff -a
+  when: ansible_facts['swaptotal_mb'] > 0
+  changed_when: false
+
+- name: Disable Swap in fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Configure Containerd (SystemdCgroup)
+  shell: |
+    mkdir -p /etc/containerd
+    containerd config default > /etc/containerd/config.toml
+    sed -i 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+  register: containerd_config
+
+- name: Restart containerd if config changed
+  systemd:
+    name: containerd
+    state: restarted
+  when: containerd_config.changed
+
+- name: Mount BPFFS for Cilium
+  mount:
+    path: /sys/fs/bpf
+    src: bpffs
+    fstype: bpf
+    state: mounted
+
+- name: Ensure services are started
+  systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop:
+    - containerd
+    - kubelet

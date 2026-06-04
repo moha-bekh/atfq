@@ -1,0 +1,236 @@
+version: "3"
+
+dotenv: [".infra.env"]
+
+vars:
+  K8S_IMAGE_DIR: images/k8s-node
+  BOOTSTRAP_DIR: bootstrap
+  NETWORK_DIR: iac/network
+  COMPUTE_DIR: iac/compute
+
+tasks:
+  # --- PACKER / IMAGES ---
+
+  images:k8s:fmt:
+    dir: "{{.K8S_IMAGE_DIR}}"
+    cmds:
+      - packer fmt .
+
+  images:k8s:validate:
+    desc: Validate K8s Packer templates
+    dir: "{{.K8S_IMAGE_DIR}}"
+    cmds:
+      - packer init .
+      - packer validate .
+
+  images:k8s:build:
+    desc: Build the Kubernetes AMI
+    dir: "{{.K8S_IMAGE_DIR}}"
+    deps: [images:k8s:validate]
+    cmds:
+      - packer build .
+
+  # --- BOOTSTRAP ---
+
+  bootstrap:apply-all:
+    desc: "Apply bootstrap"
+    cmds:
+      - task: bootstrap:local-init
+      - task: bootstrap:apply
+      - task: bootstrap:remote-init
+
+  bootstrap:local-init:
+    desc: Plan bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - mv backend.tf backend.tf.ignore || true
+      - terraform init
+
+  bootstrap:plan:
+    desc: Plan bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - terraform plan
+
+  bootstrap:remote-init:
+    desc: Initialize bootstrap with partial backend injection
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - mv backend.tf.ignore backend.tf || true
+      - >
+        terraform init 
+        -backend-config="profile={{.AWS_PROFILE}}"
+        -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" 
+        -backend-config="key=bootstrap/terraform.tfstate" 
+        -backend-config="encrypt=true"
+        -migrate-state 
+        -force-copy
+      - rm -f terraform.tfstate terraform.tfstate.backup
+
+  bootstrap:apply:
+    desc: Apply bootstrap foundation
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - terraform apply -auto-approve
+
+  bootstrap:destroy:force:
+    desc: "Nuclear option: Switch to local state and destroy bootstrap S3 bucket"
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - mv backend.tf.ignore backend.tf || true
+
+      - >
+        terraform init -reconfigure 
+        -backend-config="profile={{.AWS_PROFILE}}" 
+        -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" 
+        -backend-config="key=bootstrap/terraform.tfstate"
+        -force-copy
+
+      - mv backend.tf backend.tf.ignore || true
+
+      - terraform init -migrate-state -force-copy
+
+      - terraform destroy -auto-approve
+      - rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup
+
+  bootstrap:clean:
+    dir: "{{.BOOTSTRAP_DIR}}"
+    cmds:
+      - |
+      - aws iam detach-role-policy --role-name atfq-admin --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/atfq-admin-policy || true
+      - aws iam detach-role-policy --role-name github-actions-atfq-admin --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/atfq-admin-policy || true
+
+      - aws iam delete-policy --policy-arn arn:aws:iam::${AWS_ACCOUNT_ID}:policy/atfq-admin-policy || true
+
+      - aws iam delete-role --role-name atfq-admin || true
+      - aws iam delete-role --role-name github-actions-atfq-admin || true
+
+      - aws iam delete-open-id-connect-provider --open-id-connect-provider-arn arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com || true
+      - aws s3 rb s3://atfq-tf-state --force || true
+      - rm -rf .terraform .terraform.lock.hcl terraform.tfstate terraform.tfstate.backup || true
+
+  # --- IAC NETWORK ---
+
+  iac:network:init:
+    desc: Init Network layer
+    cmds:
+      - |
+        terraform -chdir={{.NETWORK_DIR}} init \
+          -backend-config="profile={{.AWS_PROFILE}}" \
+          -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -backend-config="key=network/terraform.tfstate"
+
+  iac:network:apply:
+    desc: Apply Network layer + Sync DNS
+    deps: [iac:network:init]
+    cmds:
+      - |
+        terraform -chdir={{.NETWORK_DIR}} apply -auto-approve \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}"
+
+  iac:network:output:ns:
+    desc: "Get Route53 Nameservers"
+    cmds:
+      - terraform -chdir=iac/network output route53_nameservers
+
+  iac:network:destroy:
+    desc: "Destroy Network layer"
+    dir: iac/network
+    cmds:
+      - |
+        terraform destroy -auto-approve \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}"
+
+  # --- IAC COMPUTE ---
+
+  iac:compute:init:
+    desc: Init Compute layer
+    cmds:
+      - |
+        terraform -chdir={{.COMPUTE_DIR}} init \
+          -backend-config="profile={{.AWS_PROFILE}}" \
+          -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -backend-config="key=compute/terraform.tfstate"
+
+  iac:compute:apply:
+    desc: Apply Compute layer
+    deps: [iac:compute:init]
+    cmds:
+      - |
+        terraform -chdir={{.COMPUTE_DIR}} apply -auto-approve \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}" \
+          -var="state_bucket_name={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}"
+
+  iac:compute:destroy:
+    desc: "Destroy Compute layer"
+    dir: iac/compute
+    cmds:
+      - |
+        terraform destroy -auto-approve \
+          -var="profile={{.AWS_PROFILE}}" \
+          -var="account_id={{.AWS_ACCOUNT_ID}}" \
+          -var="state_bucket_name={{.AWS_S3_STATE_BUCKET_NAME}}" \
+          -var="ami_prefix={{.AWS_AMI_PREFIX_NAME}}"
+
+  iac:compute:clean:
+    desc: Remove generated ansible files
+    cmds:
+      - rm -f provisioning/inventory.yaml
+      - rm -f provisioning/ansible.cfg
+      - rm -f provisioning/group_vars/all.yaml
+
+  # --- ALIAS ---
+
+  image:build:
+    desc: Shortcut to build K8s AMI
+    deps: [images:k8s:build]
+
+  infra:apply:
+    desc: Deploy full infrastructure (Network + Compute)
+    cmds:
+      - task: iac:network:apply
+      - task: iac:compute:apply
+
+  infra:apply-all:
+    desc: "Full automated deployment from zero to K8s cluster"
+    cmds:
+      - task: bootstrap:apply-all
+      - sleep 30
+      - task: iac:network:apply
+      - task: iac:compute:apply
+
+      # - task: cluster:init
+      # - kubectl apply -f orchestration/test/nginx.yaml
+
+  infra:destroy:
+    desc: Destroy full infrastructure (Ordered)
+    cmds:
+      - task: iac:compute:destroy
+      - task: iac:network:destroy
+
+  infra:destroy-all:
+    desc: Destroy everything including bootstrap
+    cmds:
+      - task: infra:destroy
+      - task: bootstrap:destroy:force
+
+  cluster:init:
+    desc: "Initialize the Kubernetes cluster using Ansible and Cilium"
+    dir: provisioning
+    pre_conditions:
+      - sh: test -f inventory.yaml
+        msg: "Inventory file not found. Run 'task iac:compute:apply' first."
+      - sh: test -f main.yaml
+        msg: "Ansible main playbook not found."
+      - sh: test -f ansible.cfg
+        msg: "Ansible config file not found."
+    cmds:
+      - |
+        ansible-playbook -i inventory.yaml main.yaml \
+          -e "project_name={{.PROJECT_NAME}}" \
+          -e "pod_network_cidr={{.AWS_POD_NETWORK_CIDR}}" \
+          --private-key ~/.ssh/{{.PROJECT_NAME}}
