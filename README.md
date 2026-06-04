@@ -1,339 +1,241 @@
-*This project has been created as part of the 42 curriculum by mbekheir, acaetano, jamar, jsommet, sdeutsch.*
-
 # ATFQ
 
-## Description
+**Ask The F\*cking Question** is a collaborative learning platform for computer science. It combines a structured wiki, authenticated contributions, user profiles, role-based moderation, and production-style infrastructure.
 
-ATFQ, short for "Ask The Fucking Question", is a collaborative web platform for learning computer science concepts through a structured knowledge wiki.
+The project was built as a full-stack product rather than a simple school exercise: frontend, API gateway, domain microservices, databases, object storage, secret management, monitoring, WAF, and Kubernetes deployment are all part of the same system.
 
-The goal of the project is to provide more than a classic wiki: users can explore articles honing down on a single computer science subject and its relevant notions as well as key questions and resources. Authenticated contributors can propose new content or edits; moderators can review pending changes; and administrators can manage access through roles and permissions.
+> Public demo / proof of concept: [https://atfq.org](https://atfq.org)
 
-Key features:
+## Why This Project Exists
 
-- Public knowledge graph with articles, sub-articles, notions, questions, and resources.
-- Secure account creation, login, logout, password reset, token refresh, and account deletion.
-- OAuth login with Google and GitHub.
-- Optional 2FA authentication.
-- User profiles with avatar upload, persistent theme customization, roles, permissions, and friendship management.
-- Moderated contribution workflow for wiki content.
-- Administration dashboard for role requests and wiki version reviews.
-- Legal pages: Privacy Policy and Terms of Service.
-- Containerized microservice architecture with PostgreSQL, Redis, MinIO, Vault, ModSecurity, Prometheus, and Grafana.
+Computer science documentation is often fragmented: articles explain concepts, courses ask questions, and communities discuss practical tradeoffs, but they rarely connect those pieces cleanly.
 
-## Instructions
+ATFQ is built around one idea: learning starts with asking better questions. The platform organizes knowledge into articles, sub-articles, notions, essential questions, and resources, then lets contributors propose changes through a moderated workflow.
 
-### Prerequisites
+## My Role
 
-Install the following tools before running the project:
+**Mohamed Bekheira (`mbekheir` / `moha-bekh`)**
 
-- Docker.
-- Task, used by the repository task files.
-- SOPS, age, yq, and jq for encrypted secret management.
+Roles assumed on the project:
 
-### Environment and secrets
+- **Product Owner**: product direction, scope definition, feature prioritization, demo readiness.
+- **Technical Lead**: architecture decisions, service boundaries, API contracts, integration strategy.
+- **Developer**: frontend, API gateway, auth/user/wiki integration, admin and moderation flows.
+- **DevOps / Security**: Docker Compose, Kubernetes, Terraform, Vault, WAF, TLS, monitoring, GHCR image delivery.
+- **Project Manager**: task breakdown, merge coordination, deployment planning, final integration.
 
-The project does not commit runtime `.env` files. Service secrets are managed through Vault and SOPS.
+I led the project end-to-end and implemented most of the product, infrastructure, security, deployment, design direction, and integration work.
 
-1. Run `EDITOR=vim task vault:secrets:edit`
+## Design Direction
 
-2. A vim buffer should open up, allowing you to edit the secrets
+I also owned the visual direction of ATFQ: brand concept, logo, interface mood, layout principles, and the Figma prototype.
 
-### Run the website
+Figma prototype: [ATFQ Prototype](https://www.figma.com/design/Wcn6Z4MUuzDb3OOM34E9VM/ATFQ-Prototype?node-id=5-31&t=0D5rCeQfG52tMJiq-1)
 
-```bash
-task up
-```
+### Logo Concept
 
-This is the single-command containerized deployment expected by the subject. It starts the frontend, API gateway, auth service, user service, wiki service, databases, object storage, Vault, WAF gateway, and monitoring stack.
+The ATFQ logo is a minimalist geometric mark built around the letter **Q**, the visual anchor of the brand. It is designed to express more than an initial: it connects the idea of questioning with knowledge graphs, technical structure, and intellectual clarity.
 
-Main URLs:
+The main circular outline represents the core question: open, universal, and accessible. Instead of using a classic Q tail, the mark introduces a satellite circle connected to the structure, evoking a node in a graph. This reflects how one strong question can connect multiple areas of computer science.
 
-- app: `https://atfq.org`
-- grafana: `https://atfq.org/grafana`
+The large central circle creates a subtle eye-like shape, suggesting vision, focus, and the ability to see through complexity. The orbital arrangement of the circles also implies movement and discovery, reinforcing the idea that learning on ATFQ is a guided path rather than a passive accumulation of information.
 
-### Useful commands
+Design principles:
 
-```bash
-# Start every service
-cd services && docker compose up --build
+- **Geometric clarity**: the mark is built from circles and tangent lines, making it scalable from favicon to interface branding.
+- **Open-source minimalism**: the visual language stays clean, technical, and compatible with modern developer tools.
+- **Functional abstraction**: the logo remains readable as a Q while also suggesting a graph node, a technical diagram, and an eye.
 
-# Start in detached mode
-cd services && docker compose up --build -d
+## Team Contributions
 
-# Stop services
-cd services && docker compose down
+The repository history and feature ownership show the following split:
 
-# Follow logs
-cd services && docker compose logs -f
+| Contributor | Main contribution area |
+| --- | --- |
+| **Mohamed Bekheira** | Product leadership, technical architecture, frontend integration, API gateway, Kubernetes, Terraform, Docker, Vault, WAF, monitoring, TLS, GHCR deployment, admin flows, demo operations. |
+| **jsommet** | Wiki service and wiki domain work. |
+| **sdeutsch** | Wiki service and wiki feature work. |
+| **acaetano** | User service and user-management features, in collaboration with Mohamed. |
+| **jamar / bitquence** | Auth service and authentication features, in collaboration with Mohamed. |
 
-# Production compose overlay
-cd services && docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up --build -d
-```
+Everything outside those shared areas was primarily handled by Mohamed Bekheira.
 
-## Team Information
+## Product Features
 
-| Member | Role(s) | Responsibilities |
-| --- | --- | --- |
-| mbekheir | Product Owner, Technical Lead, Developer, DevOps/Security | Product direction, Art Direction, technical architecture, authentication, OAuth, Vault, WAF, monitoring, design system, API integration, and delivery coherence. |
-| jamar | Project Manager, Developer | Planning, task coordination, meeting follow-up, 2FA implementation, user management support, and integration tracking. |
-| jsommet | Developer | Backend/frontend framework work, API and microservice integration, ORM/database usage, and shared module implementation. |
-| acaetano | Developer | RBAC support, user management, backend/frontend framework work, API integration, ORM/database usage, and shared module implementation. |
-| sdeutsch | Developer | Advanced search support, user-facing features, backend/frontend framework work, API integration, ORM/database usage, and shared module implementation. |
-
-All team members are expected to understand the global architecture, explain their own work, and demonstrate at least one implemented feature during evaluation.
-
-## Project Management
-
-The team organized the project around small vertical features rather than isolated technical layers. Each feature was discussed, split into backend/API/frontend tasks, implemented on Git branches, and reviewed before integration.
-
-Practices used:
-
-- Regular synchronization meetings for progress, blockers, and module validation.
-- GitHub pull requests for code review.
-- Discord for daily communication and quick technical decisions.
-- Shared architecture notes for service contracts, database decisions, and security choices.
-- Meaningful Git commits from all members to show individual and collective work.
-
-During evaluation, the team can explain how the work was distributed, how modules were selected, and how each member contributed to the final application.
-
-## Technical Stack
-
-### Frontend
-
-Prototype
-- Figma URL: https://www.figma.com/design/Wcn6Z4MUuzDb3OOM34E9VM/ATFQ-Prototype?node-id=65-69&t=oat3AzMCOrUZrXQ2-1
-
-- React 19 with TypeScript.
-- Vite for development and production build.
-- React Router for navigation.
-- TanStack Query for server state and cache invalidation.
-- Zustand for local application state.
-- React Hook Form and Zod for forms and validation.
-- Tailwind CSS 4 for styling.
-- Ky for HTTP requests.
-- MSW for frontend API mocking during development.
-
-Why: React, Vite, and TypeScript provide a productive frontend framework with strong typing, fast iteration, and a component model that fits ATFQ's wiki, profile, and dashboard screens.
-
-### Backend
-
-- Rust API Gateway with Axum.
-- Rust auth service with Tonic gRPC.
-- Rust user service with Tonic gRPC.
-- Go wiki service with gRPC.
-- PostgreSQL for persistent relational data.
-- Redis for auth cache/session-related workflows.
-- MinIO/S3-compatible storage for profile images.
-- SQLx for typed SQL access.
-- Utoipa and Swagger UI for API documentation.
-
-Why: the gateway exposes a clean HTTP API to the frontend while internal services communicate through gRPC. The split keeps authentication, profiles, and wiki logic isolated and easier to reason about.
-
-### Infrastructure
-
-- Docker Compose for single-command deployment.
-- Nginx and OWASP ModSecurity CRS as the network gateway/WAF.
-- HashiCorp Vault for secret injection through service-specific Vault agents.
-- SOPS and age for encrypted secret files.
-- Prometheus for metrics collection.
-- Grafana for dashboards.
-- Mailpit for local email testing.
-
-Why: the infrastructure mirrors real production concerns: service isolation, HTTPS gateway, secrets management, observability, and reproducible deployment.
+- Public wiki with nested articles, notions, questions, and resources.
+- Authenticated contribution workflow for creating and editing wiki content.
+- Moderation and admin dashboard for reviewing pending content and role requests.
+- Email/password authentication with access and refresh tokens.
+- OAuth login/linking with Google and GitHub.
+- Optional MFA / 2FA support.
+- User profiles with avatar upload, theme preferences, roles, permissions, and account settings.
+- Friend and presence-oriented user features.
+- Legal pages and public demo disclaimer.
+- API documentation through OpenAPI / Swagger.
+- Observability through Prometheus and Grafana.
+- Production-style deployment with Kubernetes, Vault, TLS, and WAF.
+- Custom visual identity, logo concept, and Figma-driven interface direction.
 
 ## Architecture
 
-File: atfq.excalidraw
+ATFQ uses a microservice architecture:
 
-## Database Schema
+```text
+React app
+   |
+   v
+API Gateway
+   |
+   +-- Auth service
+   +-- User service
+   +-- Wiki service
 
-ATFQ uses separate PostgreSQL databases per domain service.
+Supporting infrastructure:
+PostgreSQL, Redis, MinIO, Vault, Nginx, ModSecurity,
+Prometheus, Grafana, Kubernetes, Terraform, GHCR
+```
 
-### Auth database
+The gateway exposes the public HTTP API consumed by the frontend. Internal services communicate through typed service contracts and keep their own persistence concerns separated.
 
-<img src="docs/db-schema/auth-database.svg" alt="Auth database schema" width="520">
+## Tech Stack
 
-### User database
+### Frontend
 
-<img src="docs/db-schema/user-database.svg" alt="User database schema" width="760">
+- React 19
+- TypeScript
+- Vite
+- React Router
+- TanStack Query
+- Zustand
+- React Hook Form
+- Zod
+- Tailwind CSS
+- Ky
+- MSW for frontend mocking
 
-### Wiki database
+### Backend
 
-<img src="docs/db-schema/wiki-database.svg" alt="Wiki database schema" width="680">
+- Rust
+- Axum API gateway
+- Tonic gRPC services
+- Go wiki service
+- PostgreSQL
+- Redis
+- MinIO / S3-compatible storage
+- SQLx
+- Utoipa / Swagger UI
 
-## Features List
+### Infrastructure & Security
 
-| Feature | Description | Main contributors |
-| --- | --- | --- |
-| Frontend and backend frameworks | React/Vite frontend, Rust Axum/Tonic services, and Go wiki service organized around clear service boundaries. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Public wiki browsing | Users can browse root articles, nested articles, notions, questions, and resources. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Wiki creation and editing | Authenticated users can submit new articles and edits as pending versions. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Wiki moderation | Moderators/admins can approve or reject pending wiki versions. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| API layer | HTTP endpoints exposed by the API gateway, gRPC contracts between internal services, and Swagger/OpenAPI documentation. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Authentication | Signup, login, logout, refresh tokens, password reset, account deletion. | mbekheir |
-| OAuth | Google and GitHub authentication and provider unlinking. | mbekheir |
-| MFA | TOTP-based MFA enable, verify, and disable flow. | jamar |
-| Profile management | Username/email/password update, avatar upload/removal, theme customization. | acaetano, mbekheir, jamar |
-| Friends and presence | User search, friend requests, accepted friends, online/last-seen status. | acaetano, mbekheir, jamar |
-| Roles and permissions | Admin, moderator, user roles with permission-based UI and backend checks. | mbekheir, acaetano |
-| Admin dashboard | Role request history/review and wiki moderation review surface. | mbekheir, acaetano, jamar |
-| ORM/database access | SQLx-based Rust persistence and sqlx-based Go persistence with migrations per service. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Custom design system | Shared UI primitives, theme tokens, typography choices, reusable layout elements, and a Figma-supported visual direction. | mbekheir |
-| Advanced search | Wiki search with filtering, sorting, pagination, and user/profile search support. | sdeutsch, mbekheir |
-| Legal pages | Privacy Policy and Terms of Service available from the application. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Monitoring | Prometheus metrics and Grafana dashboard. | mbekheir |
-| WAF and secret management | ModSecurity gateway and Vault-managed service secrets. | mbekheir |
+- Docker Compose for local and demo stacks
+- Kubernetes orchestration
+- Terraform for cloud infrastructure
+- GHCR container registry
+- HashiCorp Vault for runtime secrets
+- SOPS + age for encrypted local secret material
+- Nginx reverse proxy
+- OWASP ModSecurity Core Rule Set
+- Let's Encrypt TLS
+- Prometheus and Grafana
+- Mailpit for local email testing
 
-## Chosen Modules
+## Deployment
 
-The project claims 23 module points. Only fully functional modules should be counted during evaluation.
+The project supports two deployment modes:
 
-| Category | Module | Type | Points | Implementation | Contributors |
-| --- | --- | --- | ---: | --- | --- |
-| Web | Use a framework for both frontend and backend | Major | 2 | React/Vite frontend, Rust Axum/Tonic services, and Go wiki service. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Web | API | Major | 2 | API gateway, REST endpoints, OpenAPI/Swagger documentation, and gRPC contracts between services. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Web | Advanced search with filters, sorting, and pagination | Minor | 1 | Wiki search UI includes query, type filtering, title sorting, and paginated results; user search is available from profile flows. | sdeutsch, mbekheir |
-| User Management | Standard user management and authentication | Major | 2 | Profile updates, avatar support, friends, online presence, role requests, and account settings. | acaetano, mbekheir, jamar |
-| User Management | OAuth 2.0 remote authentication | Minor | 1 | Google and GitHub OAuth login/link/unlink flows. | mbekheir |
-| User Management | Advanced permissions system | Major | 2 | Roles, permissions, role requests, admin review, and permission-gated actions. | mbekheir, acaetano |
-| User Management | Complete 2FA system | Minor | 1 | TOTP MFA enable, verify, and disable with encrypted stored material. | jamar |
-| Cybersecurity | WAF/ModSecurity + HashiCorp Vault | Major | 2 | OWASP ModSecurity CRS gateway and Vault agents for isolated secret injection. | mbekheir |
-| DevOps | Monitoring with Prometheus and Grafana | Major | 2 | Metrics endpoints for services, Prometheus scrape config, Grafana provisioning. | mbekheir |
-| DevOps | Backend as microservices | Major | 2 | API gateway, auth, user, and wiki services with separate databases and gRPC contracts. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Database | ORM/database toolkit | Major | 2 | SQLx is used in Rust services and sqlx is used in the Go wiki service to structure database access and migrations. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Module of choice | Multi-language / API / framework stack | Minor | 1 | The project combines Rust and Go backend services, React frontend, OpenAPI documentation, and gRPC service contracts. | mbekheir, jamar, jsommet, acaetano, sdeutsch |
-| Module of choice | Figma-driven UI preparation | Minor | 1 | Figma was used to prepare the visual direction and align the custom ATFQ interface before implementation. | mbekheir |
-| Module of choice | Custom-made design system | Major | 2 | Shared UI primitives, theme tokens, custom typography/theme settings, reusable navigation, and consistent ATFQ visual language. | mbekheir |
+- **Docker Compose** for local end-to-end execution.
+- **Kubernetes** for the public demo infrastructure.
 
-Total: 23 points.
+The live deployment runs container images published to GHCR and pulls them from Kubernetes. Application secrets are injected through Vault-backed flows rather than committed environment files.
 
-## Module Justification
+## Local Development
 
-- Frameworks: the project uses a real frontend framework and backend frameworks instead of a static page or ad hoc server.
-- API: the gateway exposes documented REST endpoints while internal services communicate through typed gRPC contracts.
-- Advanced search: the wiki would be hard to navigate without filtering, sorting, and pagination, so this directly improves the product.
-- Standard user management: profiles, avatars, friendship, and presence are core to a multi-user collaborative platform.
-- OAuth: remote login reduces account friction and demonstrates provider integration.
-- Advanced permissions: ATFQ needs trusted moderation and role separation to keep the knowledge base reliable.
-- 2FA: protects contributor and moderator accounts, especially those with elevated permissions.
-- WAF + Vault: the project handles authentication and user data, so gateway hardening and secret isolation are important.
-- Monitoring: Prometheus and Grafana make service health visible and support debugging during multi-service deployment.
-- Microservices: auth, user, and wiki domains have different responsibilities and storage needs; service separation keeps these boundaries clear.
-- ORM/database toolkit: SQLx keeps database access explicit while still providing typed rows, migrations, and structured persistence code.
-- Multi-language/API/framework module of choice: the project demonstrates integration across Rust, Go, React, REST, OpenAPI, and gRPC rather than a single monolithic stack.
-- Figma module of choice: the interface was prepared from a visual design source before being translated into reusable frontend components.
-- Custom design system: ATFQ has reusable UI primitives and theme behavior instead of one-off screen styling.
+Prerequisites:
 
-## Individual Contributions
+- Docker
+- Task
+- SOPS
+- age
+- jq
+- yq
 
-### acaetano
+Run the full Docker Compose stack:
 
-- Worked on the advanced permissions system with mbekheir.
-- Contributed to user management with mbekheir and jamar.
-- Participated in the shared frontend/backend framework work.
-- Participated in API integration, microservice behavior, and ORM/database usage.
-- Helped validate content structure: articles, notions, questions, and resources.
+```bash
+cd services
+task up
+```
 
-Main challenge: keeping user-facing account and permission flows understandable while the backend rules became more detailed.
+Common commands:
 
-### jamar
+```bash
+cd services
+docker compose up --build
+docker compose logs -f
+docker compose down
+```
 
-- Acted as Project Manager and coordinated planning, task breakdown, and progress tracking.
-- Implemented the 2FA flow.
-- Contributed to user management with acaetano and mbekheir.
-- Participated in the shared frontend/backend framework work.
-- Participated in API integration, microservice behavior, and ORM/database usage.
+The project intentionally does not commit real runtime `.env` files.
 
-Main challenge: coordinating delivery while security-sensitive authentication features required careful integration and testing.
+## Repository Structure
 
-### jsommet
+```text
+services/
+  app/            React frontend
+  api-gateway/    Public HTTP API gateway
+  auth/           Authentication service
+  user/           User/profile service
+  wiki/           Wiki service
+  vault/          Vault bootstrap and policies
 
-- Participated in the shared frontend/backend framework work.
-- Contributed to API and microservice integration.
-- Worked with the shared ORM/database layer and service migrations.
-- Helped keep backend contracts and service boundaries consistent.
-- Participated in integration and evaluation preparation.
+infra/
+  iac/            Terraform infrastructure
+  orchestration/  Kubernetes charts, values, and deployment tasks
 
-Main challenge: keeping domain services independent while still exposing a simple API to the frontend.
-
-### mbekheir
-
-- Acted as Product Owner and Technical Lead.
-- Implemented remote authentication with OAuth 2.0 for Google and GitHub.
-- Implemented DevOps and security infrastructure: Docker Compose, Vault, ModSecurity, Prometheus, and Grafana.
-- Worked on the advanced permissions system with acaetano.
-- Contributed to user management with acaetano and jamar.
-- Worked on advanced search with sdeutsch.
-- Built the custom-made design system and prepared the Figma-based visual direction.
-- Participated in the shared framework, API, microservice, and ORM/database modules.
-
-Main challenge: making the application reproducible with many containers while keeping secrets out of source code.
-
-### sdeutsch
-
-- Worked on advanced search functionality with mbekheir.
-- Participated in the shared frontend/backend framework work.
-- Participated in API integration, microservice behavior, and ORM/database usage.
-- Contributed to user-facing features and evaluation readiness.
-- Helped test flows from the user perspective.
-
-Main challenge: making search and user-facing workflows practical while the content and profile data came from multiple services.
+docs/
+  db-schema/      Database schema diagrams
+```
 
 ## Security Notes
 
-- Passwords are hashed with Argon2 and are never stored in plain text.
-- MFA secrets are encrypted before storage.
-- Access and refresh tokens are handled through the auth service.
-- Protected routes use bearer tokens and backend authorization checks.
-- Secrets are provided by Vault agents through service-local secret volumes.
-- ModSecurity runs at the network gateway.
-- User input is validated on the frontend and backend.
-- The API gateway enforces request body limits for uploads.
+The public version of this repository is intended to show architecture and engineering work, not expose runtime credentials.
 
-## Multi-user Support
+Current safeguards:
 
-ATFQ supports multiple users simultaneously:
+- Runtime env files are ignored.
+- Terraform state and tfvars are ignored.
+- Kubeconfig files are ignored.
+- Vault runtime data and AppRole IDs are ignored.
+- Encrypted secret files are no longer tracked.
 
-- Many users can register, log in, and browse the wiki at the same time.
-- Contributions are stored as versions, which avoids overwriting the currently published article until moderation.
-- Role requests and moderation actions are persisted and visible to authorized users.
-- Friendships and presence data are stored in the user service.
-- Services use PostgreSQL relations and constraints to reduce data corruption risks.
+Before publishing publicly, the Git history should be cleaned of old secret-related blobs and any previously exposed credentials should be rotated.
 
-## Known Limitations
+## Database Schemas
 
-- The HTTPS gateway expects local host/certificate configuration for `atfq.org`.
-- OAuth callbacks require provider credentials and redirect URLs configured in Vault.
-- Some development URLs expose services directly for local testing.
-- The project focuses on a collaborative knowledge platform, not a game; gaming modules are not claimed.
-- Bonus modules should only be counted if they are demonstrated as fully functional during evaluation.
+ATFQ uses separate PostgreSQL databases per domain service.
 
-## Resources
+### Auth
 
-Technical references used:
+<img src="docs/db-schema/auth-database.svg" alt="Auth database schema" width="520">
 
-- React documentation: https://react.dev/
-- Vite documentation: https://vite.dev/
-- React Router documentation: https://reactrouter.com/
-- TanStack Query documentation: https://tanstack.com/query/latest
-- Tailwind CSS documentation: https://tailwindcss.com/
-- Axum documentation: https://docs.rs/axum/latest/axum/
-- Tonic gRPC documentation: https://docs.rs/tonic/latest/tonic/
-- SQLx documentation: https://docs.rs/sqlx/latest/sqlx/
-- PostgreSQL documentation: https://www.postgresql.org/docs/
-- OpenAPI specification: https://spec.openapis.org/oas/latest.html
-- Docker Compose documentation: https://docs.docker.com/compose/
-- HashiCorp Vault documentation: https://developer.hashicorp.com/vault/docs
-- OWASP ModSecurity Core Rule Set: https://coreruleset.org/
-- Prometheus documentation: https://prometheus.io/docs/
-- Grafana documentation: https://grafana.com/docs/
-- Figma documentation: https://help.figma.com/
-- OAuth 2.0 overview: https://oauth.net/2/
-- OWASP Web Security Testing Guide: https://owasp.org/www-project-web-security-testing-guide/
+### User
 
-AI usage:
+<img src="docs/db-schema/user-database.svg" alt="User database schema" width="760">
 
-- AI was used to help structure documentation, especially this README, according to the ft_transcendence subject and evaluation checklist.
-- AI was used for brainstorming wording, module justification, and checklist coverage.
-- AI was not treated as an authority for project behavior; generated text must be reviewed by the team and kept consistent with the implemented code.
-- Any AI-assisted content is the team's responsibility and should be explainable by team members during evaluation.
+### Wiki
+
+<img src="docs/db-schema/wiki-database.svg" alt="Wiki database schema" width="680">
+
+## What This Project Demonstrates
+
+- Building a real product from idea to public deployment.
+- Designing service boundaries in a microservice architecture.
+- Connecting frontend, gateway, internal services, and persistence layers.
+- Managing auth, OAuth, MFA, roles, permissions, and moderation flows.
+- Running production-style infrastructure with TLS, WAF, secrets, metrics, and Kubernetes.
+- Creating the product identity, logo system, and interface direction from concept to implementation.
+- Owning technical leadership and delivery across a multi-person team.
+
+## Status
+
+ATFQ is a demo / proof of concept. It is suitable for showcasing architecture, product thinking, infrastructure, and full-stack engineering work. Data and features may be reset or changed as the project evolves.
