@@ -210,21 +210,17 @@ Current safeguards:
 
 Before publishing publicly, the Git history should be cleaned of old secret-related blobs and any previously exposed credentials should be rotated.
 
-## Database Schemas
+## Data Model
 
-ATFQ uses separate PostgreSQL databases per domain service.
+ATFQ uses separate PostgreSQL databases per domain service. Each service owns its schema and exposes behavior through the API gateway instead of sharing database access across services.
 
-### Auth
+| Domain | Main data owned | Purpose |
+| --- | --- | --- |
+| **Auth** | Users, credentials, OAuth identities, MFA material, reset tokens, refresh-token state | Handles identity, login, account security, OAuth linking, MFA, and password lifecycle. |
+| **User** | Profiles, avatars, preferences, roles, permissions, friendships, presence | Handles user-facing profile data, social features, access levels, and personalization. |
+| **Wiki** | Articles, hierarchy, notions, questions, resources, pending versions, moderation state | Handles the knowledge graph, contribution workflow, and content review lifecycle. |
 
-<img src="docs/db-schema/auth-database.svg" alt="Auth database schema" width="520">
-
-### User
-
-<img src="docs/db-schema/user-database.svg" alt="User database schema" width="760">
-
-### Wiki
-
-<img src="docs/db-schema/wiki-database.svg" alt="Wiki database schema" width="680">
+Detailed schema diagrams are kept in [`docs/db-schema`](docs/db-schema) for deeper inspection.
 
 ## What This Project Demonstrates
 
