@@ -6,6 +6,7 @@ import { Mail } from '@/assets/icons/Mail'
 import { Github } from '@/assets/icons/Github'
 import { Linkedin } from '@/assets/icons/Linkedin'
 import { Instagram } from '@/assets/icons/Instagram'
+import { CONTACT_MAILTO } from '@/config/contact'
 
 function SocialLink({ to, Icon }: { to: string, Icon: React.FunctionComponent<React.SVGProps<SVGSVGElement>> }) {
   const isExternal = to.startsWith('http') || to.startsWith('mailto:')
@@ -49,7 +50,7 @@ export function Footer() {
 
         {/* RIGHT: SOCIALS */}
         <div className="flex items-center gap-6">
-          <SocialLink to="mailto:contact@atfq.dev" Icon={Mail} />
+          <SocialLink to={CONTACT_MAILTO} Icon={Mail} />
           <SocialLink to="https://github.com" Icon={Github} />
           <SocialLink to="https://linkedin.com" Icon={Linkedin} />
           <SocialLink to="https://instagram.com" Icon={Instagram} />

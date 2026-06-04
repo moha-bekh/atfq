@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/Button';
+import { CONTACT_MAILTO } from '@/config/contact';
 
 export function Home() {
   return (
@@ -29,7 +30,7 @@ export function Home() {
               </div>
 
               <a
-                href="mailto:contact@atfq.dev"
+                href={CONTACT_MAILTO}
                 className="group w-fit text-base text-main transition-colors hover:text-text"
               >
                 Contact us

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "@/config/contact";
 
 type LegalSection = {
   title: string;
@@ -12,8 +13,6 @@ type LegalPageProps = {
   intro: string;
   sections: LegalSection[];
 };
-
-const contactEmail = "contact@atfq.dev";
 
 function LegalPage({ eyebrow, title, intro, sections }: LegalPageProps) {
   return (
@@ -57,8 +56,8 @@ function LegalPage({ eyebrow, title, intro, sections }: LegalPageProps) {
 
       <footer className="border-t border-main/20 pt-6 text-sm leading-6 text-text">
         Questions about this page can be sent to{" "}
-        <a className="font-semibold text-main hover:text-text" href={`mailto:${contactEmail}`}>
-          {contactEmail}
+        <a className="font-semibold text-main hover:text-text" href={CONTACT_MAILTO}>
+          {CONTACT_EMAIL}
         </a>
         . You can also return to the{" "}
         <Link className="font-semibold text-main hover:text-text" to="/wiki?page=getting-started">
