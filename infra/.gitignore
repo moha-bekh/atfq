@@ -22,6 +22,20 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 crash.log
+backend.tf
 
 # kubernetes
 *kubeconfig*
+
+# Local infrastructure environment
+.infra.env
+provisioning/ansible.cfg
+provisioning/inventory.yaml
+provisioning/group_vars/all.yaml
+
+# Secrets and credentials
+*.pem
+*.key
+credentials
+credentials.json
+service-account*.json

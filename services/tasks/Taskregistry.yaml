@@ -20,7 +20,7 @@ tasks:
         docker buildx build \
           --platform linux/amd64 \
           --target {{.TARGET}} \
-          -t {{.REGISTRY}}/{{.GH_USER}}/atfq-{{.NAME}}:{{.VERSION}} \
+          -t {{.REGISTRY}}/{{.GH_USER}}/atfq-prototype-{{.NAME}}:{{.VERSION}} \
           --push \
           {{.PATH}}
 
@@ -30,10 +30,10 @@ tasks:
       - task: push-svc
         vars: { NAME: "api-gateway", PATH: "./api-gateway" }
       - task: push-svc
-        vars: { NAME: "auth-service", PATH: "./auth" }
+        vars: { NAME: "auth", PATH: "./auth" }
       - task: push-svc
-        vars: { NAME: "user-service", PATH: "./user" }
+        vars: { NAME: "user", PATH: "./user" }
       - task: push-svc
-        vars: { NAME: "wiki-service", PATH: "./wiki" }
+        vars: { NAME: "wiki", PATH: "./wiki" }
       - task: push-svc
         vars: { NAME: "app", PATH: "./app" }

@@ -60,6 +60,7 @@ tasks:
       - >
         terraform init 
         -backend-config="profile={{.AWS_PROFILE}}"
+        -backend-config="region={{.AWS_REGION | default "eu-west-3" }}"
         -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" 
         -backend-config="key=bootstrap/terraform.tfstate" 
         -backend-config="encrypt=true"
@@ -82,6 +83,7 @@ tasks:
       - >
         terraform init -reconfigure 
         -backend-config="profile={{.AWS_PROFILE}}" 
+        -backend-config="region={{.AWS_REGION | default "eu-west-3" }}"
         -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" 
         -backend-config="key=bootstrap/terraform.tfstate"
         -force-copy
@@ -117,6 +119,7 @@ tasks:
       - |
         terraform -chdir={{.NETWORK_DIR}} init \
           -backend-config="profile={{.AWS_PROFILE}}" \
+          -backend-config="region={{.AWS_REGION | default "eu-west-3" }}" \
           -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
           -backend-config="key=network/terraform.tfstate"
 
@@ -151,6 +154,7 @@ tasks:
       - |
         terraform -chdir={{.COMPUTE_DIR}} init \
           -backend-config="profile={{.AWS_PROFILE}}" \
+          -backend-config="region={{.AWS_REGION | default "eu-west-3" }}" \
           -backend-config="bucket={{.AWS_S3_STATE_BUCKET_NAME}}" \
           -backend-config="key=compute/terraform.tfstate"
 

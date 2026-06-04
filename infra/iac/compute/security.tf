@@ -34,11 +34,6 @@ resource "aws_security_group_rule" "allow_vpc_internal" {
   security_group_id = aws_security_group.atfq_sg.id
 }
 
-locals {
-  my_ip = chomp(data.http.my_ip.response_body)
-  is_ipv6 = length(split(":", local.my_ip)) > 1
-}
-
 # SSH
 resource "aws_security_group_rule" "allow_ssh_my_ip" {
   type              = "ingress"
@@ -54,16 +49,6 @@ resource "aws_security_group_rule" "allow_api_external" {
   type              = "ingress"
   from_port         = 6443
   to_port           = 6443
-  protocol          = "tcp"
-  cidr_blocks       = ["${local.current_ip}/32"]
-  security_group_id = aws_security_group.atfq_sg.id
-}
-
-# NODEPORT (30000-32767)
-resource "aws_security_group_rule" "allow_nodeports" {
-  type              = "ingress"
-  from_port         = 30000
-  to_port           = 32767
   protocol          = "tcp"
   cidr_blocks       = ["${local.current_ip}/32"]
   security_group_id = aws_security_group.atfq_sg.id

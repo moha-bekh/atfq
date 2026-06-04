@@ -7,5 +7,5 @@ output "kubernetes_nodes" {
 
 output "ssh_connect_master" {
   description = "Command to connect to the master node"
-  value = "ssh -i ~/.ssh/${var.ssh_key_name} ubuntu@${[for n in aws_instance.atfq_nodes : n.public_ip if n.tags.Role == "master"][0]}"
+  value       = "ssh -i ~/.ssh/${var.ssh_key_name} ubuntu@${[for n in aws_instance.atfq_nodes : n.public_ip if n.tags.Role == "master"][0]}"
 }

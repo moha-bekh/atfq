@@ -8,9 +8,9 @@ resource "aws_instance" "atfq_nodes" {
 
   key_name               = aws_key_pair.atfq.key_name
   vpc_security_group_ids = [aws_security_group.atfq_sg.id]
-  
+
   associate_public_ip_address = true
-  source_dest_check = false
+  source_dest_check           = false
 
   user_data = <<-EOF
               #!/bin/bash
