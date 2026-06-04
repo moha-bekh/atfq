@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/atfq-logo.svg" alt="ATFQ logo" width="96" height="96">
+</p>
+
 # ATFQ
 
 **Ask The F\*cking Question** is a collaborative learning platform for computer science. It combines a structured wiki, authenticated contributions, user profiles, role-based moderation, and production-style infrastructure.
@@ -33,6 +37,10 @@ I also owned the visual direction of ATFQ: brand concept, logo, interface mood, 
 Figma prototype: [ATFQ Prototype](https://www.figma.com/design/Wcn6Z4MUuzDb3OOM34E9VM/ATFQ-Prototype?node-id=5-31&t=0D5rCeQfG52tMJiq-1)
 
 ### Logo Concept
+
+<p>
+  <img src="docs/assets/atfq-logo.svg" alt="ATFQ logo" width="72" height="72">
+</p>
 
 The ATFQ logo is a minimalist geometric mark built around the letter **Q**, the visual anchor of the brand. It is designed to express more than an initial: it connects the idea of questioning with knowledge graphs, technical structure, and intellectual clarity.
 
