@@ -1,0 +1,22 @@
+image:
+  repository: axllent/mailpit
+  tag: latest
+
+nodeSelector:
+  node-pool: shared
+
+ports:
+  - name: smtp
+    containerPort: 1025
+  - name: http
+    containerPort: 8025
+
+service:
+  enabled: true
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: smtp
+    - name: http
+      port: 8025
+      targetPort: http

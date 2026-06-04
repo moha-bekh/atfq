@@ -1,0 +1,29 @@
+replicaCount: 1
+
+workload:
+  kind: Deployment
+
+image:
+  repository: nginx
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: false
+
+service:
+  enabled: true
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
+ports:
+  - name: http
+    containerPort: 80
+
+ingress:
+  enabled: false

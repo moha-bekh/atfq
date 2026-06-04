@@ -1,18 +1,219 @@
 version: '3'
 
+vars:
+  APP_DEPLOYMENTS: api-gateway auth user wiki app-nginx
+  APPS_NAMESPACE: '{{.APPS_NAMESPACE | default "atfq-apps"}}'
+  DATA_NAMESPACE: '{{.DATA_NAMESPACE | default "atfq-data"}}'
+  EDGE_NAMESPACE: '{{.EDGE_NAMESPACE | default "atfq-edge"}}'
+  OBSERVABILITY_NAMESPACE: '{{.OBSERVABILITY_NAMESPACE | default "atfq-observability"}}'
+  TOOLS_NAMESPACE: '{{.TOOLS_NAMESPACE | default "atfq-tools"}}'
+  TIMEOUT: '{{.TIMEOUT | default "5m"}}'
+  API_BASE: '{{.API_BASE | default "cluster"}}'
+  ADMIN_USERNAME: '{{.ADMIN_USERNAME}}'
+  ADMIN_EMAIL: '{{.ADMIN_EMAIL}}'
+  ADMIN_PASSWORD: '{{.ADMIN_PASSWORD}}'
+
 tasks:
   deploy:
     desc: "Deploy a specific cluster (default prod)"
     vars:
       ENV: '{{.ENV | default "prod"}}'
     cmds:
-      - helm dependency update {{.USER_WORKING_DIR}}/services/app-nginx
-      - helmfile --file {{.USER_WORKING_DIR}}/clusters/{{.ENV}}/helmfile.yaml apply
+      - helmfile --kubeconfig {{.TASKFILE_DIR}}/kubeconfig_atfq --file {{.TASKFILE_DIR}}/clusters/{{.ENV}}/helmfile.yaml apply
     env:
-      KUBECONFIG: "{{.USER_WORKING_DIR}}/kubeconfig_atfq"
+      KUBECONFIG: "{{.TASKFILE_DIR}}/kubeconfig_atfq"
 
   get-pods:
     cmds:
       - kubectl get pods -A
     env:
-      KUBECONFIG: "{{.USER_WORKING_DIR}}/orchestration/kubeconfig_atfq"
+      KUBECONFIG: "{{.TASKFILE_DIR}}/kubeconfig_atfq"
+
+  layout-status:
+    desc: "Show node labels and pod placement"
+    cmds:
+      - |
+        kubectl --kubeconfig {{.TASKFILE_DIR}}/kubeconfig_atfq get nodes -L node-pool,node-class,type
+        kubectl --kubeconfig {{.TASKFILE_DIR}}/kubeconfig_atfq get pods -A -o wide
+
+  ghcr-pull-secret:
+    desc: "Create/update the GHCR image pull secret from KUBECONFIG and GHCR_TOKEN"
+    cmds:
+      - |
+        : "${KUBECONFIG:?KUBECONFIG is required}"
+        : "${GHCR_TOKEN:?GHCR_TOKEN is required}"
+        kubectl create namespace {{.APPS_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+        kubectl -n {{.APPS_NAMESPACE}} create secret docker-registry ghcr-pull-secret \
+          --docker-server=ghcr.io \
+          --docker-username={{.GHCR_USERNAME | default "moha-bekh"}} \
+          --docker-password="$GHCR_TOKEN" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+  restart-apps:
+    desc: "Restart app deployments that pull images from GHCR"
+    cmds:
+      - |
+        : "${KUBECONFIG:?KUBECONFIG is required}"
+        for app in {{.APP_DEPLOYMENTS}}; do
+          kubectl -n {{.APPS_NAMESPACE}} rollout restart "deployment/$app"
+        done
+        for app in {{.APP_DEPLOYMENTS}}; do
+          kubectl -n {{.APPS_NAMESPACE}} rollout status "deployment/$app" --timeout={{.TIMEOUT | default "5m"}}
+        done
+
+  deploy-ghcr-apps:
+    desc: "Update GHCR pull secret, restart app deployments, and wait for rollout"
+    cmds:
+      - task: ghcr-pull-secret
+      - task: restart-apps
+
+  wiki-seed-demo:
+    desc: "Seed the Kubernetes wiki database with the full demo documentation tree"
+    cmds:
+      - |
+        : "${KUBECONFIG:?KUBECONFIG is required}"
+        kubectl -n {{.DATA_NAMESPACE}} wait --for=condition=ready pod/db-wiki-0 --timeout={{.TIMEOUT}}
+        kubectl -n {{.DATA_NAMESPACE}} cp "{{.TASKFILE_DIR}}/../../services/wiki/scripts/seed_demo.sh" db-wiki-0:/tmp/seed_demo.sh -c db-wiki
+        kubectl -n {{.DATA_NAMESPACE}} exec db-wiki-0 -c db-wiki -- sh -ec '
+          cp /tmp/seed_demo.sh /tmp/seed_demo_k8s.sh
+          sed -i "1s|.*|#!/bin/sh|; 2s|set -euo pipefail|set -eu|" /tmp/seed_demo_k8s.sh
+          wiki_db_user=$(cat /vault/secrets/POSTGRES_USER)
+          wiki_db_password=$(cat /vault/secrets/POSTGRES_PASSWORD)
+          wiki_db_name=$(cat /vault/secrets/POSTGRES_DB)
+          export WIKI_DEMO_DATABASE_URL="postgresql://${wiki_db_user}:${wiki_db_password}@127.0.0.1:5432/${wiki_db_name}"
+          export WIKI_DEMO_AUTHOR_ID="{{.WIKI_DEMO_AUTHOR_ID | default "1"}}"
+          export WIKI_DEMO_RESOURCE_LABEL="{{.WIKI_DEMO_RESOURCE_LABEL | default "ATFQ demo dataset"}}"
+          sh /tmp/seed_demo_k8s.sh
+        '
+
+  create-admin-user:
+    desc: "Create or promote the demo admin user in Kubernetes"
+    cmds:
+      - |
+        set -eu
+        : "${KUBECONFIG:?KUBECONFIG is required}"
+        : "${ADMIN_USERNAME:?ADMIN_USERNAME is required}"
+        : "${ADMIN_EMAIL:?ADMIN_EMAIL is required}"
+        : "${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}"
+
+        kubectl -n {{.DATA_NAMESPACE}} wait --for=condition=ready pod/db-auth-0 --timeout={{.TIMEOUT}}
+        kubectl -n {{.DATA_NAMESPACE}} wait --for=condition=ready pod/db-user-0 --timeout={{.TIMEOUT}}
+
+        payload=$(printf '{"username":"%s","email":"%s","password":"%s"}' "$ADMIN_USERNAME" "$ADMIN_EMAIL" "$ADMIN_PASSWORD")
+        api_base="{{.API_BASE}}"
+
+        if [ "$api_base" = "cluster" ]; then
+          kubectl -n {{.APPS_NAMESPACE}} wait --for=condition=available deployment/api-gateway --timeout={{.TIMEOUT}}
+          response=$(kubectl -n {{.APPS_NAMESPACE}} run atfq-admin-register \
+            --rm -i --restart=Never \
+            --image=curlimages/curl:8.8.0 \
+            --env=ADMIN_PAYLOAD="$payload" \
+            --command -- sh -ec '
+              status=$(curl -sS -o /tmp/atfq-admin-register.json -w "%{http_code}" \
+                -H "content-type: application/json" \
+                -d "$ADMIN_PAYLOAD" \
+                http://api-gateway.{{.APPS_NAMESPACE}}.svc.cluster.local:8080/api/v1/auth/register || true)
+              echo "__ATFQ_HTTP_STATUS:${status}"
+              cat /tmp/atfq-admin-register.json 2>/dev/null || true
+            ')
+          status=$(printf "%s\n" "$response" | sed -n "s/^__ATFQ_HTTP_STATUS://p" | tail -n 1)
+          printf "%s\n" "$response" | sed "/^__ATFQ_HTTP_STATUS:/d; /^pod \"atfq-admin-register\" deleted/d" > /tmp/atfq-admin-register.json
+          api_base="http://api-gateway.{{.APPS_NAMESPACE}}.svc.cluster.local:8080"
+        else
+          status=$(curl -skL -o /tmp/atfq-admin-register.json -w "%{http_code}" \
+            -H "content-type: application/json" \
+            -d "$payload" \
+            "$api_base/api/v1/auth/register" || true)
+        fi
+
+        if [ "$status" != "201" ] && [ "$status" != "409" ]; then
+          echo "Unable to register admin user through $api_base/api/v1/auth/register (HTTP $status)"
+          cat /tmp/atfq-admin-register.json 2>/dev/null || true
+          exit 1
+        fi
+
+        admin_id=$(kubectl -n {{.DATA_NAMESPACE}} exec db-auth-0 -c db-auth -- sh -ec "
+          psql -U \"\$(cat /vault/secrets/POSTGRES_USER)\" \
+            -d \"\$(cat /vault/secrets/POSTGRES_DB)\" \
+            -qAt \
+            -c \"SELECT id FROM users WHERE email = '$ADMIN_EMAIL' LIMIT 1;\"
+        ")
+
+        if [ -z "$admin_id" ]; then
+          echo "Admin user $ADMIN_EMAIL was not found in auth database."
+          exit 1
+        fi
+
+        kubectl -n {{.DATA_NAMESPACE}} exec db-user-0 -c db-user -- env ADMIN_ID="$admin_id" sh -ec '
+          psql -U "$(cat /vault/secrets/POSTGRES_USER)" \
+            -d "$(cat /vault/secrets/POSTGRES_DB)" \
+            -v ON_ERROR_STOP=1 \
+            -c "
+              INSERT INTO profiles (id) VALUES ('\''$ADMIN_ID'\'') ON CONFLICT DO NOTHING;
+              INSERT INTO profile_roles (profile_id, role_name)
+              VALUES ('\''$ADMIN_ID'\'', '\''user'\''), ('\''$ADMIN_ID'\'', '\''admin'\'')
+              ON CONFLICT DO NOTHING;
+            "
+        '
+
+        echo "Demo admin ready:"
+        echo "  email: $ADMIN_EMAIL"
+        echo "  password: $ADMIN_PASSWORD"
+    env:
+      ADMIN_USERNAME: "{{.ADMIN_USERNAME}}"
+      ADMIN_EMAIL: "{{.ADMIN_EMAIL}}"
+      ADMIN_PASSWORD: "{{.ADMIN_PASSWORD}}"
+
+  demo-bootstrap:
+    desc: "Prepare Kubernetes demo data: create/promote admin user and seed wiki demo tree"
+    cmds:
+      - task: create-admin-user
+      - task: wiki-seed-demo
+
+  vault-bootstrap:
+    desc: "Initialize/unseal/provision the Kubernetes Vault instance from SOPS secrets"
+    cmds:
+      - |
+        SOPS_AGE_KEY_FILE={{.AGE_KEY | default "/Users/moha/.config/sops/age/atfq-dev.txt"}} \
+        KUBECONFIG={{.TASKFILE_DIR}}/kubeconfig_atfq \
+        DATA_NAMESPACE={{.DATA_NAMESPACE}} \
+        APPS_NAMESPACE={{.APPS_NAMESPACE}} \
+        sops exec-env {{.TASKFILE_DIR}}/../../services/vault/secrets.enc.yaml \
+          'sh {{.TASKFILE_DIR}}/scripts/bootstrap_vault_k8s.sh'
+
+  prepare-layout:
+    desc: "Create namespaces, label nodes, and copy existing runtime secrets for the namespaced layout"
+    cmds:
+      - |
+        : "${KUBECONFIG:?KUBECONFIG is required}"
+        kubectl create namespace {{.APPS_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace {{.DATA_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace {{.EDGE_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace {{.OBSERVABILITY_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace {{.TOOLS_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+
+        kubectl label node worker-01 node-pool=workload --overwrite
+        kubectl label node worker-02 node-pool=shared --overwrite
+        kubectl label node worker-01 node-class=worker --overwrite
+        kubectl label node worker-02 node-class=worker --overwrite
+
+        copy_secret() {
+          src_ns="$1"
+          dst_ns="$2"
+          name="$3"
+          if kubectl -n "$src_ns" get secret "$name" >/dev/null 2>&1; then
+            kubectl -n "$src_ns" get secret "$name" -o yaml \
+              | yq 'del(.metadata.namespace, .metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.annotations."kubectl.kubernetes.io/last-applied-configuration")' \
+              | kubectl -n "$dst_ns" apply -f -
+          fi
+        }
+
+        copy_secret default {{.APPS_NAMESPACE}} ghcr-pull-secret
+        copy_secret default {{.APPS_NAMESPACE}} vault-agent-auth-approle
+        copy_secret default {{.APPS_NAMESPACE}} vault-agent-user-approle
+        copy_secret default {{.APPS_NAMESPACE}} vault-agent-wiki-approle
+        copy_secret default {{.APPS_NAMESPACE}} vault-agent-api-gateway-approle
+        copy_secret default {{.DATA_NAMESPACE}} vault-agent-auth-approle
+        copy_secret default {{.DATA_NAMESPACE}} vault-agent-user-approle
+        copy_secret default {{.DATA_NAMESPACE}} vault-agent-wiki-approle
+        copy_secret default {{.DATA_NAMESPACE}} vault-agent-api-gateway-approle

@@ -1,0 +1,54 @@
+workload:
+  kind: DaemonSet
+
+nodeSelector:
+  node-class: worker
+
+image:
+  repository: ncabatoff/process-exporter
+  tag: latest
+
+command:
+  - /bin/process-exporter
+  - -procfs=/host/proc
+  - -config.path=/etc/process-exporter/config.yml
+  - -recheck
+  - -remove-empty-groups
+  - -gather-smaps=false
+
+ports:
+  - name: metrics
+    containerPort: 9256
+
+service:
+  enabled: true
+  ports:
+    - name: metrics
+      port: 9256
+      targetPort: metrics
+
+configMaps:
+  - name: process-exporter-config
+    data:
+      config.yml: |-
+        process_names:
+          - name: "{{.Comm}}"
+            cmdline:
+              - '.+'
+
+volumeMounts:
+  - name: proc
+    mountPath: /host/proc
+    readOnly: true
+  - name: process-exporter-config
+    mountPath: /etc/process-exporter/config.yml
+    subPath: config.yml
+    readOnly: true
+
+volumes:
+  - name: proc
+    hostPath:
+      path: /proc
+  - name: process-exporter-config
+    configMap:
+      name: process-exporter-config

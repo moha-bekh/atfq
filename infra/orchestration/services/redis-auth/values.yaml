@@ -1,0 +1,25 @@
+image:
+  repository: redis
+  tag: alpine
+
+nodeSelector:
+  node-pool: shared
+
+command: ["redis-server", "--appendonly", "yes"]
+
+ports:
+  - name: redis
+    containerPort: 6379
+
+service:
+  enabled: true
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+
+readinessProbe:
+  tcpSocket:
+    port: redis
+  initialDelaySeconds: 5
+  periodSeconds: 10

@@ -1,0 +1,127 @@
+{{- $kind := default "Deployment" .Values.workload.kind -}}
+apiVersion: {{ ternary "batch/v1" "apps/v1" (eq $kind "Job") }}
+kind: {{ $kind }}
+metadata:
+  name: {{ include "base-app.name" . }}
+  labels:
+{{ include "base-app.labels" . | nindent 4 }}
+spec:
+{{- if eq $kind "Job" }}
+  backoffLimit: {{ default 6 .Values.workload.backoffLimit }}
+  template:
+    metadata:
+      labels:
+{{ include "base-app.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: {{ default "OnFailure" .Values.workload.restartPolicy }}
+{{- else }}
+{{- if not (eq $kind "DaemonSet") }}
+  replicas: {{ default 1 .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+{{ include "base-app.selectorLabels" . | nindent 6 }}
+{{- if eq $kind "StatefulSet" }}
+  serviceName: {{ include "base-app.name" . }}
+{{- end }}
+  template:
+    metadata:
+      labels:
+{{ include "base-app.selectorLabels" . | nindent 8 }}
+    spec:
+{{- end }}
+{{- if hasKey .Values "hostNetwork" }}
+      hostNetwork: {{ .Values.hostNetwork }}
+{{- end }}
+{{- if hasKey .Values "shareProcessNamespace" }}
+      shareProcessNamespace: {{ .Values.shareProcessNamespace }}
+{{- end }}
+{{- with .Values.dnsPolicy }}
+      dnsPolicy: {{ . }}
+{{- end }}
+{{- with .Values.serviceAccount }}
+{{- if or .create .name }}
+      serviceAccountName: {{ default (include "base-app.name" $) .name }}
+{{- end }}
+{{- end }}
+{{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+{{- toYaml . | nindent 8 }}
+{{- end }}
+{{- if hasKey .Values "automountServiceAccountToken" }}
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+{{- end }}
+{{- with .Values.nodeSelector }}
+      nodeSelector:
+{{- toYaml . | nindent 8 }}
+{{- end }}
+{{- with .Values.podSecurityContext }}
+      securityContext:
+{{- toYaml . | nindent 8 }}
+{{- end }}
+{{- with .Values.initContainers }}
+      initContainers:
+{{- toYaml . | nindent 8 }}
+{{- end }}
+      containers:
+        - name: {{ include "base-app.name" . }}
+          image: "{{ .Values.image.repository }}:{{ default "latest" .Values.image.tag }}"
+          imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
+{{- with .Values.command }}
+          command:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.args }}
+          args:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.env }}
+          env:
+{{- range $name, $value := . }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+{{- end }}
+{{- end }}
+{{- with .Values.envFrom }}
+          envFrom:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- if .Values.ports }}
+          ports:
+{{- range .Values.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .containerPort }}
+              protocol: {{ default "TCP" .protocol }}
+{{- end }}
+{{- end }}
+{{- with .Values.securityContext }}
+          securityContext:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.resources }}
+          resources:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.startupProbe }}
+          startupProbe:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.readinessProbe }}
+          readinessProbe:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.livenessProbe }}
+          livenessProbe:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.volumeMounts }}
+          volumeMounts:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+{{- with .Values.sidecars }}
+{{- toYaml . | nindent 8 }}
+{{- end }}
+{{- with .Values.volumes }}
+      volumes:
+{{- toYaml . | nindent 8 }}
+{{- end }}

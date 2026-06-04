@@ -1,0 +1,115 @@
+workload:
+  kind: StatefulSet
+
+image:
+  repository: minio/minio
+  tag: latest
+
+nodeSelector:
+  node-pool: shared
+
+command: ["/bin/sh", "-c"]
+args:
+  - |
+    until [ -s /vault/secrets/MINIO_ROOT_USER ] && [ -s /vault/secrets/MINIO_ROOT_PASSWORD ]; do
+      echo 'Waiting for Vault Agent to write MinIO secrets...';
+      sleep 1;
+    done;
+    exec minio server /data --console-address ':9001'
+
+env:
+  MINIO_ROOT_USER_FILE: /vault/secrets/MINIO_ROOT_USER
+  MINIO_ROOT_PASSWORD_FILE: /vault/secrets/MINIO_ROOT_PASSWORD
+  MINIO_API_CORS_ALLOW_ORIGIN: "*"
+
+configMaps:
+  - name: minio-vault-agent-config
+    data:
+      agent-config.hcl: |-
+        exit_after_auth = false
+        pid_file = "/tmp/vault-agent-pid"
+
+        auto_auth {
+          method "approle" {
+            config = {
+              role_id_file_path = "/etc/vault/agent_ids/role-id"
+              secret_id_file_path = "/etc/vault/agent_ids/secret-id"
+              remove_secret_id_file_after_reading = false
+            }
+          }
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.minio_root_user }}{{ end }}"
+          destination = "/vault/secrets/MINIO_ROOT_USER"
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.minio_root_password }}{{ end }}"
+          destination = "/vault/secrets/MINIO_ROOT_PASSWORD"
+        }
+
+ports:
+  - name: api
+    containerPort: 9000
+  - name: console
+    containerPort: 9001
+
+service:
+  enabled: true
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+
+persistence:
+  - name: minio-data
+    enabled: true
+    size: 10Gi
+
+volumeMounts:
+  - name: minio-data
+    mountPath: /data
+  - name: vault-secrets
+    mountPath: /vault/secrets
+    readOnly: true
+
+volumes:
+  - name: minio-data
+    persistentVolumeClaim:
+      claimName: minio-data
+  - name: vault-secrets
+    emptyDir:
+      medium: Memory
+  - name: vault-agent-config
+    configMap:
+      name: minio-vault-agent-config
+  - name: vault-agent-ids
+    secret:
+      secretName: vault-agent-user-approle
+
+sidecars:
+  - name: vault-agent
+    image: hashicorp/vault:1.13.3
+    env:
+      - name: VAULT_ADDR
+        value: http://vault.atfq-data.svc.cluster.local:8200
+    command: ["vault", "agent", "-config=/etc/vault/agent-config.hcl"]
+    volumeMounts:
+      - name: vault-agent-config
+        mountPath: /etc/vault/agent-config.hcl
+        subPath: agent-config.hcl
+      - name: vault-agent-ids
+        mountPath: /etc/vault/agent_ids
+        readOnly: true
+      - name: vault-secrets
+        mountPath: /vault/secrets
+
+readinessProbe:
+  tcpSocket:
+    port: api
+  initialDelaySeconds: 10
+  periodSeconds: 10

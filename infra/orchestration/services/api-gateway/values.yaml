@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/moha-bekh/atfq-prototype-auth
+  repository: ghcr.io/moha-bekh/atfq-prototype-api-gateway
   tag: latest
 
 imagePullSecrets:
@@ -18,38 +18,28 @@ securityContext:
     drop: ["ALL"]
 
 ports:
-  - name: grpc
+  - name: http
     containerPort: 8080
-  - name: metrics
-    containerPort: 9091
 
 service:
   enabled: true
   ports:
-    - name: grpc
+    - name: http
       port: 8080
-      targetPort: grpc
-    - name: metrics
-      port: 9091
-      targetPort: metrics
+      targetPort: http
 
 env:
-  REDIS_URL: "redis://redis-auth.atfq-data.svc.cluster.local:6379"
-  METRICS_ADDR: "0.0.0.0:9091"
-  USER_SERVICE_ADDR: "http://user.atfq-apps.svc.cluster.local:8080"
   STARTUP_MAX_RETRIES: "90"
-  APP_PUBLIC_URL: "https://atfq.org"
-  SMTP_HOST: "mailpit.atfq-tools.svc.cluster.local"
-  SMTP_PORT: "1025"
-  SMTP_TLS: "false"
-  SMTP_FROM: "ATFQ <noreply@atfq.org>"
+  AUTH_SERVICE_URL: "http://auth.atfq-apps.svc.cluster.local:8080"
+  USER_SERVICE_URL: "http://user.atfq-apps.svc.cluster.local:8080"
+  WIKI_SERVICE_URL: "http://wiki.atfq-apps.svc.cluster.local:8080"
 
 envFrom:
   - secretRef:
-      name: auth-runtime-env
+      name: api-gateway-runtime-env
 
 configMaps:
-  - name: auth-vault-agent-config
+  - name: api-gateway-vault-agent-config
     data:
       agent-config.hcl: |-
         exit_after_auth = false
@@ -73,37 +63,14 @@ configMaps:
 
         template {
           contents = <<EOH
-        {{ with secret "secret/data/auth" }}
-        DATABASE_URL="postgresql://{{ .Data.data.db_user }}:{{ .Data.data.db_password }}@db-auth.atfq-data.svc.cluster.local:5432/{{ .Data.data.db_name }}"
+        {{ with secret "secret/data/api-gateway" }}
         SERVER_ADDR="{{ .Data.data.server_addr }}"
         JWT_SECRET="{{ .Data.data.jwt_secret }}"
-        CHA_CHA_KEY="{{ .Data.data.cha_cha_key }}"
-        GOOGLE_CLIENT_ID="{{ .Data.data.google_client_id }}"
-        GOOGLE_CLIENT_SECRET="{{ .Data.data.google_client_secret }}"
-        GOOGLE_REDIRECT_URL="{{ .Data.data.google_redirect_url }}"
-        GITHUB_CLIENT_ID="{{ .Data.data.github_client_id }}"
-        GITHUB_CLIENT_SECRET="{{ .Data.data.github_client_secret }}"
-        GITHUB_REDIRECT_URL="{{ .Data.data.github_redirect_url }}"
-        SMTP_USERNAME="{{ .Data.data.smtp_username }}"
-        SMTP_PASSWORD="{{ .Data.data.smtp_password }}"
+        AUTH_DATABASE_URL="postgresql://{{ .Data.data.auth_db_user }}:{{ .Data.data.auth_db_password }}@db-auth.atfq-data.svc.cluster.local:5432/{{ .Data.data.auth_db_name }}"
+        USER_DATABASE_URL="postgresql://{{ .Data.data.user_db_user }}:{{ .Data.data.user_db_password }}@db-user.atfq-data.svc.cluster.local:5432/{{ .Data.data.user_db_name }}"
         {{ end }}
         EOH
           destination = "/vault/secrets/.env"
-        }
-
-        template {
-          contents = "{{ with secret \"secret/data/auth\" }}{{ .Data.data.db_user }}{{ end }}"
-          destination = "/vault/secrets/POSTGRES_USER"
-        }
-
-        template {
-          contents = "{{ with secret \"secret/data/auth\" }}{{ .Data.data.db_password }}{{ end }}"
-          destination = "/vault/secrets/POSTGRES_PASSWORD"
-        }
-
-        template {
-          contents = "{{ with secret \"secret/data/auth\" }}{{ .Data.data.db_name }}{{ end }}"
-          destination = "/vault/secrets/POSTGRES_DB"
         }
 
 volumeMounts:
@@ -117,10 +84,10 @@ volumes:
       medium: Memory
   - name: vault-agent-config
     configMap:
-      name: auth-vault-agent-config
+      name: api-gateway-vault-agent-config
   - name: vault-agent-ids
     secret:
-      secretName: vault-agent-auth-approle
+      secretName: vault-agent-api-gateway-approle
 
 sidecars:
   - name: vault-agent
@@ -146,12 +113,12 @@ sidecars:
 
 readinessProbe:
   tcpSocket:
-    port: grpc
+    port: http
   initialDelaySeconds: 10
   periodSeconds: 10
 
 livenessProbe:
   tcpSocket:
-    port: grpc
+    port: http
   initialDelaySeconds: 30
   periodSeconds: 20

@@ -1,21 +1,133 @@
-repositories:
-  - name: ingress-nginx
-    url: https://kubernetes.github.io/ingress-nginx
-
 releases:
-
-  - name: ingress-nginx
-    namespace: ingress-nginx
+  - name: vault
+    namespace: atfq-data
     createNamespace: true
-    chart: ingress-nginx/ingress-nginx
+    chart: ../../charts/base-app
     values:
-      - controller:
-          kind: DaemonSet
-          hostNetwork: true
-          service:
-            type: ClusterIP
-          nodeSelector:
-            type: workload
+      - ../../services/vault/values.yaml
+
+  - name: redis-auth
+    namespace: atfq-data
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/redis-auth/values.yaml
+
+  - name: mailpit
+    namespace: atfq-tools
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/mailpit/values.yaml
+
+  - name: db-auth
+    namespace: atfq-data
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/db-auth/values.yaml
+
+  - name: db-user
+    namespace: atfq-data
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/db-user/values.yaml
+
+  - name: db-wiki
+    namespace: atfq-data
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/db-wiki/values.yaml
+
+  - name: minio
+    namespace: atfq-data
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/minio/values.yaml
+
+  - name: create-buckets
+    namespace: atfq-data
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/create-buckets/values.yaml
+
+  - name: auth
+    namespace: atfq-apps
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/auth/values.yaml
+
+  - name: user
+    namespace: atfq-apps
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/user/values.yaml
+
+  - name: wiki
+    namespace: atfq-apps
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/wiki/values.yaml
+
+  - name: api-gateway
+    namespace: atfq-apps
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/api-gateway/values.yaml
 
   - name: app-nginx
-    chart: ../../services/app-nginx
+    namespace: atfq-apps
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/app-nginx/values.yaml
+
+  - name: prometheus
+    namespace: atfq-observability
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/prometheus/values.yaml
+
+  - name: grafana
+    namespace: atfq-observability
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/grafana/values.yaml
+
+  - name: node-exporter
+    namespace: atfq-observability
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/node-exporter/values.yaml
+
+  - name: cadvisor
+    namespace: atfq-observability
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/cadvisor/values.yaml
+
+  - name: process-exporter
+    namespace: atfq-observability
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/process-exporter/values.yaml
+
+  - name: net-gateway
+    namespace: atfq-edge
+    createNamespace: true
+    chart: ../../charts/base-app
+    values:
+      - ../../services/net-gateway/values.yaml

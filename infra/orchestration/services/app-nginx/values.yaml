@@ -1,14 +1,47 @@
-base-app:
-  image:
-    repository: bitnami/nginx
-    tag: latest
-  nodeSelector:
-    type: workload
-  service:
-    targetPort: 8080
-  nginxTmpEnabled: true
-  securityContext:
-    runAsUser: 1001
-  ingress:
-    enabled: true
-    host: atfq.org
+image:
+  repository: ghcr.io/moha-bekh/atfq-prototype-app
+  tag: latest
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+nodeSelector:
+  node-pool: workload
+
+podSecurityContext:
+  runAsUser: 101
+  runAsGroup: 101
+  runAsNonRoot: true
+  fsGroup: 101
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+ports:
+  - name: http
+    containerPort: 8080
+
+service:
+  enabled: true
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+
+env:
+  VITE_ENABLE_MOCKS: "false"
+  VITE_API_URL: "/api/v1"
+
+readinessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+livenessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20

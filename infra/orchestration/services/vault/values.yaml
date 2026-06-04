@@ -1,0 +1,83 @@
+workload:
+  kind: StatefulSet
+
+image:
+  repository: hashicorp/vault
+  tag: 1.13.3
+
+nodeSelector:
+  node-pool: shared
+
+podSecurityContext:
+  runAsUser: 100
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    add: ["IPC_LOCK"]
+
+command: ["vault", "server", "-config=/vault/config/vault.hcl"]
+
+env:
+  SKIP_SETCAP: "true"
+  VAULT_ADDR: "http://0.0.0.0:8200"
+  VAULT_API_ADDR: "http://vault.atfq-data.svc.cluster.local:8200"
+
+ports:
+  - name: http
+    containerPort: 8200
+
+service:
+  enabled: true
+  ports:
+    - name: http
+      port: 8200
+      targetPort: http
+
+configMaps:
+  - name: vault-config
+    data:
+      vault.hcl: |-
+        storage "file" {
+          path = "/vault/data"
+          node_id = "node1"
+        }
+
+        listener "tcp" {
+          address     = "0.0.0.0:8200"
+          tls_disable = 1
+        }
+
+        disable_mlock = true
+        ui = true
+        api_addr = "http://vault.atfq-data.svc.cluster.local:8200"
+        cluster_addr = "http://vault.atfq-data.svc.cluster.local:8201"
+
+persistence:
+  - name: vault-data
+    enabled: true
+    size: 5Gi
+
+volumeMounts:
+  - name: vault-config
+    mountPath: /vault/config/vault.hcl
+    subPath: vault.hcl
+    readOnly: true
+  - name: vault-data
+    mountPath: /vault/data
+
+volumes:
+  - name: vault-config
+    configMap:
+      name: vault-config
+  - name: vault-data
+    persistentVolumeClaim:
+      claimName: vault-data
+
+readinessProbe:
+  httpGet:
+    path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10

@@ -1,0 +1,61 @@
+workload:
+  kind: DaemonSet
+
+automountServiceAccountToken: false
+
+image:
+  repository: gcr.io/cadvisor/cadvisor
+  tag: v0.49.1
+
+nodeSelector:
+  node-class: worker
+
+securityContext:
+  privileged: true
+
+command:
+  - /usr/bin/cadvisor
+  - --docker_only=true
+  - --housekeeping_interval=10s
+  - --disable_metrics=disk,diskIO,tcp,udp,percpu,sched
+  - --store_container_labels=true
+  - --whitelisted_container_labels=io.kubernetes.container.name,io.kubernetes.pod.name,io.kubernetes.pod.namespace,com.docker.compose.project,com.docker.compose.service
+
+ports:
+  - name: metrics
+    containerPort: 8080
+
+service:
+  enabled: true
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+
+volumeMounts:
+  - name: rootfs
+    mountPath: /rootfs
+    readOnly: true
+  - name: var-run
+    mountPath: /var/run
+    readOnly: true
+  - name: sys
+    mountPath: /sys
+    readOnly: true
+  - name: docker
+    mountPath: /var/lib/docker
+    readOnly: true
+
+volumes:
+  - name: rootfs
+    hostPath:
+      path: /
+  - name: var-run
+    hostPath:
+      path: /var/run
+  - name: sys
+    hostPath:
+      path: /sys
+  - name: docker
+    hostPath:
+      path: /var/lib/docker

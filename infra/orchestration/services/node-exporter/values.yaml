@@ -1,0 +1,20 @@
+workload:
+  kind: DaemonSet
+
+nodeSelector:
+  node-class: worker
+
+image:
+  repository: prom/node-exporter
+  tag: v1.8.2
+
+ports:
+  - name: metrics
+    containerPort: 9100
+
+service:
+  enabled: true
+  ports:
+    - name: metrics
+      port: 9100
+      targetPort: metrics

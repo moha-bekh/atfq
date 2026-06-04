@@ -1,0 +1,93 @@
+workload:
+  kind: Job
+  backoffLimit: 12
+  restartPolicy: OnFailure
+
+image:
+  repository: minio/mc
+  tag: latest
+
+nodeSelector:
+  node-pool: shared
+
+configMaps:
+  - name: create-buckets-vault-agent-config
+    data:
+      agent-config.hcl: |-
+        exit_after_auth = true
+        pid_file = "/tmp/vault-agent-pid"
+
+        auto_auth {
+          method "approle" {
+            config = {
+              role_id_file_path = "/etc/vault/agent_ids/role-id"
+              secret_id_file_path = "/etc/vault/agent_ids/secret-id"
+              remove_secret_id_file_after_reading = false
+            }
+          }
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.minio_root_user }}{{ end }}"
+          destination = "/vault/secrets/MINIO_ROOT_USER"
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.minio_root_password }}{{ end }}"
+          destination = "/vault/secrets/MINIO_ROOT_PASSWORD"
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.s3_bucket }}{{ end }}"
+          destination = "/vault/secrets/S3_BUCKET"
+        }
+
+initContainers:
+  - name: vault-agent
+    image: hashicorp/vault:1.13.3
+    env:
+      - name: VAULT_ADDR
+        value: http://vault.atfq-data.svc.cluster.local:8200
+    command: ["vault", "agent", "-config=/etc/vault/agent-config.hcl"]
+    volumeMounts:
+      - name: vault-agent-config
+        mountPath: /etc/vault/agent-config.hcl
+        subPath: agent-config.hcl
+      - name: vault-agent-ids
+        mountPath: /etc/vault/agent_ids
+        readOnly: true
+      - name: vault-secrets
+        mountPath: /vault/secrets
+
+command: ["/bin/sh", "-c"]
+args:
+  - |
+    until [ -s /vault/secrets/MINIO_ROOT_USER ] && [ -s /vault/secrets/MINIO_ROOT_PASSWORD ] && [ -s /vault/secrets/S3_BUCKET ]; do
+      echo 'Waiting for Vault Agent to write MinIO bucket secrets...';
+      sleep 1;
+    done;
+    until /usr/bin/mc alias set myminio http://minio.atfq-data.svc.cluster.local:9000 "$(cat /vault/secrets/MINIO_ROOT_USER)" "$(cat /vault/secrets/MINIO_ROOT_PASSWORD)"; do
+      echo 'Waiting for MinIO...';
+      sleep 2;
+    done;
+    /usr/bin/mc mb "myminio/$(cat /vault/secrets/S3_BUCKET)" || echo 'Bucket already exists';
+    /usr/bin/mc anonymous set public "myminio/$(cat /vault/secrets/S3_BUCKET)";
+
+service:
+  enabled: false
+
+volumeMounts:
+  - name: vault-secrets
+    mountPath: /vault/secrets
+    readOnly: true
+
+volumes:
+  - name: vault-secrets
+    emptyDir:
+      medium: Memory
+  - name: vault-agent-config
+    configMap:
+      name: create-buckets-vault-agent-config
+  - name: vault-agent-ids
+    secret:
+      secretName: vault-agent-user-approle

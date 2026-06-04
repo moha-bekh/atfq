@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/moha-bekh/atfq-prototype-auth
+  repository: ghcr.io/moha-bekh/atfq-prototype-wiki
   tag: latest
 
 imagePullSecrets:
@@ -34,22 +34,14 @@ service:
       targetPort: metrics
 
 env:
-  REDIS_URL: "redis://redis-auth.atfq-data.svc.cluster.local:6379"
   METRICS_ADDR: "0.0.0.0:9091"
-  USER_SERVICE_ADDR: "http://user.atfq-apps.svc.cluster.local:8080"
-  STARTUP_MAX_RETRIES: "90"
-  APP_PUBLIC_URL: "https://atfq.org"
-  SMTP_HOST: "mailpit.atfq-tools.svc.cluster.local"
-  SMTP_PORT: "1025"
-  SMTP_TLS: "false"
-  SMTP_FROM: "ATFQ <noreply@atfq.org>"
 
 envFrom:
   - secretRef:
-      name: auth-runtime-env
+      name: wiki-runtime-env
 
 configMaps:
-  - name: auth-vault-agent-config
+  - name: wiki-vault-agent-config
     data:
       agent-config.hcl: |-
         exit_after_auth = false
@@ -73,36 +65,26 @@ configMaps:
 
         template {
           contents = <<EOH
-        {{ with secret "secret/data/auth" }}
-        DATABASE_URL="postgresql://{{ .Data.data.db_user }}:{{ .Data.data.db_password }}@db-auth.atfq-data.svc.cluster.local:5432/{{ .Data.data.db_name }}"
-        SERVER_ADDR="{{ .Data.data.server_addr }}"
-        JWT_SECRET="{{ .Data.data.jwt_secret }}"
-        CHA_CHA_KEY="{{ .Data.data.cha_cha_key }}"
-        GOOGLE_CLIENT_ID="{{ .Data.data.google_client_id }}"
-        GOOGLE_CLIENT_SECRET="{{ .Data.data.google_client_secret }}"
-        GOOGLE_REDIRECT_URL="{{ .Data.data.google_redirect_url }}"
-        GITHUB_CLIENT_ID="{{ .Data.data.github_client_id }}"
-        GITHUB_CLIENT_SECRET="{{ .Data.data.github_client_secret }}"
-        GITHUB_REDIRECT_URL="{{ .Data.data.github_redirect_url }}"
-        SMTP_USERNAME="{{ .Data.data.smtp_username }}"
-        SMTP_PASSWORD="{{ .Data.data.smtp_password }}"
+        {{ with secret "secret/data/wiki" }}
+        DATABASE_URL="postgresql://{{ .Data.data.db_user }}:{{ .Data.data.db_password }}@db-wiki.atfq-data.svc.cluster.local:5432/{{ .Data.data.db_name }}"
+        METRICS_ADDR="{{ .Data.data.metrics_addr }}"
         {{ end }}
         EOH
           destination = "/vault/secrets/.env"
         }
 
         template {
-          contents = "{{ with secret \"secret/data/auth\" }}{{ .Data.data.db_user }}{{ end }}"
+          contents = "{{ with secret \"secret/data/wiki\" }}{{ .Data.data.db_user }}{{ end }}"
           destination = "/vault/secrets/POSTGRES_USER"
         }
 
         template {
-          contents = "{{ with secret \"secret/data/auth\" }}{{ .Data.data.db_password }}{{ end }}"
+          contents = "{{ with secret \"secret/data/wiki\" }}{{ .Data.data.db_password }}{{ end }}"
           destination = "/vault/secrets/POSTGRES_PASSWORD"
         }
 
         template {
-          contents = "{{ with secret \"secret/data/auth\" }}{{ .Data.data.db_name }}{{ end }}"
+          contents = "{{ with secret \"secret/data/wiki\" }}{{ .Data.data.db_name }}{{ end }}"
           destination = "/vault/secrets/POSTGRES_DB"
         }
 
@@ -117,10 +99,10 @@ volumes:
       medium: Memory
   - name: vault-agent-config
     configMap:
-      name: auth-vault-agent-config
+      name: wiki-vault-agent-config
   - name: vault-agent-ids
     secret:
-      secretName: vault-agent-auth-approle
+      secretName: vault-agent-wiki-approle
 
 sidecars:
   - name: vault-agent

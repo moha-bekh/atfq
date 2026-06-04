@@ -1,11 +1,19 @@
+{{- if .Values.service.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ default (include "base-app.name" .) .Values.service.name }}
+  labels:
+{{ include "base-app.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ default "ClusterIP" .Values.service.type }}
   ports:
-    - port: 80
-      targetPort: {{ .Values.service.targetPort }}
+{{- range .Values.service.ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ default .port .targetPort }}
+      protocol: {{ default "TCP" .protocol }}
+{{- end }}
   selector:
-    app: {{ .Release.Name }}
+{{ include "base-app.selectorLabels" . | nindent 4 }}
+{{- end }}

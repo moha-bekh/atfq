@@ -1,0 +1,115 @@
+workload:
+  kind: StatefulSet
+
+image:
+  repository: postgres
+  tag: 16-alpine
+
+nodeSelector:
+  node-pool: shared
+
+ports:
+  - name: postgres
+    containerPort: 5432
+
+service:
+  enabled: true
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+
+env:
+  POSTGRES_USER_FILE: /vault/secrets/POSTGRES_USER
+  POSTGRES_PASSWORD_FILE: /vault/secrets/POSTGRES_PASSWORD
+  POSTGRES_DB_FILE: /vault/secrets/POSTGRES_DB
+
+configMaps:
+  - name: db-user-vault-agent-config
+    data:
+      agent-config.hcl: |-
+        exit_after_auth = false
+        pid_file = "/tmp/vault-agent-pid"
+
+        auto_auth {
+          method "approle" {
+            config = {
+              role_id_file_path = "/etc/vault/agent_ids/role-id"
+              secret_id_file_path = "/etc/vault/agent_ids/secret-id"
+              remove_secret_id_file_after_reading = false
+            }
+          }
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.db_user }}{{ end }}"
+          destination = "/vault/secrets/POSTGRES_USER"
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.db_password }}{{ end }}"
+          destination = "/vault/secrets/POSTGRES_PASSWORD"
+        }
+
+        template {
+          contents = "{{ with secret \"secret/data/user\" }}{{ .Data.data.db_name }}{{ end }}"
+          destination = "/vault/secrets/POSTGRES_DB"
+        }
+
+command: ["/bin/sh", "-c"]
+args:
+  - |
+    until [ -s /vault/secrets/POSTGRES_PASSWORD ]; do
+      echo 'Waiting for Vault Agent to write secrets...';
+      sleep 1;
+    done;
+    exec docker-entrypoint.sh postgres
+
+persistence:
+  - name: db-user-data
+    enabled: true
+    size: 5Gi
+
+volumeMounts:
+  - name: db-user-data
+    mountPath: /var/lib/postgresql/data
+  - name: vault-secrets
+    mountPath: /vault/secrets
+    readOnly: true
+
+volumes:
+  - name: db-user-data
+    persistentVolumeClaim:
+      claimName: db-user-data
+  - name: vault-secrets
+    emptyDir:
+      medium: Memory
+  - name: vault-agent-config
+    configMap:
+      name: db-user-vault-agent-config
+  - name: vault-agent-ids
+    secret:
+      secretName: vault-agent-user-approle
+
+sidecars:
+  - name: vault-agent
+    image: hashicorp/vault:1.13.3
+    env:
+      - name: VAULT_ADDR
+        value: http://vault.atfq-data.svc.cluster.local:8200
+    command: ["vault", "agent", "-config=/etc/vault/agent-config.hcl"]
+    volumeMounts:
+      - name: vault-agent-config
+        mountPath: /etc/vault/agent-config.hcl
+        subPath: agent-config.hcl
+      - name: vault-agent-ids
+        mountPath: /etc/vault/agent_ids
+        readOnly: true
+      - name: vault-secrets
+        mountPath: /vault/secrets
+
+readinessProbe:
+  exec:
+    command: ["sh", "-c", "pg_isready -U $(cat /vault/secrets/POSTGRES_USER) -d $(cat /vault/secrets/POSTGRES_DB)"]
+  initialDelaySeconds: 10
+  periodSeconds: 10

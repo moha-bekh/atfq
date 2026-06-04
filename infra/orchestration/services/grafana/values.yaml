@@ -1,0 +1,45 @@
+image:
+  repository: grafana/grafana
+  tag: 11.3.1
+
+nodeSelector:
+  node-pool: shared
+
+env:
+  GF_SECURITY_ADMIN_USER: admin
+  GF_SECURITY_ADMIN_PASSWORD: admin
+  GF_USERS_ALLOW_SIGN_UP: "false"
+  GF_SERVER_ROOT_URL: "https://atfq.org/grafana/"
+  GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+
+ports:
+  - name: http
+    containerPort: 3000
+
+service:
+  enabled: true
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+
+persistence:
+  - name: grafana-data
+    enabled: true
+    size: 2Gi
+
+volumeMounts:
+  - name: grafana-data
+    mountPath: /var/lib/grafana
+
+volumes:
+  - name: grafana-data
+    persistentVolumeClaim:
+      claimName: grafana-data
+
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 10
