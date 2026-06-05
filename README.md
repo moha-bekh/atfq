@@ -12,9 +12,21 @@ The project was built as a full-stack product rather than a simple school exerci
 
 ## Why This Project Exists
 
-Computer science documentation is often fragmented: articles explain concepts, courses ask questions, and communities discuss practical tradeoffs, but they rarely connect those pieces cleanly.
+ATFQ started from a real personal problem.
 
-ATFQ is built around one idea: learning starts with asking better questions. The platform organizes knowledge into articles, sub-articles, notions, essential questions, and resources, then lets contributors propose changes through a moderated workflow.
+I have always learned programming by deep diving: not only asking how something works, but why it exists, what came before it, and how the idea evolved from earlier work. Computer science makes more sense to me when it is connected back to its roots: Claude Shannon, information theory, early hardware, operating systems, networks, programming languages, and the long chain of ideas that led to modern software. Reading books like *Code: The Hidden Language of Computer Hardware and Software* reinforced that habit: every concept is easier to understand when it is placed in a wider story.
+
+Over time, I realized that curiosity also has a cost. I could explore a subject deeply, take notes, try to connect everything, and still forget important details later. I tried tools like Notion and Obsidian, but no personal note system can capture the whole internet or keep up with how fast technical knowledge changes.
+
+I also wanted to share what I was learning: help people, teach, explain, and give self-taught developers a clearer path. But I kept running into the same question: how do I know what I know? The answer was simple: because I ask questions. I ask what something is, why it exists, how it works, what problem it solves, what came before it, what tradeoffs it introduces, and what to learn next.
+
+ATFQ is built around that idea: instead of only exposing knowledge, expose the right questions to ask. In that sense, the core product idea is a **CSFAQ**: a computer science knowledge base where each concept starts with the questions someone should ask to truly understand it.
+
+The project imagines a collaborative computer science roadmap where every domain, language, tool, and concept can be broken down into questions, notions, articles, and resources. It is close to a specialized Wikipedia for computer science, but with a stronger learning direction: a place where contributors can share knowledge, discuss, review content, and help build a path from the history of computing to current technologies.
+
+The goal is to help people who want to understand deeply, especially self-taught learners who do not want to be lost, skip foundations, or simply miss the existence of important concepts. ATFQ is for anyone who learns by asking, and for anyone who wants to help others ask better questions.
+
+This repository is also a proof of concept and an engineering showcase. I intentionally built it as a full-stack, production-style system to demonstrate product thinking, architecture, infrastructure, security, and delivery skills. If I were rebuilding ATFQ as a real long-term public product, I would simplify the architecture and make more conservative technical decisions from the start.
 
 ## My Role
 
