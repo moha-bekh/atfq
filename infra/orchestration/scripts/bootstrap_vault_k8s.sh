@@ -18,7 +18,7 @@ vault_cmd() {
 
 wait_for_vault() {
   i=0
-  until kubectl_cmd -n "$DATA_NAMESPACE" exec "$VAULT_POD" -- sh -c 'vault status -format=json >/tmp/vault-status.json; cat /tmp/vault-status.json' >/tmp/atfq-vault-status.json 2>/dev/null; do
+  until kubectl_cmd -n "$DATA_NAMESPACE" exec "$VAULT_POD" -- sh -c 'vault status -format=json >/tmp/vault-status.json || true; cat /tmp/vault-status.json' >/tmp/atfq-vault-status.json 2>/dev/null; do
     i=$((i + 1))
     if [ "$i" -gt 60 ]; then
       echo "Vault pod is not responding to vault status."
