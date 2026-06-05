@@ -44,6 +44,7 @@ export function Footer() {
 
         {/* CENTER: LEGAL LINKS */}
         <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-sub">
+          <Link to="/about" className="transition-colors hover:text-main">About</Link>
           <Link to="/terms" className="transition-colors hover:text-main">Terms</Link>
           <Link to="/privacy" className="transition-colors hover:text-main">Privacy</Link>
         </div>

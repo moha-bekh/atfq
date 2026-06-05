@@ -4,6 +4,7 @@ import { AuthLayout } from "@/components/layout/AuthLayout";
 import { ProtectedRoute } from "@/features/auth/components/ProtectedRoute";
 import { authRoutes } from "./auth/auth.routes";
 import { Home } from "@/pages/Home";
+import { About } from "@/pages/About";
 import ProfilePage from "@/pages/user/Profile";
 import DashboardPage from "@/pages/admin/Dashboard";
 import WikiPage from "@/features/wiki/pages/WikiPage";
@@ -16,6 +17,7 @@ export function AppRouter() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
           <Route path="/wiki" element={<WikiPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
