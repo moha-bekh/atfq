@@ -20,6 +20,8 @@ impl IntoResponse for AppError {
                     Code::AlreadyExists => StatusCode::CONFLICT,
                     Code::NotFound => StatusCode::NOT_FOUND,
                     Code::FailedPrecondition => StatusCode::BAD_REQUEST,
+                    Code::DeadlineExceeded => StatusCode::GATEWAY_TIMEOUT,
+                    Code::Unavailable => StatusCode::BAD_GATEWAY,
                     _ => StatusCode::INTERNAL_SERVER_ERROR,
                 };
                 (code, status.message().to_string())

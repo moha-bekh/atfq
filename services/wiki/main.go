@@ -73,6 +73,20 @@ func getPort() int {
 	return 8080
 }
 
+func intEnv(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+
+	var parsed int
+	if _, err := fmt.Sscanf(value, "%d", &parsed); err != nil || parsed <= 0 {
+		return fallback
+	}
+
+	return parsed
+}
+
 // wikiServer is defined here so all files in 'package main' can see it.
 // Its methods (the gRPC handlers) will live in handlers.go
 type wikiServer struct {
@@ -95,9 +109,9 @@ func main() {
 	defer db.Close()
 
 	// Configure connection pooling (keeps the DB healthy under load)
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxOpenConns(intEnv("WIKI_DB_MAX_OPEN_CONNS", 10))
+	db.SetMaxIdleConns(intEnv("WIKI_DB_MAX_IDLE_CONNS", 10))
+	db.SetConnMaxLifetime(time.Duration(intEnv("WIKI_DB_CONN_MAX_LIFETIME_SECS", 300)) * time.Second)
 
 	log.Println("Database connection established")
 	startMetricsServer("wiki", startedAt)

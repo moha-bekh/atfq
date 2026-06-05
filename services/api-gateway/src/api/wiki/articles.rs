@@ -9,7 +9,7 @@ use axum::{
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde::Deserialize;
 use sqlx::Row;
-use std::sync::Arc;
+use std::{env, sync::Arc, time::Duration};
 use tonic::metadata::MetadataValue;
 
 const RESOURCES_MARKER: &str = "\n\n<!-- ATFQ_RESOURCES:";
@@ -39,6 +39,16 @@ fn legacy_wiki_user_id(user_id: &str) -> i32 {
         .take(7)
         .collect();
     i32::from_str_radix(&hex, 16).unwrap_or(1).max(1)
+}
+
+fn wiki_request<T>(message: T) -> tonic::Request<T> {
+    let timeout_secs = env::var("WIKI_GRPC_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(8);
+    let mut request = tonic::Request::new(message);
+    request.set_timeout(Duration::from_secs(timeout_secs));
+    request
 }
 
 fn current_user_id_from_headers(headers: &HeaderMap) -> Option<String> {
@@ -441,7 +451,7 @@ pub async fn get_root_articles_handler(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<GetRootArticlesResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let request = tonic::Request::new(crate::grpc::wiki::GetRootArticlesRequest {});
+    let request = wiki_request(crate::grpc::wiki::GetRootArticlesRequest {});
 
     let response = client.get_root_articles(request).await?.into_inner();
 
@@ -502,7 +512,7 @@ pub async fn create_article_handler(
         })
         .collect();
 
-    let mut request = tonic::Request::new(crate::grpc::wiki::CreateArticleRequest {
+    let mut request = wiki_request(crate::grpc::wiki::CreateArticleRequest {
         article_node,
         children,
     });
@@ -565,7 +575,7 @@ pub async fn create_node_handler(
     validate_create_node_payload(&payload)?;
 
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::CreateNodeRequest {
+    let mut request = wiki_request(crate::grpc::wiki::CreateNodeRequest {
         parent_id: payload.parent_id,
         r#type: payload.node_type as i32,
         title: payload.title,
@@ -599,7 +609,7 @@ pub async fn get_article_handler(
     Path(id): Path<i32>,
 ) -> Result<Json<ArticleResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::GetArticleRequest { id });
+    let mut request = wiki_request(crate::grpc::wiki::GetArticleRequest { id });
     add_auth_header(&mut request, &headers);
     let current_user_id = current_user_id_from_headers(&headers);
     if let Some(user_id) = current_user_id.as_deref() {
@@ -658,7 +668,7 @@ pub async fn update_node_handler(
     } else {
         payload.content
     };
-    let mut request = tonic::Request::new(crate::grpc::wiki::UpdateNodeRequest {
+    let mut request = wiki_request(crate::grpc::wiki::UpdateNodeRequest {
         node_id: payload.node_id,
         title: payload.title,
         content,
@@ -701,17 +711,18 @@ pub async fn delete_node_handler(
 
     if mode == "reassign_children" {
         let response = client
-            .get_article(tonic::Request::new(crate::grpc::wiki::GetArticleRequest {
-                id,
-            }))
+            .get_article(wiki_request(crate::grpc::wiki::GetArticleRequest { id }))
             .await?
             .into_inner();
-        let fallback_parent = response.article_node.and_then(|node| node.parent_id).unwrap_or(0);
+        let fallback_parent = response
+            .article_node
+            .and_then(|node| node.parent_id)
+            .unwrap_or(0);
         let new_parent = query.new_parent.unwrap_or(fallback_parent);
 
         for child in response.sub_articles {
             client
-                .assign_parent(tonic::Request::new(crate::grpc::wiki::AssignParentRequest {
+                .assign_parent(wiki_request(crate::grpc::wiki::AssignParentRequest {
                     new_parent,
                     child: child.id,
                 }))
@@ -723,7 +734,7 @@ pub async fn delete_node_handler(
         )));
     }
 
-    let mut request = tonic::Request::new(crate::grpc::wiki::DeleteNodeRequest { node_id: id });
+    let mut request = wiki_request(crate::grpc::wiki::DeleteNodeRequest { node_id: id });
     add_required_auth_header(&mut request, &headers)?;
 
     let response = client.delete_node(request).await?.into_inner();
@@ -754,7 +765,7 @@ pub async fn assign_parent_handler(
     require_wiki_admin(&state, &user_id).await?;
 
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::AssignParentRequest {
+    let mut request = wiki_request(crate::grpc::wiki::AssignParentRequest {
         new_parent: payload.new_parent,
         child: payload.child,
     });
@@ -784,7 +795,7 @@ pub async fn get_history_handler(
     Path(id): Path<i32>,
 ) -> Result<Json<GetHistoryResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::GetHistoryRequest { node_id: id });
+    let mut request = wiki_request(crate::grpc::wiki::GetHistoryRequest { node_id: id });
     add_auth_header(&mut request, &headers);
 
     let response = client.get_history(request).await?.into_inner();
@@ -812,7 +823,7 @@ pub async fn get_pending_handler(
     Path(id): Path<i32>,
 ) -> Result<Json<PendingVersionsResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::GetPendingRequest { node_id: id });
+    let mut request = wiki_request(crate::grpc::wiki::GetPendingRequest { node_id: id });
     add_auth_header(&mut request, &headers);
 
     let response = client.get_pending(request).await?.into_inner();
@@ -836,7 +847,7 @@ pub async fn get_all_pending_handler(
     headers: HeaderMap,
 ) -> Result<Json<PendingVersionsResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::GetAllPendingRequest {});
+    let mut request = wiki_request(crate::grpc::wiki::GetAllPendingRequest {});
     add_auth_header(&mut request, &headers);
 
     let response = client.get_all_pending(request).await?.into_inner();
@@ -863,7 +874,7 @@ pub async fn approve_version_handler(
     Json(payload): Json<ModerateVersionRequest>,
 ) -> Result<Json<NodeResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::ModerateVersionRequest {
+    let mut request = wiki_request(crate::grpc::wiki::ModerateVersionRequest {
         version_id: payload.version_id,
     });
     add_required_auth_header(&mut request, &headers)?;
@@ -890,7 +901,7 @@ pub async fn reject_version_handler(
     Json(payload): Json<ModerateVersionRequest>,
 ) -> Result<Json<NodeResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::ModerateVersionRequest {
+    let mut request = wiki_request(crate::grpc::wiki::ModerateVersionRequest {
         version_id: payload.version_id,
     });
     add_required_auth_header(&mut request, &headers)?;
@@ -918,7 +929,7 @@ pub async fn search_articles_handler(
     Query(query): Query<SearchQuery>,
 ) -> Result<Json<SearchResponse>, AppError> {
     let mut client = state.wiki_client.clone();
-    let mut request = tonic::Request::new(crate::grpc::wiki::SearchRequest { query: query.q });
+    let mut request = wiki_request(crate::grpc::wiki::SearchRequest { query: query.q });
     add_auth_header(&mut request, &headers);
 
     let response = client.search_articles(request).await?.into_inner();

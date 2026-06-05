@@ -1230,8 +1230,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let s3_client = S3Client::from_conf(s3_config_builder);
 
+    let db_max_connections = env::var("USER_DB_MAX_CONNECTIONS")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(10);
+    let db_acquire_timeout_secs = env::var("USER_DB_ACQUIRE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(5);
+
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(db_max_connections)
+        .acquire_timeout(std::time::Duration::from_secs(db_acquire_timeout_secs))
         .connect(&db_url)
         .await?;
 
