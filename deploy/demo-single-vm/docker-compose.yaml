@@ -1,0 +1,232 @@
+name: atfq-demo
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+      api-gateway:
+        condition: service_started
+      minio:
+        condition: service_started
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - frontend
+      - backend
+
+  app:
+    build:
+      context: ../../services/app
+      dockerfile: Dockerfile
+      target: prod
+    restart: unless-stopped
+    environment:
+      VITE_ENABLE_MOCKS: "false"
+      VITE_API_URL: /api/v1
+    networks:
+      - frontend
+
+  api-gateway:
+    build:
+      context: ../../services/api-gateway
+      dockerfile: Dockerfile
+      target: prod
+    restart: unless-stopped
+    depends_on:
+      auth:
+        condition: service_started
+      user:
+        condition: service_started
+      wiki:
+        condition: service_started
+    environment:
+      SERVER_ADDR: 0.0.0.0:8080
+      STARTUP_MAX_RETRIES: ${STARTUP_MAX_RETRIES:-120}
+      AUTH_SERVICE_URL: http://auth:8080
+      USER_SERVICE_URL: http://user:8080
+      WIKI_SERVICE_URL: http://wiki:8080
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${AUTH_DB}
+      USER_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${USER_DB}
+      API_GATEWAY_DB_MAX_CONNECTIONS: ${API_GATEWAY_DB_MAX_CONNECTIONS:-5}
+    networks:
+      - frontend
+      - backend
+
+  auth:
+    build:
+      context: ../../services/auth
+      dockerfile: Dockerfile
+      target: prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-auth:
+        condition: service_started
+      user:
+        condition: service_started
+      mailpit:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${AUTH_DB}
+      SERVER_ADDR: 0.0.0.0:8080
+      REDIS_URL: redis://redis-auth:6379
+      USER_SERVICE_ADDR: http://user:8080
+      JWT_SECRET: ${JWT_SECRET}
+      CHA_CHA_KEY: ${CHA_CHA_KEY}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL}
+      STARTUP_MAX_RETRIES: ${STARTUP_MAX_RETRIES:-120}
+      AUTH_DB_MAX_CONNECTIONS: ${AUTH_DB_MAX_CONNECTIONS:-5}
+      METRICS_ADDR: 0.0.0.0:9091
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URL: ${GITHUB_REDIRECT_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_TLS: ${SMTP_TLS:-false}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM}
+    networks:
+      - backend
+
+  user:
+    build:
+      context: ../../services/user
+      dockerfile: Dockerfile
+      target: prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${USER_DB}
+      SERVER_ADDR: 0.0.0.0:8080
+      JWT_SECRET: ${JWT_SECRET}
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      USER_DB_MAX_CONNECTIONS: ${USER_DB_MAX_CONNECTIONS:-5}
+      METRICS_ADDR: 0.0.0.0:9091
+    networks:
+      - backend
+
+  wiki:
+    build:
+      context: ../../services/wiki
+      dockerfile: Dockerfile
+      target: prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${WIKI_DB}
+      PORT: 8080
+      METRICS_ADDR: 0.0.0.0:9091
+      WIKI_DB_MAX_OPEN_CONNS: ${WIKI_DB_MAX_OPEN_CONNS:-5}
+      WIKI_DB_MAX_IDLE_CONNS: ${WIKI_DB_MAX_IDLE_CONNS:-5}
+    networks:
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_DB}
+      AUTH_DB: ${AUTH_DB}
+      USER_DB: ${USER_DB}
+      WIKI_DB: ${WIKI_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/10-init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - backend
+
+  redis-auth:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do
+          sleep 2
+        done
+        mc mb --ignore-existing "local/$${S3_BUCKET}"
+        mc anonymous set download "local/$${S3_BUCKET}"
+    networks:
+      - backend
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    networks:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  frontend:
+  backend:

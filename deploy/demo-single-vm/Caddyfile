@@ -1,0 +1,23 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$DEMO_DOMAIN} {
+	encode zstd gzip
+
+	handle /ping {
+		respond "pong" 200
+	}
+
+	handle /api/* {
+		reverse_proxy api-gateway:8080
+	}
+
+	handle /profiles/* {
+		reverse_proxy minio:9000
+	}
+
+	handle {
+		reverse_proxy app:8080
+	}
+}
