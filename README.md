@@ -8,7 +8,7 @@
 
 The project was built as a full-stack product rather than a simple school exercise: frontend, API gateway, domain microservices, databases, object storage, secret management, monitoring, WAF, and Kubernetes deployment are all part of the same system.
 
-> Public demo / proof of concept: [https://atfq.org](https://atfq.org)
+> Public demo / proof of concept: [https://demo.atfq.org](https://demo.atfq.org)
 
 ## Why This Project Exists
 
@@ -161,12 +161,15 @@ The gateway exposes the public HTTP API consumed by the frontend. Internal servi
 
 ## Deployment
 
-The project was designed to be deployable in two modes:
+The project was designed to be deployable in three modes:
 
 - **Docker Compose** for end-to-end development and integration.
-- **Kubernetes** for the public demo infrastructure.
+- **Single-VM Docker Compose** for the public recruiter demo.
+- **Kubernetes** for the full production-style infrastructure.
 
-The live deployment runs container images published to GHCR and pulls them from Kubernetes. Application secrets are injected through Vault-backed flows rather than committed environment files.
+The live public demo runs at [https://demo.atfq.org](https://demo.atfq.org) on a cost-conscious single-VM Docker Compose stack. It pulls container images from GHCR and keeps runtime configuration in an ignored environment file on the VM.
+
+The Kubernetes infrastructure remains in the repository as the full production-style version of the system, with Vault-backed secret injection, orchestration values, monitoring, and WAF configuration.
 
 The repository intentionally does not include real runtime environment files or credentials. The public README focuses on the product, architecture, and engineering decisions rather than asking visitors to run the full infrastructure locally.
 
@@ -184,6 +187,9 @@ services/
 infra/
   iac/            Terraform infrastructure
   orchestration/  Kubernetes charts, values, and deployment tasks
+
+deploy/
+  demo-single-vm/ Low-cost public demo deployment
 
 docs/
   db-schema/      Database schema diagrams
