@@ -26,10 +26,7 @@ services:
       - backend
 
   app:
-    build:
-      context: ../../services/app
-      dockerfile: Dockerfile
-      target: prod
+    image: ${DEMO_IMAGE_PREFIX:-ghcr.io/moha-bekh/atfq-prototype}-app:${DEMO_IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       VITE_ENABLE_MOCKS: "false"
@@ -38,10 +35,7 @@ services:
       - frontend
 
   api-gateway:
-    build:
-      context: ../../services/api-gateway
-      dockerfile: Dockerfile
-      target: prod
+    image: ${DEMO_IMAGE_PREFIX:-ghcr.io/moha-bekh/atfq-prototype}-api-gateway:${DEMO_IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       auth:
@@ -65,10 +59,7 @@ services:
       - backend
 
   auth:
-    build:
-      context: ../../services/auth
-      dockerfile: Dockerfile
-      target: prod
+    image: ${DEMO_IMAGE_PREFIX:-ghcr.io/moha-bekh/atfq-prototype}-auth:${DEMO_IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -106,10 +97,7 @@ services:
       - backend
 
   user:
-    build:
-      context: ../../services/user
-      dockerfile: Dockerfile
-      target: prod
+    image: ${DEMO_IMAGE_PREFIX:-ghcr.io/moha-bekh/atfq-prototype}-user:${DEMO_IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -131,10 +119,7 @@ services:
       - backend
 
   wiki:
-    build:
-      context: ../../services/wiki
-      dockerfile: Dockerfile
-      target: prod
+    image: ${DEMO_IMAGE_PREFIX:-ghcr.io/moha-bekh/atfq-prototype}-wiki:${DEMO_IMAGE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres:

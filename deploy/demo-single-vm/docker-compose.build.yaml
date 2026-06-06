@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: ../../services/app
+      dockerfile: Dockerfile
+      target: prod
+
+  api-gateway:
+    build:
+      context: ../../services/api-gateway
+      dockerfile: Dockerfile
+      target: prod
+
+  auth:
+    build:
+      context: ../../services/auth
+      dockerfile: Dockerfile
+      target: prod
+
+  user:
+    build:
+      context: ../../services/user
+      dockerfile: Dockerfile
+      target: prod
+
+  wiki:
+    build:
+      context: ../../services/wiki
+      dockerfile: Dockerfile
+      target: prod

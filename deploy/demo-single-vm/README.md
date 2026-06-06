@@ -61,7 +61,8 @@ For a recruiter demo, `t3.small` is the conservative default.
 5. Start the demo.
 
    ```bash
-   docker compose up -d --build
+   docker compose pull
+   docker compose up -d
    ```
 
 6. Check status.
@@ -78,7 +79,8 @@ From the repo root on the VM:
 ```bash
 git pull
 cd deploy/demo-single-vm
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 ## Local smoke test
@@ -94,8 +96,18 @@ S3_PUBLIC_URL=https://localhost/profiles
 Then run:
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 curl -k https://localhost/ping
+```
+
+## Building images manually
+
+The VM should usually pull images from GHCR. If you explicitly want to build
+locally, use the build override:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.build.yaml build
+docker compose -f docker-compose.yaml -f docker-compose.build.yaml up -d
 ```
 
 ## Notes
