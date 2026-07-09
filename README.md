@@ -8,8 +8,6 @@
 
 The project was built as a full-stack product rather than a simple school exercise: frontend, API gateway, domain microservices, databases, object storage, secret management, monitoring, WAF, and Kubernetes deployment are all part of the same system.
 
-> Public demo / proof of concept: [https://demo.atfq.org](https://demo.atfq.org)
-
 ## Why This Project Exists
 
 ATFQ started from a real personal problem.
